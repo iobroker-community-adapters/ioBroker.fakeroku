@@ -25,7 +25,7 @@ States are automatically created when fakeRoku receives a key for the first time
 ## License
 The MIT License (MIT)
 
-Copyright (c) 2016 Pmant<patrickmo@gmx.de>
+Copyright (c) 2017 Pmant<patrickmo@gmx.de>
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
