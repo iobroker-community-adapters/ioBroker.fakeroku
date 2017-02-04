@@ -1,28 +1,3 @@
-![Logo](admin/fakeroku.png)
-# ioBroker.fakeroku
-=================
-This ioBroker Adapter emulates a Roku and it's only purpose is to connect ioBroker to Logitech Harmony Hubs. 
-It may also work with other devices which can control a Roku.
-
-## Installation
-Intall Adapter in ioBroker Admin
-
-## Usage
-
-### Configuration in ioBroker Admin:
-- ***LAN-IP*** needs to be the network IP of your ioBroker device
-- ***Port*** a webserver will listen for key presses
-- ***Multicast IP*** only change this if you know what you are doing
-
-### States
-States are automatically created when fakeRoku receives a key for the first time.
-
-## Changelog
-
-### 0.1.0
-  (Pmant) initial release
-  
-## License
 The MIT License (MIT)
 
 Copyright (c) 2017 Pmant
