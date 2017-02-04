@@ -8,10 +8,14 @@ It may also work with other devices which can control a Roku.
 Intall Adapter in ioBroker Admin
 
 ## Usage
-Configure Adapter in ioBroker Admin:
+
+### Configuration in ioBroker Admin:
 - ***LAN-IP*** needs to be the network IP of your ioBroker device
 - ***Port*** a webserver will listen for key presses
 - ***Multicast IP*** only change this if you know what you are doing
+
+### States
+States are automatically created when fakeRoku receives a key for the first time.
 
 ## Changelog
 
