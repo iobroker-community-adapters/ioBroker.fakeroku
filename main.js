@@ -166,17 +166,17 @@ function startDiscovery() {
             if (msg.toString().match(/^(M-SEARCH) \* HTTP\/1.\d/)) {
                 var headers = httpHeaders(msg);
                 if (headers.man === '"ssdp:discover"') {
-                    adapter.log.debug("response sent to " + rinfo.address + ":" + rinfo.port);
-                    socket.send(SSDP_RESPONSE, rinfo.port, rinfo.address);
+                    adapter.log.debug("responding to " + rinfo.address + ":" + rinfo.port);
+                    socket.send(SSDP_RESPONSE, 0, SSDP_RESPONSE.length, rinfo.port, rinfo.address);
                 }
             } else if (msg.toString().match(/^(NOTIFY) \* HTTP\/1.\d/)) {
                 //@todo
             }
         }
     );
-    socket.bind(1900, BIND, function () {
+    socket.bind(1900, "0.0.0.0", function () {
         socket.addMembership(MULTICAST_IP);
-        adapter.log.debug("listening on " + BIND + ":1900");
+        adapter.log.debug("listening on 0.0.0.0:1900");
     });
 }
 
