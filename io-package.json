@@ -2,6 +2,7 @@
     "common": {
         "name":                     "fakeroku",
         "version": "0.1.0",
+        "license": "MIT",
         "news": {
             "0.1.0": {
                 "en": "first version",
