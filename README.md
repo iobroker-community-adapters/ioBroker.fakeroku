@@ -11,6 +11,7 @@ Intall Adapter in ioBroker Admin
 Configure Adapter in ioBroker Admin:
 - ***LAN-IP*** needs to to be the network ip of you ioBroker device
 - ***Port*** a webserver will listen for key presses
+- ***Multicast IP*** only change this if you know what you are doing
 
 ## Changelog
 
