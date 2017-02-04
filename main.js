@@ -15,6 +15,7 @@ var MULTICAST_IP,
     UUID,
     SSDP_RESPONSE,
     DESCXML,
+    APPSXML,
     socket,
     server,
     objects;
@@ -73,6 +74,19 @@ function init() {
     </serviceList>
   </device>
 </root>`;
+    APPSXML = `<apps>
+  <app id="11">Roku Channel Store</app>
+  <app id="12">Netflix</app>
+  <app id="13">Amazon Video on Demand</app>
+  <app id="837">YouTube</app>
+  <app id="2016">Crackle</app>
+  <app id="3423">Rdio</app>
+  <app id="21952">Blockbuster</app>
+  <app id="31012">MGO</app>  
+  <app id="43594">CinemaNow</app>
+  <app id="46041">Sling TV</app>
+  <app id="50025">GooglePlay</app>
+</apps>`;
     objects = [];
 }
 
@@ -108,6 +122,10 @@ function startServer(callback) {
             } else {
                 if (method === "GET") {
                     var message = parseQuery(url);
+                    response.statusCode = 200;
+                    response.setHeader('Content-Type', 'text/xml; charset=utf-8');
+                    response.setHeader('Connection', 'close');
+                    adapter.log.debug("responding to get request");
                     response.end(message, function () {
                         request.connection.unref();
                     });
@@ -192,7 +210,7 @@ function parseCommand(command) {
                 setState("launch", m[2].replace(".", "_"), true, function (err) {
                     if (err) return;
                     setTimeout(function () {
-                        setState("key", m[2].replace(".", "_"), false);
+                        setState("launch", m[2].replace(".", "_"), false);
                     }, 50);
                 });
                 break;
@@ -201,7 +219,7 @@ function parseCommand(command) {
                 setState("install", m[2].replace(".", "_"), true, function (err) {
                     if (err) return;
                     setTimeout(function () {
-                        setState("key", m[2].replace(".", "_"), false);
+                        setState("launch", m[2].replace(".", "_"), false);
                     }, 50);
                 });
                 break;
@@ -215,7 +233,13 @@ function parseCommand(command) {
 
 function parseQuery(query) {
     var message = "";
-    //@todo
+    switch (query) {
+        case "/query/apps":
+            message = APPSXML;
+            break;
+        default:
+            break;
+    }
     return message;
 }
 
