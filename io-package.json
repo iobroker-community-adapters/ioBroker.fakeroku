@@ -1,9 +1,14 @@
 {
     "common": {
         "name":                     "fakeroku",
-        "version": "0.1.0",
+        "version": "0.1.1",
         "license": "MIT",
         "news": {
+            "0.1.1": {
+                "en": "fix package.json",
+                "de": "fix package.json",
+                "ru": "fix package.json"
+            },
             "0.1.0": {
                 "en": "first version",
                 "de": "erste Version",

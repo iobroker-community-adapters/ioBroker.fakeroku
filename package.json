@@ -1,6 +1,6 @@
 {
   "name": "iobroker.fakeroku",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "ioBroker fakeroku Adapter",
   "author": {
     "name": "Pmant",
@@ -12,7 +12,7 @@
       "email": "patrickmo@gmx.de"
     }
   ],
-  "homepage": "https://github.com/ioBroker/ioBroker.fakeroku",
+  "homepage": "https://github.com/Pmant/ioBroker.fakeroku",
   "licenses": [
     {
       "type": "MIT",
@@ -27,7 +27,7 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/ioBroker/ioBroker.fakeroku"
+    "url": "https://github.com/Pmant/ioBroker.fakeroku"
   },
   "dependencies": {
     "http-headers": "^3.0.1"
@@ -46,7 +46,7 @@
     "test": "node node_modules/mocha/bin/mocha"
   },
   "bugs": {
-    "url": "https://github.com/ioBroker/ioBroker.fakeroku/issues"
+    "url": "https://github.com/Pmant/ioBroker.fakeroku/issues"
   },
   "readmeFilename": "README.md"
 }
