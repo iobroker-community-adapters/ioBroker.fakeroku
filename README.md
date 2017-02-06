@@ -14,6 +14,10 @@ Intall Adapter in ioBroker Admin
 - ***Port*** a webserver will listen for key presses
 - ***Multicast IP*** only change this if you know what you are doing
 
+### Configuration in Harmony APP & Software
+Add Roku 3 device following this Guide:
+https://support.myharmony.com/en-us/harmony-experience-with-roku
+
 ### States
 States are automatically created when fakeRoku receives a key for the first time.
 
