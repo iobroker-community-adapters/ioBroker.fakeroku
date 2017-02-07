@@ -23,6 +23,9 @@ States are automatically created when fakeRoku receives a key for the first time
 
 ## Changelog
 
+### 0.1.1
+  (Pmant) fix package.json
+
 ### 0.1.0
   (Pmant) initial release
   
