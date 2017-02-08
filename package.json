@@ -19,6 +19,7 @@
       "url": "https://github.com/Pmant/ioBroker.fakeroku/blob/master/LICENSE"
     }
   ],
+  "license": "MIT",
   "keywords": [
     "ioBroker",
     "fakeroku",
