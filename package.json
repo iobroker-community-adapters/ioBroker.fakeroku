@@ -1,6 +1,6 @@
 {
   "name": "iobroker.fakeroku",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "ioBroker fakeroku Adapter",
   "author": {
     "name": "Pmant",
@@ -48,5 +48,8 @@
   "bugs": {
     "url": "https://github.com/Pmant/ioBroker.fakeroku/issues"
   },
-  "readmeFilename": "README.md"
+  "readmeFilename": "README.md",
+  "engines": {
+    "node": ">=4.0.0"
+  }
 }

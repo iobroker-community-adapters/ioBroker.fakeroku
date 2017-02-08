@@ -1,7 +1,7 @@
 {
     "common": {
         "name":                     "fakeroku",
-        "version": "0.1.1",
+        "version": "0.2.0",
         "license": "MIT",
         "news": {
             "0.1.1": {
@@ -30,42 +30,19 @@
         "readme":                   "https://github.com/Pmant/ioBroker.fakeroku/blob/master/README.md",
         "loglevel":                 "info",
         "type":                     "hardware",
-        "restartAdapters":          []
+        "restartAdapters":          [],
+        "singletonHost":            true
     },
     "native": {
         "MULTICAST_IP": "239.255.255.250",
-        "HTTP_PORT": "9093",
         "BIND": "0.0.0.0",
-        "UUID": ""
+        "devices": [{"name": "ioBroker", "port": 9093, "uuid": null}]
     },
     "objects": [
 
     ],
     "instanceObjects": [
-        {
-            "_id":  "key",
-            "type": "channel",
-            "common": {
-                "name": "key"
-            },
-            "native": {}
-        },
-        {
-            "_id":  "launch",
-            "type": "channel",
-            "common": {
-                "name": "launch"
-            },
-            "native": {}
-        },
-        {
-            "_id":  "install",
-            "type": "channel",
-            "common": {
-                "name": "install"
-            },
-            "native": {}
-        }
+
     ]
 
 }

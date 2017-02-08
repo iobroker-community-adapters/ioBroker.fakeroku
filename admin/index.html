@@ -1,22 +1,32 @@
-
 <html>
-
 <link rel="stylesheet" type="text/css" href="../../lib/css/themes/jquery-ui/redmond/jquery-ui.min.css"/>
-<link rel="stylesheet" type="text/css" href="../../css/adapter.css"/>
-
+<link rel="stylesheet" type="text/css" href="../../lib/css/jqGrid/ui.jqgrid-4.5.4.css"/>
+<link rel="stylesheet" type="text/css" href="../../lib/css/jquery.multiselect-1.13.css"/>
+<script type="text/javascript" src="../../lib/js/jqGrid/jquery.jqGrid-4.5.4.min.js"></script>
+<script type="text/javascript" src="../../lib/js/jqGrid/grid.locale-all.js"></script>
 <script type="text/javascript" src="../../lib/js/jquery-1.11.1.min.js"></script>
 <script type="text/javascript" src="../../socket.io/socket.io.js"></script>
 <script type="text/javascript" src="../../lib/js/jquery-ui-1.10.3.full.min.js"></script>
-
+<link rel="stylesheet" type="text/css" href="../../css/adapter.css"/>
 <script type="text/javascript" src="../../js/translate.js"></script>
 <script type="text/javascript" src="../../js/adapter-settings.js"></script>
-
 <style>
     .number {
         width: 70px
     }
 </style>
+<style>
+    .table_header {
+        background-color: blue;
+        color: white;
+    }
+    .ip {
+        width: 150px;
+        text-align: right;
+    }
+</style>
 <script type="text/javascript">
+    var devices = [];
     systemDictionary = {
         "Fakeroku adapter settings": {
             "de": "Fakeroku adapter settings",
@@ -25,39 +35,31 @@
         "LAN IP (not 0.0.0.0):": {"de": "LAN IP (nicht 0.0.0.0):", "ru": "LAN IP (not 0.0.0.0):"},
     };
 
-    function showHideSettings() {
-        if ($('#secure').prop('checked')) {
-            $('#_certPublic').show();
-            $('#_certPrivate').show();
-            $('#_certChained').show();
-            $('.le-settings').show();
-
-            if ($('#leEnabled').prop('checked')) {
-                $('.le-sub-settings').show();
-                if ($('#leUpdate').prop('checked')) {
-                    $('.le-sub-settings-update').show();
-                } else {
-                    $('.le-sub-settings-update').hide();
+    function setValue(id, value, onChange) {
+        // example: select elements with id=key and class=value and insert value
+        if ($('#' + id + '.value').attr('type') == 'checkbox') {
+            $('#' + id + '.value').prop('checked', value).change(function() {
+                onChange();
+            });
+        } else {
+            $('#' + id + '.value').val(value).change(function() {
+                onChange();
+            }).keyup(function() {
+                // Chack that only numbers entered
+                if ($(this).hasClass('number')) {
+                    var val = $(this).val();
+                    if (val) {
+                        var newVal = '';
+                        for (var i = 0; i < val.length; i++) {
+                            if (val[i] >= '0' && val[i] <= '9') {
+                                newVal += val[i];
+                            }
+                        }
+                        if (val != newVal) $(this).val(newVal);
+                    }
                 }
-            } else {
-                $('.le-sub-settings').hide();
-            }
-
-        } else {
-            $('#_certPublic').hide();
-            $('#_certPrivate').hide();
-            $('#_certChained').hide();
-            $('#auth').prop('checked', false);
-            $('.le-settings').hide();
-        }
-        if ($('#auth').prop('checked')) {
-            $('#secure').prop('checked', true);
-            $('#defaultUser').val('admin');
-            $('.defaultUser').hide();
-            $('#_ttl').show();
-        } else {
-            $('.defaultUser').show();
-            $('#_ttl').hide();
+                onChange();
+            });
         }
     }
 
@@ -72,53 +74,22 @@
             $('#BIND.value').val(settings.BIND);
         });
 
-        if (settings.autoUpdate  === undefined) settings.autoUpdate = 24;
-        if (!settings.lePort)                   settings.lePort     = 80;
+        devices = settings.devices || [];
 
-        $('.value').each(function () {
-            var key = $(this).attr('id');
-            // example: select elements with id=key and class=value and insert value
-            if ($('#' + key + '.value').attr('type') === 'checkbox') {
-                $('#' + key + '.value').prop('checked', settings[key]).change(function() {
-                    showHideSettings();
-                    onChange();
-                });
-            } else {
-                $('#' + key + '.value').val(settings[key]).change(onChange).keyup(function() {
-                    onChange();
-                    // Chack that only numbers entered
-                    if ($(this).hasClass('number')) {
-                        var val = $(this).val();
-                        if (val) {
-                            var newVal = '';
-                            for (var i = 0; i < val.length; i++) {
-                                if (val[i] >= '0' && val[i] <= '9') {
-                                    newVal += val[i];
-                                }
-                            }
+        for (var key in settings) {
+            setValue(key, settings[key], onChange);
+        }
 
-                            if (val != newVal) $(this).val(newVal);
-                        }
-                    }
-                });
-            }
-        });
+        if (typeof values2table === 'function') {
+            $('#devices').hide();
+            $('#pager-devices').hide();
+            values2table('values', devices, onChange);
+        } else {
+            editTable('devices', ['name', 'port'], devices, 350);
+            $('#values').hide();
+        }
 
         onChange(false);
-
-        fillSelectCertificates('#certPublic',  'public',  settings.certPublic);
-        fillSelectCertificates('#certPrivate', 'private', settings.certPrivate);
-        fillSelectCertificates('#certChained', 'chained', settings.certChained);
-        fillUsers('#defaultUser', settings.defaultUser);
-
-        showHideSettings();
-
-        $('#auth').change(function () {
-            if ($(this).prop('checked')) {
-                $('#secure').prop('checked', true);
-                showHideSettings();
-            }
-        });
     }
 
     function save(callback) {
@@ -132,9 +103,11 @@
             }
         });
 
-        if ($('#secure').prop('checked') && (!$('#certPrivate').val() || !$('#certPublic').val())) {
-            showMessage(_('Set certificates or load it first in the system settings (right top).'));
-            return;
+        // Get edited table
+        if (typeof table2values === 'function') {
+            obj.devices = table2values('values');
+        } else {
+            obj.devices = getTableResult('devices', ['name', 'port']);
         }
 
         callback(obj);
@@ -146,8 +119,25 @@
     <table><tr><td><img src="fakeroku.png"></td><td><h3 class="translate">Fakeroku adapter settings</h3></td></tr></table>
     <table>
         <tr><td class="translate">LAN IP (not 0.0.0.0):</td><td><select class="value" id="BIND"></select></td></tr>
-        <tr><td>Port:</td><td><input  class="value number" id="HTTP_PORT" size="5" maxlength="5" type="number"/></td></tr>
         <tr><td>Multicast IP:</td><td><input  class="value" id="MULTICAST_IP" /></td></tr>
     </table>
+
+    <h4 class="translate">Roku devices to emulate</h4>
+    <table id="devices"></table><div id="pager-devices"></div>
+    <div id="values" style="width: 100%; height: calc(100% - 195px)">
+        <button class="table-button-add" style="margin-left: 10px; width: 1.5em; height: 1.5em"></button>
+        <div style="width: 100%; height: calc(100% - 30px); overflow: auto;">
+            <table class="table-values" style="width: 100%;">
+                <thead>
+                <tr>
+                    <th data-name="_index" style="width: 40px"></th>
+                    <th data-name="name">Name</th>
+                    <th data-name="port">Port</th>
+                    <th data-buttons="delete" style="width: 40px"></th>
+                </tr>
+                </thead>
+            </table>
+        </div>
+    </div>
 </div>
 </html>

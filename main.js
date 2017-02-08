@@ -8,23 +8,22 @@ var httpHeaders = require('http-headers');
 
 var utils =    require(__dirname + '/lib/utils'); // Get common adapter utils
 var adapter = utils.adapter('fakeroku');
+var configChanged = false;
 
-var MULTICAST_IP,
-    HTTP_PORT,
-    BIND,
-    UUID,
-    SSDP_RESPONSE,
-    DESCXML,
-    APPSXML,
-    socket,
-    server,
-    objects;
+var MULTICAST_IP;
+var BIND;
+var socket;
+
+var devices = {};
+var devArray = [];
 
 adapter.on('unload', function (callback) {
     try {
         adapter.log.info('cleaned everything up...');
         stopDiscovery();
-        stopServer();
+        for (let j = 0; j < devArray.length; j++) {
+            stopServer(devArray[j]);
+        }
         callback();
     } catch (e) {
         callback();
@@ -33,20 +32,22 @@ adapter.on('unload', function (callback) {
 
 adapter.on('ready', function () {
     init();
-    main();
 });
 
 function init() {
     MULTICAST_IP = adapter.config.MULTICAST_IP || "239.255.255.250";
-    UUID = adapter.config.UUID || getUUID();
-    HTTP_PORT = Math.min(65535, Math.max(0, parseInt(adapter.config.HTTP_PORT, 10) || 9093));
     BIND = adapter.config.BIND || "0.0.0.0";
-    SSDP_RESPONSE = new Buffer(
-        "HTTP/1.1 200 OK\r\nCache-Control: max-age=300\r\nST: roku:ecp\r\nUSN: uuid:roku:ecp:" +
-        UUID + "\r\nExt: \r\nServer: Roku UPnP/1.0 MiniUPnPd/1.4\r\nLOCATION: http://" +
-        BIND + ":" + HTTP_PORT + "/\r\n\r\n"
-    );
-    DESCXML = `<?xml version="1.0" encoding="UTF-8" ?>
+
+    for (var i = 0; i < adapter.config.devices.length; i++) {
+        var dev = adapter.config.devices[i];
+        var UUID = dev.uuid || genUUID(dev.name);
+        var HTTP_PORT = Math.min(65535, Math.max(0, parseInt(dev.port, 10) || 9093));
+        var SSDP_RESPONSE = new Buffer(
+            "HTTP/1.1 200 OK\r\nCache-Control: max-age=300\r\nST: roku:ecp\r\nUSN: uuid:roku:ecp:" +
+            UUID + "\r\nExt: \r\nServer: Roku UPnP/1.0 MiniUPnPd/1.4\r\nLOCATION: http://" +
+            BIND + ":" + HTTP_PORT + "/\r\n\r\n"
+        );
+        var DESCXML = `<?xml version="1.0" encoding="UTF-8" ?>
 <root xmlns="urn:schemas-upnp-org:device-1-0">
   <specVersion>
     <major>1</major>
@@ -54,11 +55,11 @@ function init() {
   </specVersion>
   <device>
     <deviceType>urn:roku-com:device:player:1-0</deviceType>
-    <friendlyName>ioBroker${adapter.instance}</friendlyName>
+    <friendlyName>${dev.name}</friendlyName>
     <manufacturer>Pmant</manufacturer>
     <manufacturerURL>https://github.com/Pmant/</manufacturerURL>
     <modelDescription>ioBroker fake Roku player</modelDescription>
-    <modelName>ioBroker${adapter.instance}</modelName>
+    <modelName>${dev.name}</modelName>
     <modelNumber>4200X</modelNumber>
     <modelURL>https://github.com/Pmant/ioBroker.fakeroku</modelURL>
     <serialNumber>${UUID}</serialNumber>
@@ -74,7 +75,7 @@ function init() {
     </serviceList>
   </device>
 </root>`;
-    APPSXML = `<apps>
+        var APPSXML = `<apps>
   <app id="11">Roku Channel Store</app>
   <app id="12">Netflix</app>
   <app id="13">Amazon Video on Demand</app>
@@ -87,17 +88,78 @@ function init() {
   <app id="46041">Sling TV</app>
   <app id="50025">GooglePlay</app>
 </apps>`;
-    objects = [];
-}
+        devices[dev.name.replace(/[.\s]+/g, '_')] = {
+            UUID: UUID,
+            HTTP_PORT: HTTP_PORT,
+            SSDP_RESPONSE: SSDP_RESPONSE,
+            DESCXML: DESCXML,
+            APPSXML: APPSXML,
+            server: null,
+            objects: [],
+            sync: false
+        };
+        devArray.push(dev.name.replace(/[.\s]+/g, '_'));
+    }
+    //sync devices and channels
+    adapter.getDevices(function (err, devs) {
+        for (let d = 0; d < devs.length; d++) {
+            //delete old device
+            if (!devices[devs[d].common.name]) {
+                adapter.deleteDevice(devs[d].common.name);
+                adapter.log.debug('deleting old device ' + devs[d]._id);
+            } else {
+                devices[devs[d].common.name].sync = true;
+                adapter.log.debug('found device ' + devs[d]._id);
+            }
+        }
 
-function main() {
-    startServer(function () {
-        startDiscovery();
+        // create device and channels for new devices
+        var devCreate = [];
+        for (let j = 0; j < devArray.length; j++) {
+            if (!devices[devArray[j]].sync) {
+                devCreate.push(devArray[j]);
+            }
+        }
+
+        if (devCreate.length) {
+            for (let k = 0; k < devCreate.length; k++) {
+                if (k === devCreate.length - 1) {
+                    createDevice(devCreate[k], true);
+                } else {
+                    createDevice(devCreate[k], false);
+                }
+            }
+        } else {
+            if (configChanged) {
+                updateConfig();
+            }
+            main();
+        }
     });
 }
 
-function startServer(callback) {
-    server = http.createServer(function (request, response) {
+function createDevice(device, last) {
+    adapter.log.debug("creating device: " + device);
+    adapter.createDevice(device, {name: device}, function () {
+        adapter.log.debug("creating channels for " + device);
+        adapter.createChannel(device, 'keys', {name: 'keys'}, function () {
+            adapter.createChannel(device, 'apps', {name: 'apps'}, function () {
+                devices[device].sync = true;
+                if (last) main();
+            });
+        });
+    });
+}
+
+function main() {
+    for (let j = 0; j < devArray.length; j++) {
+        startServer(devArray[j]);
+    }
+    startDiscovery();
+}
+
+function startServer(device, callback) {
+    devices[device].server = http.createServer(function (request, response) {
         request.connection.ref();
         var method = request.method;
         var url = request.url;
@@ -116,12 +178,12 @@ function startServer(callback) {
                 response.setHeader('Content-Type', 'text/xml; charset=utf-8');
                 response.setHeader('Connection', 'close');
                 adapter.log.debug("sending service description");
-                response.end(DESCXML, function () {
+                response.end(devices[device].DESCXML, function () {
                     request.connection.unref();
                 });
             } else {
                 if (method === "GET") {
-                    var message = parseQuery(url);
+                    var message = parseQuery(device, url);
                     response.statusCode = 200;
                     response.setHeader('Content-Type', 'text/xml; charset=utf-8');
                     response.setHeader('Connection', 'close');
@@ -130,7 +192,7 @@ function startServer(callback) {
                         request.connection.unref();
                     });
                 } else {
-                    parseCommand(url);
+                    parseCommand(device, url);
                     response.end(function () {
                         request.connection.unref();
                     });
@@ -138,21 +200,21 @@ function startServer(callback) {
             }
         });
     });
-    server.on('connection', function (socket) {
+    devices[device].server.on('connection', function (socket) {
         socket.unref();
     });
-    server.on("error", function (err) {
+    devices[device].server.on("error", function (err) {
         adapter.log.error(err);
-        stopServer();
+        stopServer(device);
     });
-    server.listen(HTTP_PORT, BIND, function () {
-        adapter.log.debug("HTTP-Server started on " + BIND + ":" + HTTP_PORT);
+    devices[device].server.listen(devices[device].HTTP_PORT, BIND, function () {
+        adapter.log.debug("HTTP-Server started on " + BIND + ":" + devices[device].HTTP_PORT);
     });
     if (typeof callback === 'function') callback();
 }
 
-function stopServer() {
-    if (server) server.close();
+function stopServer(device) {
+    if (devices[device].server) devices[device].server.close();
 }
 
 function startDiscovery() {
@@ -167,7 +229,9 @@ function startDiscovery() {
                 var headers = httpHeaders(msg);
                 if (headers.man === '"ssdp:discover"') {
                     adapter.log.debug("responding to " + rinfo.address + ":" + rinfo.port);
-                    socket.send(SSDP_RESPONSE, 0, SSDP_RESPONSE.length, rinfo.port, rinfo.address);
+                    for (let j = 0; j < devArray.length; j++) {
+                        socket.send(devices[devArray[j]].SSDP_RESPONSE, 0, devices[devArray[j]].SSDP_RESPONSE.length, rinfo.port, rinfo.address);
+                    }
                 }
             } else if (msg.toString().match(/^(NOTIFY) \* HTTP\/1.\d/)) {
                 //@todo
@@ -184,42 +248,42 @@ function stopDiscovery() {
     if (socket && socket._bindState) socket.close();
 }
 
-function parseCommand(command) {
+function parseCommand(device, command) {
     var m;
     if (m = command.match(/^\/([^\/]+)\/(\S+)$/)) {
         switch (m[1]) {
             case "keypress":
                 //key is pressed once => set state to true for 50ms
-                setState("key", m[2].replace(".", "_"), true, function (err) {
+                setState(device, "keys", m[2].replace(".", "_"), true, function (err) {
                     if (err) return;
                     setTimeout(function () {
-                        setState("key", m[2].replace(".", "_"), false);
+                        setState(device, "keys", m[2].replace(".", "_"), false);
                     }, 50);
                 });
                 break;
             case "keydown":
                 //key is pressed => set state to true
-                setState("key", m[2].replace(".", "_"), true);
+                setState(device, "keys", m[2].replace(".", "_"), true);
                 break;
             case "keyup":
                 //key is released => set state to false
-                setState("key", m[2].replace(".", "_"), false);
+                setState(device, "keys", m[2].replace(".", "_"), false);
                 break;
             case "launch":
                 //launch app => set state to true for 50ms
-                setState("launch", m[2].replace(".", "_"), true, function (err) {
+                setState(device, "apps", m[2].replace(".", "_"), true, function (err) {
                     if (err) return;
                     setTimeout(function () {
-                        setState("launch", m[2].replace(".", "_"), false);
+                        setState(device, "apps", m[2].replace(".", "_"), false);
                     }, 50);
                 });
                 break;
             case "install":
                 //install app => set state to true for 50ms
-                setState("install", m[2].replace(".", "_"), true, function (err) {
+                setState(device, "apps", m[2].replace(".", "_"), true, function (err) {
                     if (err) return;
                     setTimeout(function () {
-                        setState("launch", m[2].replace(".", "_"), false);
+                        setState(device, "apps", m[2].replace(".", "_"), false);
                     }, 50);
                 });
                 break;
@@ -231,11 +295,11 @@ function parseCommand(command) {
     }
 }
 
-function parseQuery(query) {
+function parseQuery(device, query) {
     var message = "";
     switch (query) {
         case "/query/apps":
-            message = APPSXML;
+            message = devices[device].APPSXML;
             break;
         default:
             break;
@@ -243,9 +307,9 @@ function parseQuery(query) {
     return message;
 }
 
-function setState(channel, state, val, callback) {
-    var id = channel + "." + state;
-    if (objects[id]) {
+function setState(device, channel, state, val, callback) {
+    var id = device + "." + channel + "." + state;
+    if (devices[device].objects[id]) {
         adapter.log.debug('state cached -> writing value');
         adapter.setState(id, {val: val, ack: true});
         if (typeof callback === 'function') callback();
@@ -259,7 +323,7 @@ function setState(channel, state, val, callback) {
             if (!obj) {
                 adapter.log.debug('creating new state');
                 //create object first
-                adapter.createState('', channel, state, {
+                adapter.createState(device, channel, state, {
                     name:   state,
                     def:    false,
                     type:   'boolean',
@@ -271,28 +335,42 @@ function setState(channel, state, val, callback) {
                 }, function () {
                     adapter.log.debug('created new state -> writing value');
                     adapter.setState(id, {val: val, ack: true});
-                    objects[id] = true;
+                    devices[device].objects[id] = true;
                     if (typeof callback === 'function') callback();
                 });
                 return;
             }
             adapter.log.debug('state found -> writing value');
             adapter.setState(id, {val: val, ack: true});
-            objects[id] = true;
+            devices[device].objects[id] = true;
             if (typeof callback === 'function') callback();
         });
     }
 }
 
-function getUUID() {
+function genUUID(device) {
     var crypto = require('crypto');
     var uuid = crypto.createHash('md5').update(crypto.randomBytes(256)).digest("hex");
-    var obj = {
-        native: {
-            UUID: uuid
+    for (var i = 0; i < adapter.config.devices.length; i++) {
+        if (adapter.config.devices[i].name === device) {
+            adapter.config.devices[i].uuid = uuid;
         }
-    };
-    adapter.extendForeignObject('system.adapter.fakeroku.' + adapter.instance, obj);
+    }
+    configChanged = true;
     return uuid;
+}
+
+function updateConfig() {
+    adapter.getForeignObject('system.adapter.fakeroku.' + adapter.instance, function (err, obj) {
+        if (err || !obj) {
+            adapter.log.warn("adapter config object not found!");
+            return;
+        }
+        obj.native = adapter.config;
+        adapter.log.debug("updating config with new uuid");
+        adapter.setForeignObject('system.adapter.fakeroku.' + adapter.instance, obj, function () {
+            
+        });
+    });
 }
 

@@ -11,17 +11,21 @@ Intall Adapter in ioBroker Admin
 
 ### Configuration in ioBroker Admin:
 - ***LAN-IP*** needs to be the network IP of your ioBroker device
-- ***Port*** a webserver will listen for key presses
 - ***Multicast IP*** only change this if you know what you are doing
+- ***Roku devices*** add / change / delete devices to emulate
 
 ### Configuration in Harmony APP & Software
 Add Roku 3 device following this Guide:
 https://support.myharmony.com/en-us/harmony-experience-with-roku
+You can rename the device on your Harmony.
 
 ### States
 States are automatically created when fakeRoku receives a key for the first time.
 
 ## Changelog
+
+### 0.2.0
+  (Pmant) run multiple fakeroku's in one instance
 
 ### 0.1.1
   (Pmant) fix package.json
