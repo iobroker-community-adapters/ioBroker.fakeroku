@@ -4,6 +4,11 @@
         "version": "0.2.0",
         "license": "MIT",
         "news": {
+            "0.2.0": {
+                "en": "emulate multiple rokus",
+                "de": "emuliere mehrere rokus",
+                "ru": "emulate multiple rokus"
+            },
             "0.1.1": {
                 "en": "fix package.json",
                 "de": "fix package.json",
