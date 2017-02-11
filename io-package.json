@@ -20,18 +20,18 @@
                 "ru": "first version"
             }
         },
-        "title":                    "Javascript/Node.js based fakeroku ioBroker adapter",
+        "title":                    "Fakeroku Emulator",
         "desc":                     {
-                 "en": "ioBroker fakeroku Adapter",
-                 "de": "ioBroker Pmant Adapter",
-                 "ru": "ioBroker Pmant драйвер как образец"
+                 "en": "Adapter emulates Roku-Devices to Harmony Hub",
+                 "de": "Adapter simuliert Roku-Geräte für den Harmony Hub",
+                 "ru": "ioBroker fakeroku драйвер как образец"
         },
         "platform":                 "Javascript/Node.js",
         "mode":                     "daemon",
         "icon":                     "fakeroku.png",
         "enabled":                  true,
         "extIcon":                  "https://raw.githubusercontent.com/Pmant/ioBroker.fakeroku/master/admin/fakeroku.png",
-        "keywords":                 ["fakeroku"],
+        "keywords":                 ["fakeroku", "Harmony Hub"],
         "readme":                   "https://github.com/Pmant/ioBroker.fakeroku/blob/master/README.md",
         "loglevel":                 "info",
         "type":                     "hardware",
