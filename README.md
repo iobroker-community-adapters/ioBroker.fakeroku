@@ -24,6 +24,10 @@ States are automatically created when fakeRoku receives a key for the first time
 
 ## Changelog
 
+### 0.2.1
+  (Pmant) fix jQuery error in admin
+  (ykuendig) add translations
+
 ### 0.2.0
   (Pmant) run multiple fakeroku's in one instance
 

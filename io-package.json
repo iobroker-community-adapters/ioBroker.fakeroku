@@ -1,9 +1,14 @@
 {
     "common": {
         "name":                     "fakeroku",
-        "version": "0.2.0",
+        "version": "0.2.1",
         "license": "MIT",
         "news": {
+            "0.2.0": {
+                "en": "fix admin error",
+                "de": "fix fehler in admin",
+                "ru": "fix admin error"
+            },
             "0.2.0": {
                 "en": "emulate multiple rokus",
                 "de": "emuliere mehrere rokus",
