@@ -2,7 +2,8 @@ var srcDir   = __dirname + "/../";
 
 module.exports = {
     options: {
-        force: true
+        force: true,
+        esnext: true
     },
     all: [
         srcDir + "*.js",
