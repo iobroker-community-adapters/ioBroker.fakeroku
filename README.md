@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/Pmant/ioBroker.fakeroku.svg?branch=master)](https://travis-ci.org/Pmant/ioBroker.fakeroku)
+
 ![Logo](admin/fakeroku.png)
 # ioBroker.fakeroku
 =================
