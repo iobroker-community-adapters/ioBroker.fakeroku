@@ -40,12 +40,7 @@
         "type": "multimedia",
         "restartAdapters": [],
         "singletonHost": true,
-        "authors": [
-            {
-                "name": "Pmant",
-                "email": "patrickmo@gmx.de"
-            }
-        ]
+        "authors": ["Pmant <patrickmo@gmx.de>"]        
     },
     "native": {
         "MULTICAST_IP": "239.255.255.250",
