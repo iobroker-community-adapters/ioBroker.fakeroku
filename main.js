@@ -7,7 +7,7 @@ var http = require('http');
 var httpHeaders = require('http-headers');
 
 var utils =    require(__dirname + '/lib/utils'); // Get common adapter utils
-var adapter = utils.adapter('fakeroku');
+var adapter = utils.Adapter('fakeroku');
 var configChanged = false;
 
 var MULTICAST_IP;
