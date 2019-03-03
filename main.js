@@ -6,7 +6,7 @@ var dgram = require('dgram');
 var http = require('http');
 var httpHeaders = require('http-headers');
 
-var utils =    require(__dirname + '/lib/utils'); // Get common adapter utils
+var utils = require('@iobroker/adapter-core'); // Get common adapter utils
 var adapter = utils.Adapter('fakeroku');
 var configChanged = false;
 
