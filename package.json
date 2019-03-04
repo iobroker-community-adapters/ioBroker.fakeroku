@@ -31,7 +31,8 @@
     "url": "https://github.com/Pmant/ioBroker.fakeroku"
   },
   "dependencies": {
-    "http-headers": "^3.0.1"
+    "http-headers": "^3.0.1",
+    "@iobroker/adapter-core": "^1.0.3"
   },
   "devDependencies": {
     "grunt": "^1.0.1",
@@ -40,8 +41,7 @@
     "grunt-jscs": "^3.0.1",
     "grunt-http": "^2.2.0",
     "mocha": "^4.1.0",
-    "chai": "^4.1.2",
-    "@iobroker/adapter-core": "^1.0.3"
+    "chai": "^4.1.2"
   },
   "main": "main.js",
   "scripts": {
