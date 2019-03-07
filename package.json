@@ -31,7 +31,8 @@
     "url": "https://github.com/Pmant/ioBroker.fakeroku"
   },
   "dependencies": {
-    "http-headers": "^3.0.1"
+    "http-headers": "^3.0.1",
+    "@iobroker/adapter-core": "^1.0.3"
   },
   "devDependencies": {
     "grunt": "^1.0.1",
