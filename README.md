@@ -2,7 +2,7 @@
 
 ![Logo](admin/fakeroku.png)
 # ioBroker.fakeroku
-=================
+![Number of Installations](http://iobroker.live/badges/fakeroku-installed.svg) ![Number of Installations](http://iobroker.live/badges/fakeroku-stable.svg) =================
 This ioBroker Adapter emulates a Roku and it's only purpose is to connect ioBroker to Logitech Harmony Hubs. 
 It may also work with other devices which can control a Roku.
 
