@@ -57,11 +57,11 @@ function init() {
     <deviceType>urn:roku-com:device:player:1-0</deviceType>
     <friendlyName>${dev.name}</friendlyName>
     <manufacturer>Pmant</manufacturer>
-    <manufacturerURL>https://github.com/Pmant/</manufacturerURL>
+    <manufacturerURL>https://github.com/iobroker-community-adapters/</manufacturerURL>
     <modelDescription>ioBroker fake Roku player</modelDescription>
     <modelName>${dev.name}</modelName>
     <modelNumber>4200X</modelNumber>
-    <modelURL>https://github.com/Pmant/ioBroker.fakeroku</modelURL>
+    <modelURL>https://github.com/iobroker-community-adapters/ioBroker.fakeroku</modelURL>
     <serialNumber>${UUID}</serialNumber>
     <UDN>uuid:roku:ecp:${UUID}</UDN>
     <serviceList>
@@ -369,7 +369,7 @@ function updateConfig() {
         obj.native = adapter.config;
         adapter.log.debug("updating config with new uuid");
         adapter.setForeignObject('system.adapter.fakeroku.' + adapter.instance, obj, function () {
-            
+
         });
     });
 }

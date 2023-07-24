@@ -30,17 +30,17 @@
         "mode": "daemon",
         "icon": "fakeroku.png",
         "enabled": true,
-        "extIcon": "https://raw.githubusercontent.com/Pmant/ioBroker.fakeroku/master/admin/fakeroku.png",
+        "extIcon": "https://github.com/iobroker-community-adapters/ioBroker.fakeroku/master/admin/fakeroku.png",
         "keywords": [
             "fakeroku",
             "Harmony Hub"
         ],
-        "readme": "https://github.com/Pmant/ioBroker.fakeroku/blob/master/README.md",
+        "readme": "https://github.com/iobroker-community-adapters/blob/master/README.md",
         "loglevel": "info",
         "type": "multimedia",
         "restartAdapters": [],
         "singletonHost": true,
-        "authors": ["Pmant <patrickmo@gmx.de>"]        
+        "authors": ["Pmant <patrickmo@gmx.de>"]
     },
     "native": {
         "MULTICAST_IP": "239.255.255.250",

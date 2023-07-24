@@ -1,7 +1,6 @@
 ![Logo](admin/fakeroku.png)
 # ioBroker.fakeroku
 
-[![Build Status](https://travis-ci.org/Pmant/ioBroker.fakeroku.svg?branch=master)](https://travis-ci.org/Pmant/ioBroker.fakeroku)
 ![Number of Installations](http://iobroker.live/badges/fakeroku-installed.svg) 
 ![Number of Installations](http://iobroker.live/badges/fakeroku-stable.svg) 
 
