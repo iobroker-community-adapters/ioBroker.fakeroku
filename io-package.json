@@ -1,58 +1,73 @@
 {
-    "common": {
-        "name": "fakeroku",
-        "version": "0.2.1",
-        "license": "MIT",
-        "news": {
-            "0.2.0": {
-                "en": "emulate multiple rokus",
-                "de": "emuliere mehrere rokus",
-                "ru": "emulate multiple rokus"
-            },
-            "0.1.1": {
-                "en": "fix package.json",
-                "de": "fix package.json",
-                "ru": "fix package.json"
-            },
-            "0.1.0": {
-                "en": "first version",
-                "de": "erste Version",
-                "ru": "first version"
-            }
-        },
-        "title": "Fakeroku Emulator",
-        "desc": {
-            "en": "Adapter emulates Roku-Devices to Harmony Hub",
-            "de": "Adapter simuliert Roku-Geräte für den Harmony Hub",
-            "ru": "ioBroker fakeroku драйвер как образец"
-        },
-        "platform": "Javascript/Node.js",
-        "mode": "daemon",
-        "icon": "fakeroku.png",
-        "enabled": true,
-        "extIcon": "https://github.com/iobroker-community-adapters/ioBroker.fakeroku/master/admin/fakeroku.png",
-        "keywords": [
-            "fakeroku",
-            "Harmony Hub"
-        ],
-        "readme": "https://github.com/iobroker-community-adapters/blob/master/README.md",
-        "loglevel": "info",
-        "type": "multimedia",
-        "restartAdapters": [],
-        "singletonHost": true,
-        "authors": ["Pmant <patrickmo@gmx.de>"]
+  "common": {
+    "name": "fakeroku",
+    "version": "0.2.2",
+    "license": "MIT",
+    "news": {
+      "0.2.2": {
+        "en": "fixed issues with controller v5",
+        "de": "problemstellungen mit controller v5",
+        "ru": "фиксированные проблемы с контроллером v5",
+        "pt": "problemas fixos com controlador v5",
+        "nl": "vertaling:",
+        "fr": "problèmes fixes avec controller v5",
+        "it": "problemi fissi con controller v5",
+        "es": "problemas fijos con controlador v5",
+        "pl": "zastrzeżenia regulatora v5",
+        "uk": "фіксовані питання з контролером v5",
+        "zh-cn": "a. 控制容忍的固定问题"
+      },
+      "0.2.0": {
+        "en": "emulate multiple rokus",
+        "de": "emuliere mehrere rokus",
+        "ru": "emulate multiple rokus"
+      },
+      "0.1.1": {
+        "en": "fix package.json",
+        "de": "fix package.json",
+        "ru": "fix package.json"
+      },
+      "0.1.0": {
+        "en": "first version",
+        "de": "erste Version",
+        "ru": "first version"
+      }
     },
-    "native": {
-        "MULTICAST_IP": "239.255.255.250",
-        "BIND": "0.0.0.0",
-        "devices": [
-            {
-                "name": "ioBroker",
-                "port": 9093,
-                "uuid": null
-            }
-        ]
+    "title": "Fakeroku Emulator",
+    "desc": {
+      "en": "Adapter emulates Roku-Devices to Harmony Hub",
+      "de": "Adapter simuliert Roku-Geräte für den Harmony Hub",
+      "ru": "ioBroker fakeroku драйвер как образец"
     },
-    "objects": [],
-    "instanceObjects": []
+    "platform": "Javascript/Node.js",
+    "mode": "daemon",
+    "icon": "fakeroku.png",
+    "enabled": true,
+    "extIcon": "https://github.com/iobroker-community-adapters/ioBroker.fakeroku/master/admin/fakeroku.png",
+    "keywords": [
+      "fakeroku",
+      "Harmony Hub"
+    ],
+    "readme": "https://github.com/iobroker-community-adapters/blob/master/README.md",
+    "loglevel": "info",
+    "type": "multimedia",
+    "restartAdapters": [],
+    "singletonHost": true,
+    "authors": [
+      "Pmant <patrickmo@gmx.de>"
+    ]
+  },
+  "native": {
+    "MULTICAST_IP": "239.255.255.250",
+    "BIND": "0.0.0.0",
+    "devices": [
+      {
+        "name": "ioBroker",
+        "port": 9093,
+        "uuid": null
+      }
+    ]
+  },
+  "objects": [],
+  "instanceObjects": []
 }

@@ -30,8 +30,7 @@ States are automatically created when fakeRoku receives a key for the first time
 	Placeholder for the next version (at the beginning of the line):
 	### __WORK IN PROGRESS__
 -->
-
-### __WORK IN PROGRESS__
+### 0.2.2 (2023-07-24)
 * (Appollon77) fixed issues with controller v5
 
 ### 0.2.1
@@ -46,7 +45,7 @@ States are automatically created when fakeRoku receives a key for the first time
 
 ### 0.1.0
   (Pmant) initial release
-  
+
 ## License
 The MIT License (MIT)
 
