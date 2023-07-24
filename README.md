@@ -26,6 +26,13 @@ You can rename the device on your Harmony.
 States are automatically created when fakeRoku receives a key for the first time.
 
 ## Changelog
+<!--
+	Placeholder for the next version (at the beginning of the line):
+	### __WORK IN PROGRESS__
+-->
+
+### __WORK IN PROGRESS__
+* (Appollon77) fixed issues with controller v5
 
 ### 0.2.1
   (Pmant) fix jQuery error in admin
