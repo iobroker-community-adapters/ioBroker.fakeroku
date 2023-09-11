@@ -30,6 +30,9 @@
     "type": "git",
     "url": "https://github.com/iobroker-community-adapters/ioBroker.fakeroku"
   },
+  "engines": {
+    "node": ">=16"
+  },
   "dependencies": {
     "http-headers": "^3.0.1",
     "@iobroker/adapter-core": "^1.0.3"
@@ -56,7 +59,4 @@
     "url": "https://github.com/iobroker-community-adapters/ioBroker.fakeroku/issues"
   },
   "readmeFilename": "README.md",
-  "engines": {
-    "node": ">=4.0.0"
-  }
 }
