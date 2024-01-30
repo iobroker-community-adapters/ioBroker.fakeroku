@@ -48,7 +48,7 @@
       "fakeroku",
       "Harmony Hub"
     ],
-    "readme": "https://github.com/iobroker-community-adapters/blob/master/README.md",
+    "readme": "https://github.com/iobroker-community-adapters/ioBroker.fakeroku/blob/master/README.md",
     "loglevel": "info",
     "type": "multimedia",
     "restartAdapters": [],
