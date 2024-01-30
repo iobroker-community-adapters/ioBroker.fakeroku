@@ -43,7 +43,7 @@
     "mode": "daemon",
     "icon": "fakeroku.png",
     "enabled": true,
-    "extIcon": "https://github.com/iobroker-community-adapters/ioBroker.fakeroku/master/admin/fakeroku.png",
+    "extIcon": "https://raw.githubusercontent.com/iobroker-community-adapters/ioBroker.fakeroku/master/admin/fakeroku.png",
     "keywords": [
       "fakeroku",
       "Harmony Hub"
