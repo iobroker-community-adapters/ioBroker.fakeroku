@@ -33,28 +33,56 @@
         "ru": "first version"
       }
     },
-    "title": "Fakeroku Emulator",
+    "titleLang": {
+      "en": "Fakeroku Emulator",
+      "de": "Fakeroku Emulator",
+      "ru": "Emulator Fakeroku",
+      "pt": "Emulador de Fakeroku",
+      "nl": "Fakeroku-emulator",
+      "fr": "Émulateur Fakeroku",
+      "it": "Emulatore Fakeroku",
+      "es": "Fakeroku Emulator",
+      "pl": "Fakeroku Emulator",
+      "uk": "Fakeroku Емулятор",
+      "zh-cn": "Fakeroku 模拟器"
+    },
     "desc": {
       "en": "Adapter emulates Roku-Devices to Harmony Hub",
       "de": "Adapter simuliert Roku-Geräte für den Harmony Hub",
       "ru": "ioBroker fakeroku драйвер как образец"
     },
-    "platform": "Javascript/Node.js",
-    "mode": "daemon",
-    "icon": "fakeroku.png",
-    "enabled": true,
-    "extIcon": "https://raw.githubusercontent.com/iobroker-community-adapters/ioBroker.fakeroku/master/admin/fakeroku.png",
     "keywords": [
       "fakeroku",
       "Harmony Hub"
     ],
+    "licenseInformation": {
+
+      "license": "MIT",
+      "type": "free"
+    },
+    "platform": "Javascript/Node.js",
+    "mode": "daemon",
+    "icon": "fakeroku.png",
+    "extIcon": "https://raw.githubusercontent.com/iobroker-community-adapters/ioBroker.fakeroku/master/admin/fakeroku.png",
     "readme": "https://github.com/iobroker-community-adapters/ioBroker.fakeroku/blob/master/README.md",
     "loglevel": "info",
+    "tier": 2,
     "type": "multimedia",
-    "restartAdapters": [],
-    "singletonHost": true,
+    "enabled": true,
     "authors": [
       "Pmant <patrickmo@gmx.de>"
+    ],
+    "restartAdapters": [],
+    "singletonHost": true,
+    "dependencies": [
+      {
+        "js-controller": ">=5.0.19"
+      }
+    ],
+    "globalDependencies": [
+      {
+        "admin": ">=6.13.16"
+      }
     ]
   },
   "native": {
