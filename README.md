@@ -31,7 +31,7 @@ States are automatically created when fakeRoku receives a key for the first time
 	### __WORK IN PROGRESS__
 -->
 ### __WORK IN PROGRESS__
-* (mcm1957) Adapter requires node.js 18 and js-controller >= 5 now
+* (mcm1957) Adapter requires node.js >= 18 and js-controller >= 5 now
 * (mcm1957) Dependencies have been updated
 
 ### 0.2.2 (2023-07-24)
