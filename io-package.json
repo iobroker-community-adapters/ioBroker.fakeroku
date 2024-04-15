@@ -2,7 +2,6 @@
   "common": {
     "name": "fakeroku",
     "version": "0.2.2",
-    "license": "MIT",
     "news": {
       "0.2.2": {
         "en": "fixed issues with controller v5",
@@ -56,7 +55,6 @@
       "Harmony Hub"
     ],
     "licenseInformation": {
-
       "license": "MIT",
       "type": "free"
     },
