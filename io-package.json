@@ -94,18 +94,19 @@
     "type": "multimedia",
     "enabled": true,
     "authors": [
-      "Pmant <patrickmo@gmx.de>"
+      "Pmant <patrickmo@gmx.de>",
+      "iobroker-community-adapters <iobroker-community-adapters@gmx.de>"
     ],
     "restartAdapters": [],
     "singletonHost": true,
     "dependencies": [
       {
-        "js-controller": ">=5.0.19"
+        "js-controller": ">=6.0.11"
       }
     ],
     "globalDependencies": [
       {
-        "admin": ">=6.13.16"
+        "admin": ">=7.6.17"
       }
     ]
   },

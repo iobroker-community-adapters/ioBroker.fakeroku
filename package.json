@@ -2,15 +2,10 @@
   "name": "iobroker.fakeroku",
   "version": "0.3.0",
   "description": "ioBroker fakeroku Adapter",
-  "author": {
-    "name": "Pmant",
-    "email": "patrickmo@gmx.de"
-  },
+  "author": "Pmant <patrickmo@gmx.de>",
   "contributors": [
-    {
-      "name": "Pmant",
-      "email": "patrickmo@gmx.de"
-    }
+    "Pmant <patrickmo@gmx.de>",
+    "iobroker-community-adapters <iobroker-community-adapters@gmx.de>"
   ],
   "homepage": "https://github.com/iobroker-community-adapters/ioBroker.fakeroku",
   "license": "MIT",
