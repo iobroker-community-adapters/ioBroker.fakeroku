@@ -20,7 +20,7 @@
     "url": "https://github.com/iobroker-community-adapters/ioBroker.fakeroku"
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=20"
   },
   "dependencies": {
     "http-headers": "^3.0.1",
