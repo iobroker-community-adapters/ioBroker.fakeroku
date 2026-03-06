@@ -8,3 +8,5 @@ test
 .travis.yml
 appveyor.yml
 /tmp
+eslint.config.mjs
+prettier.config.mjs
