@@ -45,17 +45,41 @@
       "0.2.0": {
         "en": "emulate multiple rokus",
         "de": "emuliere mehrere rokus",
-        "ru": "emulate multiple rokus"
+        "ru": "emulate multiple rokus",
+        "pt": "emular vários rokus",
+        "nl": "meerdere roku's emuleren",
+        "fr": "émuler plusieurs rokus",
+        "it": "emulare più roku",
+        "es": "emular múltiples rokus",
+        "pl": "emulować wiele roku",
+        "uk": "емулювати кілька rokus",
+        "zh-cn": "模拟多个 roku"
       },
       "0.1.1": {
         "en": "fix package.json",
         "de": "fix package.json",
-        "ru": "fix package.json"
+        "ru": "fix package.json",
+        "pt": "corrigir pacote.json",
+        "nl": "pakket.json repareren",
+        "fr": "réparer package.json",
+        "it": "correggere pacchetto.json",
+        "es": "arreglar paquete.json",
+        "pl": "napraw pakiet.json",
+        "uk": "виправити package.json",
+        "zh-cn": "修复 package.json"
       },
       "0.1.0": {
         "en": "first version",
         "de": "erste Version",
-        "ru": "first version"
+        "ru": "first version",
+        "pt": "primeira versão",
+        "nl": "eerste versie",
+        "fr": "première version",
+        "it": "prima versione",
+        "es": "primera versión",
+        "pl": "pierwsza wersja",
+        "uk": "перша версія",
+        "zh-cn": "第一个版本"
       }
     },
     "titleLang": {
@@ -74,7 +98,15 @@
     "desc": {
       "en": "Adapter emulates Roku-Devices to Harmony Hub",
       "de": "Adapter simuliert Roku-Geräte für den Harmony Hub",
-      "ru": "ioBroker fakeroku драйвер как образец"
+      "ru": "ioBroker fakeroku драйвер как образец",
+      "pt": "Adaptador emula dispositivos Roku para Harmony Hub",
+      "nl": "Adapter emuleert Roku-apparaten naar Harmony Hub",
+      "fr": "L'adaptateur émule les appareils Roku vers Harmony Hub",
+      "it": "L'adattatore emula i dispositivi Roku su Harmony Hub",
+      "es": "El adaptador emula dispositivos Roku a Harmony Hub",
+      "pl": "Adapter emuluje urządzenia Roku do Harmony Hub",
+      "uk": "Адаптер емулює Roku-Devices до Harmony Hub",
+      "zh-cn": "适配器模拟 Roku-Devices 到 Harmony Hub"
     },
     "keywords": [
       "fakeroku",
