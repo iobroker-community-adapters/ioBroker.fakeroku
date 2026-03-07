@@ -111,7 +111,10 @@
       {
         "admin": ">=7.7.22"
       }
-    ]
+    ],
+    "adminUI": {
+      "config": "html"
+    }
   },
   "native": {
     "MULTICAST_IP": "239.255.255.250",
