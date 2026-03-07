@@ -30,8 +30,7 @@ States are automatically created when fakeRoku receives a key for the first time
 	Placeholder for the next version (at the beginning of the line):
 	### __WORK IN PROGRESS__
 -->
-
-### **WORK IN PROGRESS**
+### 0.4.0 (2026-03-07)
 - (iobroker-bot) Adapter requires node.js >= 20 now.
 - (copilot) Adapter requires admin >= 7.7.22 now
 - (copilot) Adapter requires js-controller >= 6.0.11 now
@@ -50,12 +49,6 @@ States are automatically created when fakeRoku receives a key for the first time
 
 ### 0.2.0
   (Pmant) run multiple fakeroku's in one instance
-
-### 0.1.1
-  (Pmant) fix package.json
-
-### 0.1.0
-  (Pmant) initial release
 
 ## License
 The MIT License (MIT)
