@@ -92,6 +92,8 @@
     "loglevel": "info",
     "tier": 2,
     "compact": false,
+    "connectionType": "local",
+    "dataSource": "poll",
     "type": "multimedia",
     "enabled": true,
     "authors": [
