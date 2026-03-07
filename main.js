@@ -105,8 +105,13 @@ function init() {
         for (let d = 0; d < devs.length; d++) {
             //delete old device
             if (!devices[devs[d].common.name]) {
-                adapter.deleteDevice(devs[d].common.name);
-                adapter.log.debug(`deleting old device ${devs[d]._id}`);
+                adapter.delObject(devs[d]._id, { recursive: true }, function (err) {
+                    if (err) {
+                        adapter.log.warn(`Error deleting device ${devs[d]._id}: ${err}`);
+                    } else {
+                        adapter.log.debug(`deleting old device ${devs[d]._id}`);
+                    }
+                });
             } else {
                 devices[devs[d].common.name].sync = true;
                 adapter.log.debug(`found device ${devs[d]._id}`);
@@ -140,16 +145,36 @@ function init() {
 
 function createDevice(device, last) {
     adapter.log.debug(`creating device: ${device}`);
-    adapter.createDevice(device, { name: device }, function () {
+    adapter.setObjectNotExists(device, { type: 'device', common: { name: device }, native: {} }, function (err) {
+        if (err) {
+            adapter.log.warn(`Error creating device ${device}: ${err}`);
+            return;
+        }
         adapter.log.debug(`creating channels for ${device}`);
-        adapter.createChannel(device, 'keys', { name: 'keys' }, function () {
-            adapter.createChannel(device, 'apps', { name: 'apps' }, function () {
-                devices[device].sync = true;
-                if (last) {
-                    main();
+        adapter.setObjectNotExists(
+            `${device}.keys`,
+            { type: 'channel', common: { name: 'keys' }, native: {} },
+            function (err) {
+                if (err) {
+                    adapter.log.warn(`Error creating channel ${device}.keys: ${err}`);
+                    return;
                 }
-            });
-        });
+                adapter.setObjectNotExists(
+                    `${device}.apps`,
+                    { type: 'channel', common: { name: 'apps' }, native: {} },
+                    function (err) {
+                        if (err) {
+                            adapter.log.warn(`Error creating channel ${device}.apps: ${err}`);
+                            return;
+                        }
+                        devices[device].sync = true;
+                        if (last) {
+                            main();
+                        }
+                    },
+                );
+            },
+        );
     });
 }
 
@@ -348,22 +373,30 @@ function setState(device, channel, state, val, callback) {
             if (!obj) {
                 adapter.log.debug('creating new state');
                 //create object first
-                adapter.createState(
-                    device,
-                    channel,
-                    state,
+                adapter.setObjectNotExists(
+                    id,
                     {
-                        name: state,
-                        def: false,
-                        type: 'boolean',
-                        read: 'true',
-                        write: 'false',
-                        role: 'indicator.state',
+                        type: 'state',
+                        common: {
+                            name: state,
+                            def: false,
+                            type: 'boolean',
+                            read: true,
+                            write: false,
+                            role: 'indicator.state',
+                        },
+                        native: {
+                            url: `${channel}/${state}`,
+                        },
                     },
-                    {
-                        url: `${channel}/${state}`,
-                    },
-                    function () {
+                    function (err) {
+                        if (err) {
+                            adapter.log.warn(`Error creating state ${id}: ${err}`);
+                            if (typeof callback === 'function') {
+                                callback(err);
+                            }
+                            return;
+                        }
                         adapter.log.debug('created new state -> writing value');
                         adapter.setState(id, { val: val, ack: true });
                         devices[device].objects[id] = true;
