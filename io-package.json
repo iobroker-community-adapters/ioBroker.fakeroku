@@ -91,6 +91,7 @@
     "readme": "https://github.com/iobroker-community-adapters/ioBroker.fakeroku/blob/master/README.md",
     "loglevel": "info",
     "tier": 2,
+    "compact": false,
     "type": "multimedia",
     "enabled": true,
     "authors": [
