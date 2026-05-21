@@ -5,5 +5,8 @@
   "rokuDevicesToEmulate": "Te emuleren Roku-apparaten",
   "columnName": "Naam",
   "columnPort": "Poort",
-  "columnUuid": "UUID"
+  "columnUuid": "UUID",
+  "bindHelp": "Selecteer het LAN-IP-adres van deze ioBroker-host. Gebruik geen 0.0.0.0.",
+  "multicastHelp": "De standaard voor SSDP-detectie is 239.255.255.250.",
+  "devicesHelp": "Configureer virtuele Roku-apparaten met unieke naam, poort en UUID."
 }

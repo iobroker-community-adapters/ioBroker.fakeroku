@@ -5,5 +5,8 @@
   "rokuDevicesToEmulate": "Dispositivos Roku para emular",
   "columnName": "Nome",
   "columnPort": "Porta",
-  "columnUuid": "UUID"
+  "columnUuid": "UUID",
+  "bindHelp": "Selecione o endereço IP LAN deste host ioBroker. Não use 0.0.0.0.",
+  "multicastHelp": "O padrão para descoberta SSDP é 239.255.255.250.",
+  "devicesHelp": "Configure dispositivos Roku virtuais com nome, porta e UUID exclusivos."
 }

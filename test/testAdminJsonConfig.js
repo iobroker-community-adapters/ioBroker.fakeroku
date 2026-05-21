@@ -15,8 +15,10 @@ describe('admin jsonConfig migration', () => {
 
     it('contains jsonConfig and short-form i18n files', () => {
         assert.equal(fs.existsSync(path.join(rootDir, 'admin', 'jsonConfig.json')), true);
-        assert.equal(fs.existsSync(path.join(rootDir, 'admin', 'i18n', 'en.json')), true);
-        assert.equal(fs.existsSync(path.join(rootDir, 'admin', 'i18n', 'de.json')), true);
+        const languages = ['de', 'en', 'es', 'fr', 'it', 'nl', 'pl', 'pt', 'ru', 'uk', 'zh-cn'];
+        for (const lang of languages) {
+            assert.equal(fs.existsSync(path.join(rootDir, 'admin', 'i18n', `${lang}.json`)), true);
+        }
     });
 
     it('uses translation keys in jsonConfig labels', () => {
@@ -24,8 +26,12 @@ describe('admin jsonConfig migration', () => {
 
         assert.equal(jsonConfig.items.header.label, 'fakerokuAdapterSettings');
         assert.equal(jsonConfig.items.BIND.label, 'lanIpNotAny');
+        assert.equal(jsonConfig.items.BIND.help, 'bindHelp');
+        assert.equal(jsonConfig.items.MULTICAST_IP.type, 'ip');
         assert.equal(jsonConfig.items.MULTICAST_IP.label, 'multicastIp');
+        assert.equal(jsonConfig.items.MULTICAST_IP.help, 'multicastHelp');
         assert.equal(jsonConfig.items.devices.label, 'rokuDevicesToEmulate');
+        assert.equal(jsonConfig.items.devices.help, 'devicesHelp');
         assert.equal(jsonConfig.items.devices.items[0].title, 'columnName');
         assert.equal(jsonConfig.items.devices.items[1].title, 'columnPort');
         assert.equal(jsonConfig.items.devices.items[2].title, 'columnUuid');
