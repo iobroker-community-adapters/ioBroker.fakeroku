@@ -18,4 +18,13 @@ describe('admin jsonConfig migration', () => {
         assert.equal(fs.existsSync(path.join(rootDir, 'admin', 'i18n', 'en.json')), true);
         assert.equal(fs.existsSync(path.join(rootDir, 'admin', 'i18n', 'de.json')), true);
     });
+
+    it('uses translation keys in jsonConfig labels', () => {
+        const jsonConfig = JSON.parse(fs.readFileSync(path.join(rootDir, 'admin', 'jsonConfig.json'), 'utf8'));
+
+        assert.equal(jsonConfig.items.header.label, 'fakerokuAdapterSettings');
+        assert.equal(jsonConfig.items.BIND.label, 'lanIpNotAny');
+        assert.equal(jsonConfig.items.MULTICAST_IP.label, 'multicastIp');
+        assert.equal(jsonConfig.items.devices.label, 'rokuDevicesToEmulate');
+    });
 });

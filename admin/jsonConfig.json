@@ -9,11 +9,11 @@
       "md": 12,
       "lg": 12,
       "xl": 12,
-      "label": "Fakeroku adapter settings"
+      "label": "fakerokuAdapterSettings"
     },
     "BIND": {
       "type": "ip",
-      "label": "LAN IP (not 0.0.0.0):",
+      "label": "lanIpNotAny",
       "xs": 12,
       "sm": 12,
       "md": 6,
@@ -22,7 +22,7 @@
     },
     "MULTICAST_IP": {
       "type": "text",
-      "label": "Multicast IP:",
+      "label": "multicastIp",
       "xs": 12,
       "sm": 12,
       "md": 6,
@@ -31,7 +31,7 @@
     },
     "devices": {
       "type": "table",
-      "label": "Roku devices to emulate",
+      "label": "rokuDevicesToEmulate",
       "xs": 12,
       "sm": 12,
       "md": 12,
@@ -41,7 +41,7 @@
         {
           "type": "text",
           "attr": "name",
-          "title": "Name",
+          "title": "name",
           "xs": 12,
           "sm": 12,
           "md": 5,
@@ -51,7 +51,7 @@
         {
           "type": "number",
           "attr": "port",
-          "title": "Port",
+          "title": "port",
           "min": 0,
           "max": 65535,
           "xs": 12,
@@ -63,7 +63,7 @@
         {
           "type": "text",
           "attr": "uuid",
-          "title": "UUID",
+          "title": "uuid",
           "xs": 12,
           "sm": 12,
           "md": 4,

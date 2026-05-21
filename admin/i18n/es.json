@@ -1,9 +1,9 @@
 {
-  "Fakeroku adapter settings": "Ajustes del adaptador Fakeroku",
-  "LAN IP (not 0.0.0.0):": "IP LAN (no 0.0.0.0):",
-  "Multicast IP:": "IP de multidifusión:",
-  "Name": "Nombre",
-  "Port": "Puerto",
-  "Roku devices to emulate": "Dispositivos Roku a emular",
-  "UUID": "UUID"
+  "fakerokuAdapterSettings": "Ajustes del adaptador Fakeroku",
+  "lanIpNotAny": "IP LAN (no 0.0.0.0):",
+  "multicastIp": "IP de multidifusión:",
+  "name": "Nombre",
+  "port": "Puerto",
+  "rokuDevicesToEmulate": "Dispositivos Roku a emular",
+  "uuid": "UUID"
 }
