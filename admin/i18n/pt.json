@@ -1,0 +1,12 @@
+{
+  "fakerokuAdapterSettings": "Configurações do adaptador Fakeroku",
+  "lanIpNotAny": "IP LAN (não 0.0.0.0):",
+  "multicastIp": "IP multicast:",
+  "rokuDevicesToEmulate": "Dispositivos Roku para emular",
+  "columnName": "Nome",
+  "columnPort": "Porta",
+  "columnUuid": "UUID",
+  "bindHelp": "Selecione o endereço IP LAN deste host ioBroker. Não use 0.0.0.0.",
+  "multicastHelp": "O padrão para descoberta SSDP é 239.255.255.250.",
+  "devicesHelp": "Configure dispositivos Roku virtuais com nome, porta e UUID exclusivos."
+}

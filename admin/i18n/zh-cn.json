@@ -1,0 +1,12 @@
+{
+  "fakerokuAdapterSettings": "Fakeroku 适配器设置",
+  "lanIpNotAny": "LAN IP（非 0.0.0.0）：",
+  "multicastIp": "组播 IP：",
+  "rokuDevicesToEmulate": "要模拟的 Roku 设备",
+  "columnName": "名称",
+  "columnPort": "端口",
+  "columnUuid": "UUID",
+  "bindHelp": "请选择此 ioBroker 主机的局域网 IP 地址。不要使用 0.0.0.0。",
+  "multicastHelp": "SSDP 发现的默认值是 239.255.255.250。",
+  "devicesHelp": "请配置具有唯一名称、端口和 UUID 的虚拟 Roku 设备。"
+}
