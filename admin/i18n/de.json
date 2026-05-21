@@ -1,9 +1,9 @@
 {
-  "fakerokuAdapterSettings": "Fakeroku-Adapter Einstellungen",
+  "fakerokuAdapterSettings": "Fakeroku Adapter Einstellungen",
   "lanIpNotAny": "LAN IP (nicht 0.0.0.0):",
   "multicastIp": "Multicast IP:",
-  "name": "Name",
-  "port": "Port",
   "rokuDevicesToEmulate": "Zu emulierende Roku-Geräte",
-  "uuid": "UUID"
+  "columnName": "Name",
+  "columnPort": "Port",
+  "columnUuid": "UUID"
 }

@@ -2,8 +2,8 @@
   "fakerokuAdapterSettings": "Настройки драйвера Fakeroku",
   "lanIpNotAny": "LAN IP (не 0.0.0.0):",
   "multicastIp": "Multicast IP:",
-  "name": "Имя",
-  "port": "Порт",
   "rokuDevicesToEmulate": "Эмулируемые устройства Roku",
-  "uuid": "UUID"
+  "columnName": "Имя",
+  "columnPort": "Порт",
+  "columnUuid": "UUID"
 }

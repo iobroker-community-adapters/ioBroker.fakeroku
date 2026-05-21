@@ -41,7 +41,7 @@
         {
           "type": "text",
           "attr": "name",
-          "title": "name",
+          "title": "columnName",
           "xs": 12,
           "sm": 12,
           "md": 5,
@@ -51,7 +51,7 @@
         {
           "type": "number",
           "attr": "port",
-          "title": "port",
+          "title": "columnPort",
           "min": 0,
           "max": 65535,
           "xs": 12,
@@ -63,7 +63,7 @@
         {
           "type": "text",
           "attr": "uuid",
-          "title": "uuid",
+          "title": "columnUuid",
           "xs": 12,
           "sm": 12,
           "md": 4,

@@ -26,5 +26,8 @@ describe('admin jsonConfig migration', () => {
         assert.equal(jsonConfig.items.BIND.label, 'lanIpNotAny');
         assert.equal(jsonConfig.items.MULTICAST_IP.label, 'multicastIp');
         assert.equal(jsonConfig.items.devices.label, 'rokuDevicesToEmulate');
+        assert.equal(jsonConfig.items.devices.items[0].title, 'columnName');
+        assert.equal(jsonConfig.items.devices.items[1].title, 'columnPort');
+        assert.equal(jsonConfig.items.devices.items[2].title, 'columnUuid');
     });
 });

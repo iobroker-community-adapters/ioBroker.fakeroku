@@ -2,8 +2,8 @@
   "fakerokuAdapterSettings": "Fakeroku 适配器设置",
   "lanIpNotAny": "LAN IP（非 0.0.0.0）：",
   "multicastIp": "组播 IP：",
-  "name": "名称",
-  "port": "端口",
   "rokuDevicesToEmulate": "要模拟的 Roku 设备",
-  "uuid": "UUID"
+  "columnName": "名称",
+  "columnPort": "端口",
+  "columnUuid": "UUID"
 }

@@ -2,8 +2,8 @@
   "fakerokuAdapterSettings": "Ustawienia adaptera Fakeroku",
   "lanIpNotAny": "LAN IP (nie 0.0.0.0):",
   "multicastIp": "IP multicast:",
-  "name": "Nazwa",
-  "port": "Port",
   "rokuDevicesToEmulate": "Urządzenia Roku do emulacji",
-  "uuid": "UUID"
+  "columnName": "Nazwa",
+  "columnPort": "Port",
+  "columnUuid": "UUID"
 }
