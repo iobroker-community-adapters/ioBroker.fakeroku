@@ -32,6 +32,7 @@ States are automatically created when fakeRoku receives a key for the first time
 -->
 ### **WORK IN PROGRESS**
 - (copilot) Adapter requires node.js >= 22 now
+- (copilot) **ENHANCED**: Migrated admin configuration to jsonConfig with i18n files
 
 ### 0.4.0 (2026-03-07)
 - (iobroker-bot) Adapter requires node.js >= 20 now.

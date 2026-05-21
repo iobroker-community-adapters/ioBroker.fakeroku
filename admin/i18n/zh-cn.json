@@ -1,0 +1,9 @@
+{
+  "Fakeroku adapter settings": "Fakeroku 适配器设置",
+  "LAN IP (not 0.0.0.0):": "LAN IP（非 0.0.0.0）：",
+  "Multicast IP:": "组播 IP：",
+  "Name": "名称",
+  "Port": "端口",
+  "Roku devices to emulate": "要模拟的 Roku 设备",
+  "UUID": "UUID"
+}

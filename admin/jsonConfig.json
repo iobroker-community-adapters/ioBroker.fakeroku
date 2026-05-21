@@ -1,0 +1,76 @@
+{
+  "type": "panel",
+  "items": {
+    "header": {
+      "type": "staticText",
+      "text": "Fakeroku adapter settings",
+      "newLine": true,
+      "xs": 12,
+      "sm": 12,
+      "md": 12,
+      "lg": 12,
+      "xl": 12
+    },
+    "BIND": {
+      "type": "ip",
+      "label": "LAN IP (not 0.0.0.0):",
+      "xs": 12,
+      "sm": 12,
+      "md": 6,
+      "lg": 6,
+      "xl": 6
+    },
+    "MULTICAST_IP": {
+      "type": "text",
+      "label": "Multicast IP:",
+      "xs": 12,
+      "sm": 12,
+      "md": 6,
+      "lg": 6,
+      "xl": 6
+    },
+    "devices": {
+      "type": "table",
+      "label": "Roku devices to emulate",
+      "xs": 12,
+      "sm": 12,
+      "md": 12,
+      "lg": 12,
+      "xl": 12,
+      "items": [
+        {
+          "type": "text",
+          "attr": "name",
+          "title": "Name",
+          "xs": 12,
+          "sm": 12,
+          "md": 5,
+          "lg": 5,
+          "xl": 5
+        },
+        {
+          "type": "number",
+          "attr": "port",
+          "title": "Port",
+          "min": 0,
+          "max": 65535,
+          "xs": 12,
+          "sm": 12,
+          "md": 3,
+          "lg": 3,
+          "xl": 3
+        },
+        {
+          "type": "text",
+          "attr": "uuid",
+          "title": "UUID",
+          "xs": 12,
+          "sm": 12,
+          "md": 4,
+          "lg": 4,
+          "xl": 4
+        }
+      ]
+    }
+  }
+}
