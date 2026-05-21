@@ -3,13 +3,13 @@
   "items": {
     "header": {
       "type": "staticText",
-      "text": "Fakeroku adapter settings",
       "newLine": true,
       "xs": 12,
       "sm": 12,
       "md": 12,
       "lg": 12,
-      "xl": 12
+      "xl": 12,
+      "label": "Fakeroku adapter settings"
     },
     "BIND": {
       "type": "ip",

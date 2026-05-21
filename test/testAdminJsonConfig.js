@@ -5,7 +5,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 describe('admin jsonConfig migration', () => {
-    const rootDir = __dirname;
+    const rootDir = path.join(__dirname, '..');
 
     it('uses json adminUI in io-package', () => {
         const ioPackage = JSON.parse(fs.readFileSync(path.join(rootDir, 'io-package.json'), 'utf8'));
