@@ -1,0 +1,12 @@
+{
+  "fakerokuAdapterSettings": "Настройки драйвера Fakeroku",
+  "lanIpNotAny": "LAN IP (не 0.0.0.0):",
+  "multicastIp": "Multicast IP:",
+  "rokuDevicesToEmulate": "Эмулируемые устройства Roku",
+  "columnName": "Имя",
+  "columnPort": "Порт",
+  "columnUuid": "UUID",
+  "bindHelp": "Выберите LAN IP-адрес этого хоста ioBroker. Не используйте 0.0.0.0.",
+  "multicastHelp": "Значение по умолчанию для SSDP-обнаружения: 239.255.255.250.",
+  "devicesHelp": "Настройте виртуальные устройства Roku с уникальными именем, портом и UUID."
+}

@@ -1,0 +1,12 @@
+{
+  "fakerokuAdapterSettings": "Налаштування адаптера Fakeroku",
+  "lanIpNotAny": "LAN IP (не 0.0.0.0):",
+  "multicastIp": "Multicast IP:",
+  "rokuDevicesToEmulate": "Пристрої Roku для емуляції",
+  "columnName": "Назва",
+  "columnPort": "Порт",
+  "columnUuid": "UUID",
+  "bindHelp": "Виберіть LAN IP-адресу цього хоста ioBroker. Не використовуйте 0.0.0.0.",
+  "multicastHelp": "Типове значення для SSDP-виявлення: 239.255.255.250.",
+  "devicesHelp": "Налаштуйте віртуальні пристрої Roku з унікальними назвою, портом та UUID."
+}

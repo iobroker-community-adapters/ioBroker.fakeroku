@@ -158,7 +158,7 @@
       }
     ],
     "adminUI": {
-      "config": "html"
+      "config": "json"
     }
   },
   "native": {

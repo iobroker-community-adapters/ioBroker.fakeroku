@@ -1,0 +1,12 @@
+{
+  "fakerokuAdapterSettings": "Ustawienia adaptera Fakeroku",
+  "lanIpNotAny": "LAN IP (nie 0.0.0.0):",
+  "multicastIp": "IP multicast:",
+  "rokuDevicesToEmulate": "Urządzenia Roku do emulacji",
+  "columnName": "Nazwa",
+  "columnPort": "Port",
+  "columnUuid": "UUID",
+  "bindHelp": "Wybierz adres IP LAN tego hosta ioBroker. Nie używaj 0.0.0.0.",
+  "multicastHelp": "Domyślna wartość dla wykrywania SSDP to 239.255.255.250.",
+  "devicesHelp": "Skonfiguruj wirtualne urządzenia Roku z unikalną nazwą, portem i UUID."
+}
