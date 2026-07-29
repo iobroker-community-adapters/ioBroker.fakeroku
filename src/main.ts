@@ -1,26 +1,33 @@
 import * as utils from "@iobroker/adapter-core";
 import type { RokuAdvert } from "./discovery/ssdp-messages";
 import { RokuSsdpResponder } from "./discovery/ssdp-responder";
+import { DEFAULT_APPS } from "./ecp/device-info";
+import type { CommandEvent } from "./ecp/ecp-command";
+import { EcpHttpServer } from "./ecp/ecp-http-server";
+import { commandToStateWrite, STANDARD_KEYS } from "./ecp/state-model";
 import { deriveUuid } from "./lib/device-identity";
+import { sanitizeId } from "./lib/pure-helpers";
 
 /** Managed timeout for a stuck SSDP start (a busy port 1900 must not hang onReady). */
 const SSDP_START_TIMEOUT_MS = 5000;
 /** Proactive ssdp:alive interval so controllers find the device without searching. */
 const SSDP_NOTIFY_INTERVAL_MS = 300_000;
+/** How long a keypress pulses its keys.<Key> state true before falling back to false. */
+const KEY_PULSE_MS = 50;
 const DEFAULT_ECP_PORT = 8060;
 
 /**
  * ioBroker.fakeroku — Roku emulator (input side).
  *
  * Emulates one or more Roku devices on the LAN so that ECP/SSDP remotes
- * (Logitech Harmony, Sofabaton X1, the Roku app) trigger events in ioBroker.
- *
- * Milestone 1: lifecycle + interface-bound SSDP discovery. The ECP HTTP server +
- * device-info and the command/keys data model follow in milestones 2–3.
+ * (Logitech Harmony, Sofabaton X1, the Roku app) trigger events in ioBroker:
+ * a keypress lands in `<device>.command` and pulses `<device>.keys.<Key>`.
  */
 export class Fakeroku extends utils.Adapter {
   private ssdp: RokuSsdpResponder | undefined;
   private notifyTimer: ioBroker.Interval | undefined;
+  private readonly ecpServers: EcpHttpServer[] = [];
+  private readonly pulseTimers = new Set<ioBroker.Timeout>();
 
   /**
    * @param options adapter options passed through by js-controller
@@ -35,35 +42,111 @@ export class Fakeroku extends utils.Adapter {
     this.on("unload", this.onUnload.bind(this));
   }
 
-  /** Start the interface-bound SSDP responder for every configured device. */
+  /** Create each device's object tree, start its ECP server, then the shared SSDP responder. */
   private async onReady(): Promise<void> {
     try {
       await this.setState("info.connection", { val: false, ack: true });
 
       const interfaceIp = this.config.networkInterface;
       if (!interfaceIp) {
-        this.log.warn("No network interface selected — SSDP discovery disabled. Choose one in the adapter settings.");
+        this.log.warn("No network interface selected — discovery/ECP disabled. Choose one in the settings.");
         return;
       }
 
-      const devices: RokuAdvert[] = (this.config.devices ?? [])
-        .filter(d => d && typeof d.name === "string" && d.name.length > 0)
-        .map(d => ({ uuid: deriveUuid(d.name), port: Number(d.port) || DEFAULT_ECP_PORT }));
-
-      if (devices.length === 0) {
+      const configured = (this.config.devices ?? []).filter(d => d && typeof d.name === "string" && d.name.length > 0);
+      if (configured.length === 0) {
         this.log.warn("No emulated Roku devices configured.");
         return;
       }
 
-      this.ssdp = new RokuSsdpResponder({ devices, interfaceIp, logger: this.log });
+      const adverts: RokuAdvert[] = [];
+      for (const d of configured) {
+        const deviceId = sanitizeId(d.name);
+        const advert: RokuAdvert = { uuid: deriveUuid(d.name), port: Number(d.port) || DEFAULT_ECP_PORT };
+        await this.createDeviceStates(deviceId, d.name);
+        const server = new EcpHttpServer({
+          device: advert,
+          friendlyName: d.name,
+          apps: DEFAULT_APPS,
+          interfaceIp,
+          logger: this.log,
+          onCommand: cmd => this.applyCommand(deviceId, cmd),
+        });
+        await server.start();
+        this.ecpServers.push(server);
+        adverts.push(advert);
+      }
+
+      this.ssdp = new RokuSsdpResponder({ devices: adverts, interfaceIp, logger: this.log });
       await this.startWithTimeout(this.ssdp.start(), SSDP_START_TIMEOUT_MS);
       this.ssdp.announce();
       this.notifyTimer = this.setInterval(() => this.ssdp?.announce(), SSDP_NOTIFY_INTERVAL_MS);
 
       await this.setState("info.connection", { val: true, ack: true });
-      this.log.info(`Emulating ${devices.length} Roku device(s) on ${interfaceIp}`);
+      this.log.info(`Emulating ${adverts.length} Roku device(s) on ${interfaceIp}`);
     } catch (e) {
       this.log.error(`onReady failed: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
+
+  /**
+   * Create the fixed object tree for one emulated Roku: the device, `command` +
+   * `commandType`, and every standard remote key as a `button.press` state — all
+   * up front, so the tree is usable before any key is ever pressed.
+   *
+   * @param deviceId the id-safe device path segment
+   * @param friendlyName the configured device name
+   */
+  private async createDeviceStates(deviceId: string, friendlyName: string): Promise<void> {
+    await this.extendObject(deviceId, { type: "device", common: { name: friendlyName }, native: {} });
+    await this.extendObject(`${deviceId}.command`, {
+      type: "state",
+      common: { name: "Last command", type: "string", role: "text", read: true, write: false, def: "" },
+      native: {},
+    });
+    await this.extendObject(`${deviceId}.commandType`, {
+      type: "state",
+      common: { name: "Last command type", type: "string", role: "text", read: true, write: false, def: "" },
+      native: {},
+    });
+    await this.extendObject(`${deviceId}.keys`, { type: "channel", common: { name: "keys" }, native: {} });
+    for (const key of STANDARD_KEYS) {
+      await this.extendObject(`${deviceId}.keys.${key}`, {
+        type: "state",
+        // "sensor" = generic boolean read-only (active/inactive). The docs suggest
+        // button.press for a keypress-as-state, but the repochecker rejects it
+        // (E1010 — not in its role list); sensor is the gate-conformant fit.
+        common: { name: key, type: "boolean", role: "sensor", read: true, write: false, def: false },
+        native: {},
+      });
+    }
+  }
+
+  /**
+   * Apply a received ECP command to this device's states: record it in `command`
+   * / `commandType`, and pulse or hold the standard key if it is one.
+   *
+   * @param deviceId the id-safe device path segment
+   * @param cmd the parsed ECP command
+   */
+  private applyCommand(deviceId: string, cmd: CommandEvent): void {
+    const write = commandToStateWrite(cmd);
+    void this.setState(`${deviceId}.command`, { val: write.command, ack: true });
+    void this.setState(`${deviceId}.commandType`, { val: write.commandType, ack: true });
+    if (write.pulseKey) {
+      const id = `${deviceId}.keys.${write.pulseKey}`;
+      void this.setState(id, { val: true, ack: true });
+      const timer = this.setTimeout(() => {
+        if (timer) {
+          this.pulseTimers.delete(timer);
+        }
+        void this.setState(id, { val: false, ack: true });
+      }, KEY_PULSE_MS);
+      if (timer) {
+        this.pulseTimers.add(timer);
+      }
+    } else if (write.holdKey) {
+      void this.setState(`${deviceId}.keys.${write.holdKey.key}`, { val: write.holdKey.value, ack: true });
     }
   }
 
@@ -107,7 +190,14 @@ export class Fakeroku extends utils.Adapter {
         this.clearInterval(this.notifyTimer);
         this.notifyTimer = undefined;
       }
+      for (const t of this.pulseTimers) {
+        this.clearTimeout(t);
+      }
+      this.pulseTimers.clear();
       this.ssdp?.stop();
+      for (const s of this.ecpServers) {
+        s.stop();
+      }
       void this.setState("info.connection", { val: false, ack: true });
       callback();
     } catch {
