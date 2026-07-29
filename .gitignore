@@ -20,6 +20,7 @@ admin/i18n/flat.txt
 .dev-server/
 
 # Build & Test
+build/
 coverage/
 .nyc_output/
 *.tsbuildinfo
@@ -27,7 +28,6 @@ coverage/
 # Environment
 .env
 .env.local
-admin/hue-emu-logo.png
 
 # Claude Code local files (not published)
 .claude/settings.local.json
