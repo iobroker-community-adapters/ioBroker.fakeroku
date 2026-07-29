@@ -1,7 +1,7 @@
 {
   "common": {
     "name": "fakeroku",
-    "version": "0.4.0",
+    "version": "0.5.0",
     "news": {
       "0.4.0": {
         "en": "Adapter requires node.js >= 20 now.\nAdapter requires admin >= 7.7.22 now\nAdapter requires js-controller >= 6.0.11 now\nDependencies have been updated",
@@ -132,46 +132,65 @@
     "platform": "Javascript/Node.js",
     "mode": "daemon",
     "icon": "fakeroku.png",
-    "extIcon": "https://raw.githubusercontent.com/iobroker-community-adapters/ioBroker.fakeroku/master/admin/fakeroku.png",
-    "readme": "https://github.com/iobroker-community-adapters/ioBroker.fakeroku/blob/master/README.md",
+    "extIcon": "https://raw.githubusercontent.com/krobipd/ioBroker.fakeroku/main/admin/fakeroku.png",
+    "readme": "https://github.com/krobipd/ioBroker.fakeroku/blob/main/README.md",
     "loglevel": "info",
     "tier": 2,
     "compact": false,
     "connectionType": "local",
-    "dataSource": "poll",
+    "dataSource": "push",
     "type": "multimedia",
     "enabled": true,
     "authors": [
-      "Pmant <patrickmo@gmx.de>",
-      "iobroker-community-adapters <iobroker-community-adapters@gmx.de>"
+      "krobi <krobi@power-dreams.com>"
     ],
     "restartAdapters": [],
     "singletonHost": true,
     "dependencies": [
       {
-        "js-controller": ">=6.0.11"
+        "js-controller": ">=7.2.2"
       }
     ],
     "globalDependencies": [
       {
-        "admin": ">=7.7.22"
+        "admin": ">=7.8.23"
       }
     ],
     "adminUI": {
-      "config": "html"
+      "config": "json"
     }
   },
   "native": {
-    "MULTICAST_IP": "239.255.255.250",
-    "BIND": "0.0.0.0",
+    "networkInterface": "",
     "devices": [
       {
         "name": "ioBroker",
-        "port": 9093,
-        "uuid": null
+        "port": 8060
       }
     ]
   },
   "objects": [],
-  "instanceObjects": []
+  "instanceObjects": [
+    {
+      "_id": "info",
+      "type": "channel",
+      "common": {
+        "name": "Information"
+      },
+      "native": {}
+    },
+    {
+      "_id": "info.connection",
+      "type": "state",
+      "common": {
+        "role": "indicator.connected",
+        "name": "Device or service connected",
+        "type": "boolean",
+        "read": true,
+        "write": false,
+        "def": false
+      },
+      "native": {}
+    }
+  ]
 }

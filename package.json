@@ -1,56 +1,86 @@
 {
   "name": "iobroker.fakeroku",
-  "version": "0.4.0",
-  "description": "ioBroker fakeroku Adapter",
-  "author": "Pmant <patrickmo@gmx.de>",
+  "version": "0.5.0",
+  "description": "ioBroker adapter that emulates Roku devices, letting ECP/SSDP remotes (Logitech Harmony, Sofabaton, Roku app) trigger events in ioBroker",
+  "author": {
+    "name": "krobi",
+    "email": "krobi@power-dreams.com"
+  },
   "contributors": [
-    "Pmant <patrickmo@gmx.de>",
-    "iobroker-community-adapters <iobroker-community-adapters@gmx.de>"
+    {
+      "name": "Pmant",
+      "email": "patrickmo@gmx.de",
+      "role": "Original author"
+    },
+    {
+      "name": "Claude (Anthropic)",
+      "role": "Coding assistance"
+    }
   ],
-  "homepage": "https://github.com/iobroker-community-adapters/ioBroker.fakeroku",
+  "homepage": "https://github.com/krobipd/ioBroker.fakeroku",
   "license": "MIT",
   "keywords": [
     "ioBroker",
     "fakeroku",
+    "Roku",
+    "Harmony",
     "Smart Home",
     "home automation"
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/iobroker-community-adapters/ioBroker.fakeroku"
+    "url": "https://github.com/krobipd/ioBroker.fakeroku"
   },
   "engines": {
     "node": ">=22"
   },
   "dependencies": {
-    "@iobroker/adapter-core": "^3.3.2",
-    "http-headers": "^3.0.1"
+    "@iobroker/adapter-core": "^3.4.3",
+    "node-ssdp": "^4.0.1"
   },
   "devDependencies": {
-    "@alcalzone/release-script": "^5.2.0",
+    "@alcalzone/release-script": "^5.2.1",
     "@alcalzone/release-script-plugin-iobroker": "^5.2.0",
     "@alcalzone/release-script-plugin-license": "^5.2.0",
-    "@alcalzone/release-script-plugin-manual-review": "^5.2.0",
     "@iobroker/adapter-dev": "^1.5.0",
     "@iobroker/eslint-config": "^2.3.4",
     "@iobroker/testing": "^5.3.0",
+    "@types/node": "^22",
+    "@types/node-ssdp": "^4.0.5",
     "@tsconfig/node22": "^22.0.5",
-    "@types/node": "^22.20.1",
-    "typescript": "~5.9.3"
+    "@types/iobroker": "npm:@iobroker/types@^7.2.2",
+    "@vitest/coverage-v8": "^4.1.10",
+    "rimraf": "^6.1.3",
+    "typescript": "~6.0.3",
+    "vitest": "^4.1.10"
   },
-  "main": "main.js",
+  "main": "build/main.js",
+  "files": [
+    "build/",
+    "admin/",
+    "io-package.json",
+    "LICENSE"
+  ],
   "scripts": {
-    "test:js": "mocha --config test/mocharc.custom.json \"{!(node_modules|test)/**/*.test.js,*.test.js,test/**/test!(PackageFiles|Startup).js}\"",
+    "prebuild": "rimraf build",
+    "build": "build-adapter ts",
+    "watch": "build-adapter ts --watch",
+    "check": "tsc --noEmit",
+    "test:ts": "vitest run",
+    "test:unit": "vitest run",
     "test:package": "mocha test/package --exit",
     "test:integration": "mocha test/integration --exit",
-    "test": "npm run test:js && npm run test:package",
-    "check": "tsc --noEmit -p tsconfig.check.json",
-    "lint": "eslint -c eslint.config.mjs .",
-    "translate": "translate-adapter",
-    "release": "release-script"
+    "test": "npm run test:ts && npm run test:package",
+    "coverage": "vitest run --coverage",
+    "lint": "eslint",
+    "lint:fix": "eslint --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "release": "release-script",
+    "translate": "translate-adapter"
   },
   "bugs": {
-    "url": "https://github.com/iobroker-community-adapters/ioBroker.fakeroku/issues"
+    "url": "https://github.com/krobipd/ioBroker.fakeroku/issues"
   },
   "readmeFilename": "README.md"
 }

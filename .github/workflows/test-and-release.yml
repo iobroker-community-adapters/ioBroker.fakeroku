@@ -1,97 +1,139 @@
 name: Test and Release
 
-# Run this job on all pushes and pull requests
-# as well as tags with a semantic version
 on:
-    push:
-        branches:
-            - 'master'
-        tags:
-            # normal versions
-            - 'v[0-9]+.[0-9]+.[0-9]+'
-            # pre-releases
-            - 'v[0-9]+.[0-9]+.[0-9]+-**'
-    pull_request: {}
+  push:
+    branches:
+      - main
+    tags:
+      - v[0-9]+.[0-9]+.[0-9]+
+      - v[0-9]+.[0-9]+.[0-9]+-**
+  pull_request:
+    branches:
+      - main
 
-# Cancel previous PR/branch runs when a new commit is pushed
 concurrency:
-    group: ${{ github.ref }}
-    cancel-in-progress: true
+  group: ${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-    # Performs quick checks before the expensive test runs
-    check-and-lint:
-        if: contains(github.event.head_commit.message, '[skip ci]') == false
+  check-and-lint:
+    if: contains(github.event.head_commit.message, '[skip ci]') == false
+    runs-on: ubuntu-latest
+    steps:
+      - uses: ioBroker/testing-action-check@v2
+        with:
+          node-version: "24.x"
+          type-checking: true
+          lint: true
 
-        runs-on: ubuntu-latest
+  repochecker-version-gate:
+    if: contains(github.event.head_commit.message, '[skip ci]') == false
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Verify io-package.json against ioBroker stable repository
+        run: |
+          set -euo pipefail
+          # Source: sources-dist-stable.json — die offizielle Stable-Schiene aus
+          # ioBroker.repositories. Default-Installationen (`activeRepo: stable`)
+          # ziehen alle ioBroker-Adapter von dort. Jede in io-package.json
+          # deklarierte Adapter-Voraussetzung (common.dependencies +
+          # common.globalDependencies) muss latest-stable matchen.
+          URL="https://raw.githubusercontent.com/ioBroker/ioBroker.repositories/master/sources-dist-stable.json"
+          HTTP_STATUS=$(curl -sLo /tmp/stable.json -w "%{http_code}" --max-time 30 "$URL" || echo "000")
+          if [ "$HTTP_STATUS" = "404" ]; then
+            echo "::error ::sources-dist-stable.json returned 404 — file moved/renamed. Update workflow URL."
+            exit 1
+          fi
+          if [ "$HTTP_STATUS" = "000" ] || [ "$HTTP_STATUS" -ge 500 ] 2>/dev/null; then
+            echo "::warning ::sources-dist-stable.json not reachable (HTTP $HTTP_STATUS) — skipping live check"
+            exit 0
+          fi
+          if [ "$HTTP_STATUS" -ne 200 ] 2>/dev/null; then
+            echo "::warning ::sources-dist-stable.json returned HTTP $HTTP_STATUS — skipping live check"
+            exit 0
+          fi
+          # Schema-Sanity: ohne js-controller + admin ist die Datei kaputt
+          JS_STABLE=$(jq -r '."js-controller".version // ""' /tmp/stable.json)
+          ADMIN_STABLE=$(jq -r '.admin.version // ""' /tmp/stable.json)
+          if [ -z "${JS_STABLE}" ] || [ -z "${ADMIN_STABLE}" ]; then
+            echo "::error ::sources-dist-stable.json schema changed — could not parse js-controller/admin versions."
+            exit 1
+          fi
+          # Iteriere über alle Adapter-Deps in io-package.json (dependencies + globalDependencies)
+          # und vergleiche jeweils gegen den stable-Wert. Format: "<kind>\t<name>\t<value>"
+          DEPS=$(jq -r '
+            [
+              (.common.dependencies // [] | map(to_entries[] | "dependencies\t\(.key)\t\(.value)")),
+              (.common.globalDependencies // [] | map(to_entries[] | "globalDependencies\t\(.key)\t\(.value)"))
+            ] | flatten | .[]
+          ' io-package.json)
+          FAIL=0
+          while IFS=$'\t' read -r KIND NAME VALUE; do
+            [ -z "${NAME}" ] && continue
+            STABLE=$(jq -r --arg n "${NAME}" '.[$n].version // ""' /tmp/stable.json)
+            if [ -z "${STABLE}" ]; then
+              echo "::warning ::${NAME} not in sources-dist-stable.json — skipping (no autosync target)"
+              continue
+            fi
+            EXPECTED=">=${STABLE}"
+            if [ "${VALUE}" != "${EXPECTED}" ]; then
+              echo "::error ::Drift: io-package.json ${KIND}.${NAME}=${VALUE}, expected ${EXPECTED} (latest stable)"
+              FAIL=1
+            else
+              echo "✓ ${KIND}.${NAME} = ${VALUE}"
+            fi
+          done <<< "${DEPS}"
+          if [ "${FAIL}" -eq 1 ]; then
+            echo ""
+            echo "Source: https://github.com/ioBroker/ioBroker.repositories/blob/master/sources-dist-stable.json"
+            echo "Fix: bump io-package.json common.dependencies / globalDependencies to the stable versions above."
+            echo "(release-script before_commit hook does this automatically — run 'npm run release' to apply.)"
+            exit 1
+          fi
+          echo "✓ all ioBroker-deps synced with stable repository"
 
-        steps:
-            - uses: ioBroker/testing-action-check@v1
-              with:
-                  node-version: '24.x'
-                  # Uncomment the following line if your adapter cannot be installed using 'npm ci'
-                  # install-command: 'npm install'
-                  lint: false
-                
+  workflow-lint:
+    if: contains(github.event.head_commit.message, '[skip ci]') == false
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Lint workflow YAML files (actionlint)
+        uses: reviewdog/action-actionlint@v1
+        with:
+          fail_level: error
 
-    # Runs adapter tests on all supported node versions and OSes
-    adapter-tests:
-        needs: [check-and-lint]
-        if: contains(github.event.head_commit.message, '[skip ci]') == false
+  adapter-tests:
+    if: contains(github.event.head_commit.message, '[skip ci]') == false
+    needs: [check-and-lint]
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        node-version: [22.x, 24.x]
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    steps:
+      - name: Run tests
+        uses: ioBroker/testing-action-adapter@v1
+        with:
+          node-version: ${{ matrix.node-version }}
+          os: ${{ matrix.os }}
+          build: true
 
-        runs-on: ${{ matrix.os }}
-        strategy:
-            matrix:
-                node-version: [22.x, 24.x]
-                os: [ubuntu-latest, windows-latest, macos-latest]
-
-        steps:
-            - uses: ioBroker/testing-action-adapter@v1
-              with:
-                  node-version: ${{ matrix.node-version }}
-                  os: ${{ matrix.os }}
-                  # Uncomment the following line if your adapter cannot be installed using 'npm ci'
-                  # install-command: 'npm install'
-
-    # TODO: To enable automatic npm releases, create a token on npmjs.org
-    # Enter this token as a GitHub secret (with name NPM_TOKEN) in the repository options
-    # Then uncomment the following block:
-
-    # Deploys the final package to NPM
-    deploy:
-        needs: [check-and-lint, adapter-tests]
-
-        # Trigger this step only when a commit on any branch is tagged with a version number
-        if: |
-            contains(github.event.head_commit.message, '[skip ci]') == false &&
-            github.event_name == 'push' &&
-            startsWith(github.ref, 'refs/tags/v')
-
-        runs-on: ubuntu-latest
-
-        # Write permissions are required to create Github releases
-        permissions:
-            contents: write
-            id-token: write
-
-        steps:
-            - uses: ioBroker/testing-action-deploy@v1
-              with:
-                  node-version: '24.x'
-                  # Uncomment the following line if your adapter cannot be installed using 'npm ci'
-                  # install-command: 'npm install'
-                  # npm-token: ${{ secrets.NPM_TOKEN }}  # Commented out for migration to Trusted Publishing
-                  github-token: ${{ secrets.GITHUB_TOKEN }}
-
-                  # When using Sentry for error reporting, Sentry can be informed about new releases
-                  # To enable create a API-Token in Sentry (User settings, API keys)
-                  # Enter this token as a GitHub secret (with name SENTRY_AUTH_TOKEN) in the repository options
-                  # Then uncomment and customize the following block:
-                  #sentry: true
-                  #sentry-token: ${{ secrets.SENTRY_AUTH_TOKEN }}
-                  #sentry-url: "https://sentry.io"
-                  #sentry-org: "mcm4iob"
-                  #sentry-project: "iobroker-pid"
-                  #sentry-version-prefix: "iobroker.pid"
-                  ## If your sentry project is linked to a GitHub repository, you can enable the following option
-                  #sentry-github-integration: true
+  deploy:
+    needs: [check-and-lint, adapter-tests, repochecker-version-gate, workflow-lint]
+    if: |
+      contains(github.event.head_commit.message, '[skip ci]') == false &&
+      github.event_name == 'push' &&
+      startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - uses: ioBroker/testing-action-deploy@v1
+        with:
+          # Node 24 avoids npm@latest+Node22 MODULE_NOT_FOUND for promise-retry
+          # during the publish step (seen in parcelapp v0.4.0 deploy).
+          node-version: "24.x"
+          build: true
+          github-token: ${{ secrets.GITHUB_TOKEN }}

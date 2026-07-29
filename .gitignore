@@ -1,5 +1,35 @@
-/.idea
-/node_modules
-/tmp
-#ignore .commitinfo created by ioBroker release script
+# macOS
+.DS_Store
+
+# Node.js
+node_modules/
+npm-debug.log*
+
+# IDE
+.idea/
+.vscode/*
+!.vscode/settings.json
+*.swp
+*.swo
+
+# ioBroker repochecker
 .commitinfo
+
+# ioBroker
+admin/i18n/flat.txt
+.dev-server/
+
+# Build & Test
+coverage/
+.nyc_output/
+*.tsbuildinfo
+
+# Environment
+.env
+.env.local
+admin/hue-emu-logo.png
+
+# Claude Code local files (not published)
+.claude/settings.local.json
+.claude/dev-history.md
+CLAUDE.local.md

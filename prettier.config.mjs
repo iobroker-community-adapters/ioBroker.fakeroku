@@ -1,8 +1,8 @@
-// ioBroker prettier configuration file
-import prettierConfig from '@iobroker/eslint-config/prettier.config.mjs';
+import prettierConfig from "@iobroker/eslint-config/prettier.config.mjs";
 
 export default {
-    ...prettierConfig,
-    // uncomment next line if you prefer double quotes
-    // singleQuote: false,
+  ...prettierConfig,
+  useTabs: false,
+  tabWidth: 2,
+  singleQuote: false,
 };
