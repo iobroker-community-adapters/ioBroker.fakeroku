@@ -66,17 +66,28 @@ becomes `true`, or watch `.command` for the last button as text.
 
 [Older changelogs can be found here](CHANGELOG_OLD.md)
 
-## Credits
+## History
 
-This adapter would not exist without [Pmant](https://github.com/Pmant), who built the
-original fakeroku on ioBroker back in 2017 and proved the idea works. The code has
-since been rewritten from the ground up — but the idea, and the proof that it works,
-are his.
+fakeroku has a long lineage on ioBroker, and this version continues it — for existing
+users it is simply a new version of the same adapter:
+
+- **[Pmant](https://github.com/Pmant)** created fakeroku in 2017 and built the original
+  Roku emulation: SSDP discovery, the ECP surface and multi-device support.
+- **[Apollon77](https://github.com/Apollon77)** kept the test and build tooling current
+  over the following years.
+- The **[ioBroker Community Adapters](https://github.com/iobroker-community-adapters)**
+  team — notably [mcm1957](https://github.com/mcm1957) and
+  [foxriver76](https://github.com/foxriver76) — maintained and modernized the adapter
+  from 2023 to 2026, releasing versions up to 0.4.0.
+- From **0.5.0** on, [krobi](https://github.com/krobipd) rewrote the adapter from the
+  ground up in TypeScript and added the full ECP surface including `device-info`.
 
 ## License
 
 The MIT License (MIT)
 
+Copyright (c) 2017-2023 Pmant <patrickmo@gmx.de>
+Copyright (c) 2023-2026 iobroker-community-adapters <iobroker-community-adapters@gmx.de>
 Copyright (c) 2026 krobi <krobi@power-dreams.com>
 
 Permission is hereby granted, free of charge, to any person obtaining a copy

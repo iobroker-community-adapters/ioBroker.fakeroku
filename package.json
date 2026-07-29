@@ -13,6 +13,11 @@
       "role": "Original author"
     },
     {
+      "name": "iobroker-community-adapters",
+      "email": "iobroker-community-adapters@gmx.de",
+      "role": "Maintenance 2023-2026"
+    },
+    {
       "name": "Claude (Anthropic)",
       "role": "Coding assistance"
     }
