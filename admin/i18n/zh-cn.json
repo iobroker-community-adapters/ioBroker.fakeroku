@@ -1,0 +1,7 @@
+{
+  "networkInterface": "网络接口（绑定 + 广播）",
+  "networkInterfaceTooltip": "模拟 Roku 绑定并广播的网卡。请选择您的 LAN 地址；不要保留为“所有接口”。",
+  "devicesTable": "模拟的 Roku 设备",
+  "columnName": "名称",
+  "columnPort": "ECP 端口"
+}

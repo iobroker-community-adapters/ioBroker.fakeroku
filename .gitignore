@@ -20,7 +20,6 @@ admin/i18n/flat.txt
 .dev-server/
 
 # Build & Test
-build/
 coverage/
 .nyc_output/
 *.tsbuildinfo

@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": ["../../src/lib/pure-helpers.ts"],
+  "sourcesContent": ["/**\n * Pure string helpers for the Roku emulator \u2014 no ioBroker or network dependencies,\n * kept isolated so they can be unit-tested on their own.\n */\n\n/**\n * Make a string safe as an ioBroker object-id segment: every character outside\n * `[A-Za-z0-9-_]` becomes `_`.\n *\n * @param raw the raw device or key name\n * @returns the id-safe string\n */\nexport function sanitizeId(raw: string): string {\n  return raw.replace(/[^A-Za-z0-9\\-_]/g, \"_\");\n}\n\n/**\n * Normalize a Roku key name taken from the ECP URL path:\n * decode the URL-encoded character of a `Lit_<char>` keyboard keypress, then\n * replace ALL dots with `_` (the old adapter's `replace('.', '_')` only hit the first).\n *\n * @param raw the raw key segment from the request URL\n * @returns the normalized key name\n */\nexport function normalizeKey(raw: string): string {\n  const decoded = raw.startsWith(\"Lit_\") ? `Lit_${decodeURIComponent(raw.slice(4))}` : raw;\n  return decoded.replace(/\\./g, \"_\");\n}\n"],
+  "mappings": ";;;;;;;;;;;;;;;;;;AAAA;AAAA;AAAA;AAAA;AAAA;AAAA;AAYO,SAAS,WAAW,KAAqB;AAC9C,SAAO,IAAI,QAAQ,oBAAoB,GAAG;AAC5C;AAUO,SAAS,aAAa,KAAqB;AAChD,QAAM,UAAU,IAAI,WAAW,MAAM,IAAI,OAAO,mBAAmB,IAAI,MAAM,CAAC,CAAC,CAAC,KAAK;AACrF,SAAO,QAAQ,QAAQ,OAAO,GAAG;AACnC;",
+  "names": []
+}

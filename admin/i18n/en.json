@@ -1,0 +1,7 @@
+{
+  "networkInterface": "Network interface (bind + advertise)",
+  "networkInterfaceTooltip": "The network card the emulated Rokus bind to and advertise on. Pick your LAN address; do not leave it on 'all interfaces'.",
+  "devicesTable": "Emulated Roku devices",
+  "columnName": "Name",
+  "columnPort": "ECP port"
+}

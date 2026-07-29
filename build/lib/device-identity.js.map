@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": ["../../src/lib/device-identity.ts"],
+  "sourcesContent": ["import { createHash } from \"node:crypto\";\n\n/**\n * Derive a stable Roku device identity (serial / UDN) from the device name.\n *\n * Deterministic md5 of the name, so the emulated Roku keeps the same USN/serial\n * across restarts \u2014 unlike the old adapter, whose UUID changed between the first\n * two runs (bug A1) and re-paired the Harmony. Milestone 2 (device-info) may\n * replace this with a persisted, richer identity; for discovery a stable\n * per-name value is enough.\n *\n * @param name the configured device name\n * @returns a 32-char lowercase hex identity\n */\nexport function deriveUuid(name: string): string {\n  return createHash(\"md5\").update(`fakeroku:${name}`).digest(\"hex\");\n}\n"],
+  "mappings": ";;;;;;;;;;;;;;;;;;AAAA;AAAA;AAAA;AAAA;AAAA;AAAA,yBAA2B;AAcpB,SAAS,WAAW,MAAsB;AAC/C,aAAO,+BAAW,KAAK,EAAE,OAAO,YAAY,IAAI,EAAE,EAAE,OAAO,KAAK;AAClE;",
+  "names": []
+}

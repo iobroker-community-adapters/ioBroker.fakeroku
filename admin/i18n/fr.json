@@ -1,0 +1,7 @@
+{
+  "networkInterface": "Interface réseau (liaison + annonce)",
+  "networkInterfaceTooltip": "La carte réseau à laquelle les Roku émulés se lient et s'annoncent. Choisissez votre adresse LAN ; ne la laissez pas sur 'toutes les interfaces'.",
+  "devicesTable": "Appareils Roku émulés",
+  "columnName": "Nom",
+  "columnPort": "Port ECP"
+}

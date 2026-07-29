@@ -71,7 +71,7 @@
       "0.2.0": {
         "en": "emulate multiple rokus",
         "de": "emuliere mehrere rokus",
-        "ru": "emulate multiple rokus",
+        "ru": "эмуляция нескольких Roku",
         "pt": "emular vários rokus",
         "nl": "meerdere roku's emuleren",
         "fr": "émuler plusieurs rokus",
@@ -83,8 +83,8 @@
       },
       "0.1.1": {
         "en": "fix package.json",
-        "de": "fix package.json",
-        "ru": "fix package.json",
+        "de": "package.json korrigiert",
+        "ru": "исправлен package.json",
         "pt": "corrigir pacote.json",
         "nl": "pakket.json repareren",
         "fr": "réparer package.json",

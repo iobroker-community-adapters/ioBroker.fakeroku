@@ -1,0 +1,7 @@
+{
+  "networkInterface": "Interfejs sieciowy (bind + rozgłaszanie)",
+  "networkInterfaceTooltip": "Karta sieciowa, do której podłączają się i rozgłaszają emulowane Roku. Wybierz swój adres LAN; nie zostawiaj na 'wszystkich interfejsach'.",
+  "devicesTable": "Emulowane urządzenia Roku",
+  "columnName": "Nazwa",
+  "columnPort": "Port ECP"
+}

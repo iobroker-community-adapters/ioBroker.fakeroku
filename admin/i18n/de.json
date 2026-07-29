@@ -1,0 +1,7 @@
+{
+  "networkInterface": "Netzwerkschnittstelle (Binden + Ankündigen)",
+  "networkInterfaceTooltip": "Die Netzwerkkarte, an die sich die emulierten Rokus binden und über die sie sich ankündigen. Wähle deine LAN-Adresse; nicht auf 'alle Schnittstellen' lassen.",
+  "devicesTable": "Emulierte Roku-Geräte",
+  "columnName": "Name",
+  "columnPort": "ECP-Port"
+}

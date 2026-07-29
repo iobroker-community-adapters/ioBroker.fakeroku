@@ -1,10 +1,11 @@
 {
-  "i18n": false,
+  "i18n": true,
   "type": "panel",
   "items": {
     "networkInterface": {
       "type": "ip",
-      "label": "Network interface (bind + advertise)",
+      "label": "networkInterface",
+      "tooltip": "networkInterfaceTooltip",
       "listenOnAllPorts": false,
       "onlyIp4": true,
       "xs": 12,
@@ -15,15 +16,15 @@
     },
     "devices": {
       "type": "table",
-      "label": "Emulated Roku devices",
+      "label": "devicesTable",
       "xs": 12,
       "sm": 12,
       "md": 12,
       "lg": 12,
       "xl": 12,
       "items": [
-        { "type": "text", "attr": "name", "title": "Name", "width": "60%" },
-        { "type": "number", "attr": "port", "title": "ECP port", "width": "40%", "default": 8060 }
+        { "type": "text", "attr": "name", "title": "columnName", "width": "60%" },
+        { "type": "number", "attr": "port", "title": "columnPort", "width": "40%", "default": 8060 }
       ]
     }
   }

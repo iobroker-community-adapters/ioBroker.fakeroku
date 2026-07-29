@@ -1,0 +1,7 @@
+{
+  "networkInterface": "Netwerkinterface (binden + aankondigen)",
+  "networkInterfaceTooltip": "De netwerkkaart waaraan de geëmuleerde Roku's zich binden en aankondigen. Kies je LAN-adres; laat het niet op 'alle interfaces' staan.",
+  "devicesTable": "Geëmuleerde Roku-apparaten",
+  "columnName": "Naam",
+  "columnPort": "ECP-poort"
+}
