@@ -109,8 +109,8 @@
       "zh-cn": "Fakeroku 模拟器"
     },
     "desc": {
-      "en": "Adapter emulates Roku-Devices to Harmony Hub",
-      "de": "Adapter simuliert Roku-Geräte für den Harmony Hub",
+      "en": "Emulates Roku devices so ECP/SSDP remotes (Harmony, Sofabaton, Roku app) trigger events in ioBroker",
+      "de": "Emuliert Roku-Geräte, damit ECP/SSDP-Fernbedienungen (Harmony, Sofabaton, Roku-App) Ereignisse in ioBroker auslösen",
       "ru": "ioBroker fakeroku драйвер как образец",
       "pt": "Adaptador emula dispositivos Roku para Harmony Hub",
       "nl": "Adapter emuleert Roku-apparaten naar Harmony Hub",
