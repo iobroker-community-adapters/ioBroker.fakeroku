@@ -80,6 +80,19 @@
         "pl": "napraw pakiet.json",
         "uk": "виправити package.json",
         "zh-cn": "修复 package.json"
+      },
+      "0.1.0": {
+        "en": "first version",
+        "de": "erste Version",
+        "ru": "first version",
+        "pt": "primeira versão",
+        "nl": "eerste versie",
+        "fr": "première version",
+        "it": "prima versione",
+        "es": "primera versión",
+        "pl": "pierwsza wersja",
+        "uk": "перша версія",
+        "zh-cn": "第一个版本"
       }
     },
     "titleLang": {
