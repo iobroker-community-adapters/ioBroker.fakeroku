@@ -1,22 +1,30 @@
 {
-    "type": "panel",
-    "items": {
-        "networkInterface": {
-            "type": "ip",
-            "label": "Network interface (bind + advertise)",
-            "listenOnAllPorts": false,
-            "onlyIp4": true,
-            "sm": 12,
-            "md": 6
-        },
-        "devices": {
-            "type": "table",
-            "label": "Emulated Roku devices",
-            "sm": 12,
-            "items": [
-                { "type": "text", "attr": "name", "title": "Name", "width": "60%" },
-                { "type": "number", "attr": "port", "title": "ECP port", "width": "40%", "default": 8060 }
-            ]
-        }
+  "i18n": false,
+  "type": "panel",
+  "items": {
+    "networkInterface": {
+      "type": "ip",
+      "label": "Network interface (bind + advertise)",
+      "listenOnAllPorts": false,
+      "onlyIp4": true,
+      "xs": 12,
+      "sm": 12,
+      "md": 6,
+      "lg": 6,
+      "xl": 6
+    },
+    "devices": {
+      "type": "table",
+      "label": "Emulated Roku devices",
+      "xs": 12,
+      "sm": 12,
+      "md": 12,
+      "lg": 12,
+      "xl": 12,
+      "items": [
+        { "type": "text", "attr": "name", "title": "Name", "width": "60%" },
+        { "type": "number", "attr": "port", "title": "ECP port", "width": "40%", "default": 8060 }
+      ]
     }
+  }
 }

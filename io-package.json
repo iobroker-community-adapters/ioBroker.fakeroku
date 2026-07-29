@@ -3,6 +3,19 @@
     "name": "fakeroku",
     "version": "0.5.0",
     "news": {
+      "0.5.0": {
+        "en": "Complete rewrite in TypeScript with the full Roku ECP surface including device-info (works with modern remotes like the Sofabaton X1). New clean data model: a command datapoint plus fixed keys states.",
+        "de": "Komplette Neufassung in TypeScript mit voller Roku-ECP-Oberfläche inklusive device-info (funktioniert mit modernen Fernbedienungen wie der Sofabaton X1). Neues sauberes Datenmodell: ein command-Datenpunkt plus feste keys-Zustände.",
+        "ru": "Complete rewrite in TypeScript with the full Roku ECP surface including device-info. New clean data model: a command datapoint plus fixed keys states.",
+        "pt": "Complete rewrite in TypeScript with the full Roku ECP surface including device-info. New clean data model: a command datapoint plus fixed keys states.",
+        "nl": "Complete rewrite in TypeScript with the full Roku ECP surface including device-info. New clean data model: a command datapoint plus fixed keys states.",
+        "fr": "Complete rewrite in TypeScript with the full Roku ECP surface including device-info. New clean data model: a command datapoint plus fixed keys states.",
+        "it": "Complete rewrite in TypeScript with the full Roku ECP surface including device-info. New clean data model: a command datapoint plus fixed keys states.",
+        "es": "Complete rewrite in TypeScript with the full Roku ECP surface including device-info. New clean data model: a command datapoint plus fixed keys states.",
+        "pl": "Complete rewrite in TypeScript with the full Roku ECP surface including device-info. New clean data model: a command datapoint plus fixed keys states.",
+        "uk": "Complete rewrite in TypeScript with the full Roku ECP surface including device-info. New clean data model: a command datapoint plus fixed keys states.",
+        "zh-cn": "Complete rewrite in TypeScript with the full Roku ECP surface including device-info. New clean data model: a command datapoint plus fixed keys states."
+      },
       "0.4.0": {
         "en": "Adapter requires node.js >= 20 now.\nAdapter requires admin >= 7.7.22 now\nAdapter requires js-controller >= 6.0.11 now\nDependencies have been updated",
         "de": "Adapter benötigt jetzt node.js >= 20.\nAdapter benötigt admin >= 7.7.22 jetzt\nAdapter benötigt jetzt js-controller >= 6.0.11\nAbhängigkeiten wurden aktualisiert",
@@ -80,19 +93,6 @@
         "pl": "napraw pakiet.json",
         "uk": "виправити package.json",
         "zh-cn": "修复 package.json"
-      },
-      "0.1.0": {
-        "en": "first version",
-        "de": "erste Version",
-        "ru": "first version",
-        "pt": "primeira versão",
-        "nl": "eerste versie",
-        "fr": "première version",
-        "it": "prima versione",
-        "es": "primera versión",
-        "pl": "pierwsza wersja",
-        "uk": "перша версія",
-        "zh-cn": "第一个版本"
       }
     },
     "titleLang": {
