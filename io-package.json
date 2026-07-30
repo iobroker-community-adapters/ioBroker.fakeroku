@@ -1,9 +1,9 @@
 {
   "common": {
     "name": "fakeroku",
-    "version": "0.4.0",
+    "version": "0.5.0",
     "news": {
-      "NEXT": {
+      "0.5.0": {
         "en": "Complete rewrite with the full Roku control surface including device-info, and a clean new data model: a command datapoint plus fixed keys states.",
         "de": "Komplette Neufassung mit voller Roku-Oberfläche inklusive device-info und sauberem neuem Datenmodell: ein command-Datenpunkt plus feste keys-Zustände.",
         "ru": "Полная переработка с полной поверхностью управления Roku, включая device-info, и новая чистая модель данных: точка данных command плюс фиксированные состояния keys.",
