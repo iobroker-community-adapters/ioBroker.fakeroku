@@ -3,6 +3,19 @@
     "name": "fakeroku",
     "version": "0.4.0",
     "news": {
+      "NEXT": {
+        "en": "Complete rewrite with the full Roku control surface including device-info, and a clean new data model: a command datapoint plus fixed keys states.",
+        "de": "Komplette Neufassung mit voller Roku-Oberfläche inklusive device-info und sauberem neuem Datenmodell: ein command-Datenpunkt plus feste keys-Zustände.",
+        "ru": "Полная переработка с полной поверхностью управления Roku, включая device-info, и новая чистая модель данных: точка данных command плюс фиксированные состояния keys.",
+        "pt": "Reescrita completa com a superfície de controlo Roku completa, incluindo device-info, e um novo modelo de dados limpo: um ponto de dados command mais estados keys fixos.",
+        "nl": "Volledige herschrijving met het volledige Roku-besturingsoppervlak inclusief device-info en een schoon nieuw gegevensmodel: een command-datapunt plus vaste keys-statussen.",
+        "fr": "Réécriture complète avec la surface de contrôle Roku complète incluant device-info, et un nouveau modèle de données propre : un point de données command plus des états keys fixes.",
+        "it": "Riscrittura completa con la superficie di controllo Roku completa incluso device-info, e un nuovo modello dati pulito: un datapoint command più stati keys fissi.",
+        "es": "Reescritura completa con la superficie de control Roku completa incluido device-info, y un nuevo modelo de datos limpio: un punto de datos command más estados keys fijos.",
+        "pl": "Całkowite przepisanie z pełną powierzchnią sterowania Roku, w tym device-info, oraz nowy czysty model danych: punkt danych command plus stałe stany keys.",
+        "uk": "Повне переписування з повною поверхнею керування Roku, включно з device-info, та нова чиста модель даних: точка даних command плюс фіксовані стани keys.",
+        "zh-cn": "完全重写，具有完整的 Roku 控制界面，包括 device-info，以及全新的清晰数据模型：command 数据点加上固定的 keys 状态。"
+      },
       "0.4.0": {
         "en": "Adapter requires node.js >= 20 now.\nAdapter requires admin >= 7.7.22 now\nAdapter requires js-controller >= 6.0.11 now\nDependencies have been updated",
         "de": "Adapter benötigt jetzt node.js >= 20.\nAdapter benötigt admin >= 7.7.22 jetzt\nAdapter benötigt jetzt js-controller >= 6.0.11\nAbhängigkeiten wurden aktualisiert",
@@ -80,19 +93,6 @@
         "pl": "napraw pakiet.json",
         "uk": "виправити package.json",
         "zh-cn": "修复 package.json"
-      },
-      "0.1.0": {
-        "en": "first version",
-        "de": "erste Version",
-        "ru": "first version",
-        "pt": "primeira versão",
-        "nl": "eerste versie",
-        "fr": "première version",
-        "it": "prima versione",
-        "es": "primera versión",
-        "pl": "pierwsza wersja",
-        "uk": "перша версія",
-        "zh-cn": "第一个版本"
       }
     },
     "titleLang": {

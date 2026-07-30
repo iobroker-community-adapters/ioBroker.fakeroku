@@ -8,46 +8,9 @@ permissions:
   contents: write
 
 jobs:
-  # Dependabot regenerates package-lock.json on npm bumps and drops the nested
-  # platform-optional subtree (@esbuild/* etc.), which breaks `npm ci` and fails
-  # the required check. Recompute the lockfile (script-free, no install) and push
-  # it back with a deploy key — a non-GITHUB_TOKEN push re-triggers the PR check,
-  # unlike the built-in token. In-repo PRs only (Dependabot branches are in-repo).
-  lockfile-fix:
-    if: >
-      github.actor == 'dependabot[bot]' &&
-      github.event.pull_request.head.repo.full_name == github.event.pull_request.base.repo.full_name
-    runs-on: ubuntu-latest
-    env:
-      NPM_CONFIG_IGNORE_SCRIPTS: "true"
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          ref: ${{ github.event.pull_request.head.ref }}
-          ssh-key: ${{ secrets.LOCKFIX_DEPLOY_KEY }}
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22.x
-      - name: Recompute lockfile and push back if out of sync
-        env:
-          HEAD_REF: ${{ github.event.pull_request.head.ref }}
-        run: |
-          set -euo pipefail
-          npm install --package-lock-only --ignore-scripts
-          if git diff --quiet -- package-lock.json; then
-            echo "lockfile already in sync — nothing to do"
-            exit 0
-          fi
-          echo "lockfile was out of sync — committing repair"
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add package-lock.json
-          git commit -m "chore(deps): repair lockfile — restore platform-optional subtree"
-          git push origin "HEAD:${HEAD_REF}"
-
   auto-merge:
-    if: github.actor == 'dependabot[bot]'
     runs-on: ubuntu-latest
+    if: github.actor == 'dependabot[bot]'
     steps:
       - name: Fetch Dependabot metadata
         id: metadata

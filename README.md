@@ -1,9 +1,10 @@
-![Logo](admin/fakeroku.png)
+# <img src="https://cdn.jsdelivr.net/gh/krobipd/ioBroker.fakeroku@main/admin/fakeroku.svg" width="48" align="top" /> ioBroker.fakeroku
 
-# ioBroker.fakeroku
+**Release:** [![npm version](https://img.shields.io/npm/v/iobroker.fakeroku)](https://www.npmjs.com/package/iobroker.fakeroku) ![stable](https://iobroker.live/badges/fakeroku-stable.svg) ![Installations](https://iobroker.live/badges/fakeroku-installed.svg) [![npm downloads](https://img.shields.io/npm/dt/iobroker.fakeroku)](https://www.npmjs.com/package/iobroker.fakeroku)
 
-![Number of Installations](https://iobroker.live/badges/fakeroku-installed.svg)
-![Number of Installations](https://iobroker.live/badges/fakeroku-stable.svg)
+**Build:** [![Test and Release](https://github.com/krobipd/ioBroker.fakeroku/actions/workflows/test-and-release.yml/badge.svg)](https://github.com/krobipd/ioBroker.fakeroku/actions/workflows/test-and-release.yml) ![Node](https://img.shields.io/badge/node-%3E%3D22-brightgreen) ![TypeScript](https://img.shields.io/badge/TypeScript-strict-blue) [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+
+**Support:** [![Ko-fi](https://img.shields.io/badge/Ko--fi-Support-ff5e5b?logo=ko-fi)](https://ko-fi.com/krobipd) [![PayPal](https://img.shields.io/badge/Donate-PayPal-blue.svg)](https://paypal.me/krobipd)
 
 Emulates one or more **Roku devices** on your LAN so that ECP/SSDP remotes — a
 Logitech Harmony Hub, a Sofabaton X1, the Roku mobile app — can trigger events in
@@ -13,6 +14,19 @@ on the remote becomes a datapoint in ioBroker.
 Unlike the classic fake-Roku, this build answers the full Roku control surface
 including `/query/device-info` with a **current** Roku version — the part modern
 remotes check at pairing time, so it works beyond a classic Harmony hub.
+
+## Features
+
+- Emulates one or more Roku devices on the LAN — the Roku control protocol (ECP) over HTTP plus SSDP discovery on port 1900.
+- Full Roku control surface including `/query/device-info` with a current Roku version — the part modern remotes check when pairing.
+- Clean data model per device: a `command` datapoint plus fixed `keys.<Key>` states, all created up front.
+- Several emulated Rokus from a single instance; discovery bound to the chosen network interface; command handling restricted to the LAN.
+
+## Requirements
+
+- Node.js >= 22
+- js-controller >= 7.2.2
+- admin >= 7.8.23
 
 ## Installation
 
@@ -57,7 +71,7 @@ becomes `true`, or watch `.command` for the last button as text.
 	### **WORK IN PROGRESS**
 -->
 ### **WORK IN PROGRESS**
-- Complete rewrite in TypeScript with the full Roku control surface including `device-info` — works with modern remotes (Sofabaton X1, Roku app), not just a classic Harmony hub
+- Complete rewrite with the full Roku control surface, including `device-info` with a current Roku version — the part modern remotes check at pairing, beyond what a classic Harmony hub needs
 - New clean data model: a `command` datapoint plus fixed `keys.<Key>` states, all created up front instead of appearing only after the first keypress
 - Discovery binds to the chosen network interface, command handling is restricted to the local network
 
@@ -107,3 +121,7 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
+
+---
+
+_Developed with assistance from Claude.ai_
