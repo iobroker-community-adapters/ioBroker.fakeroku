@@ -35,7 +35,9 @@ Install the adapter from the ioBroker admin.
 ## Configuration
 
 - **Network interface** — the network card the emulated Rokus bind to and advertise
-  on. Pick your LAN address; do not leave it on "all interfaces".
+  on. Leave it on "all interfaces" and the adapter runs out of the box — it detects
+  the routable IP automatically. Pick a specific address only on a host with several
+  network cards.
 - **Emulated Roku devices** — a table of devices, each with a **name** and an
   **ECP port** (default `8060`, the real Roku port). You can emulate several Rokus
   from one instance.
@@ -70,6 +72,11 @@ becomes `true`, or watch `.command` for the last button as text.
 	Placeholder for the next version (at the beginning of the line):
 	### **WORK IN PROGRESS**
 -->
+### **WORK IN PROGRESS**
+- Runs without any setup now — the adapter detects the routable network address on its own instead of sitting idle until a network interface is picked
+- Leftover entries from an earlier version disappear from the object tree on start, so the tree no longer keeps unused nodes around
+- The admin page now opens with a short explanation of what the adapter does and how to set it up
+
 ### 0.5.0 (2026-07-30)
 - Complete rewrite with the full Roku control surface, including `device-info` with a current Roku version — the part modern remotes check at pairing, beyond what a classic Harmony hub needs
 - New clean data model: a `command` datapoint plus fixed `keys.<Key>` states, all created up front instead of appearing only after the first keypress

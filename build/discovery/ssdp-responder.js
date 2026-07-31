@@ -45,18 +45,22 @@ class RokuSsdpResponder {
   socket;
   /** Bind on 1900, join multicast on the selected interface, start answering. Rejects on bind error. */
   async start() {
+    var _a;
     const socket = dgram.createSocket({ type: "udp4", reuseAddr: true });
     this.socket = socket;
     await new Promise((resolve, reject) => {
       const onBindError = (err) => reject(err);
       socket.once("error", onBindError);
       socket.bind(SSDP_PORT, () => {
+        var _a2;
         socket.removeListener("error", onBindError);
         try {
-          socket.addMembership(MULTICAST_ADDR, this.config.interfaceIp);
+          socket.addMembership(MULTICAST_ADDR, this.config.bindIp);
         } catch (e) {
-          reject(e instanceof Error ? e : new Error(String(e)));
-          return;
+          const where = (_a2 = this.config.bindIp) != null ? _a2 : "default interface";
+          this.config.logger.warn(
+            `SSDP multicast join failed on ${where}: ${e instanceof Error ? e.message : String(e)} \u2014 discovery may be incomplete`
+          );
         }
         socket.on("error", (err) => {
           this.config.logger.error(`SSDP socket error: ${err.message}`);
@@ -66,7 +70,9 @@ class RokuSsdpResponder {
         resolve();
       });
     });
-    this.config.logger.debug(`Roku SSDP responder bound on ${this.config.interfaceIp}:${SSDP_PORT}`);
+    this.config.logger.debug(
+      `Roku SSDP responder on :${SSDP_PORT}, advertising ${this.config.advertiseIp} (join: ${(_a = this.config.bindIp) != null ? _a : "default"})`
+    );
   }
   onMessage(text, address, port) {
     var _a;
@@ -74,7 +80,7 @@ class RokuSsdpResponder {
       return;
     }
     for (const device of this.config.devices) {
-      const response = Buffer.from((0, import_ssdp_messages.buildSearchResponse)(device, this.config.interfaceIp));
+      const response = Buffer.from((0, import_ssdp_messages.buildSearchResponse)(device, this.config.advertiseIp));
       (_a = this.socket) == null ? void 0 : _a.send(response, port, address, (err) => {
         if (err) {
           this.config.logger.warn(`SSDP response send failed: ${err.message}`);
@@ -88,7 +94,7 @@ class RokuSsdpResponder {
       return;
     }
     for (const device of this.config.devices) {
-      const notify = Buffer.from((0, import_ssdp_messages.buildAliveNotify)(device, this.config.interfaceIp));
+      const notify = Buffer.from((0, import_ssdp_messages.buildAliveNotify)(device, this.config.advertiseIp));
       this.socket.send(notify, SSDP_PORT, MULTICAST_ADDR, (err) => {
         if (err) {
           this.config.logger.debug(`SSDP NOTIFY send failed: ${err.message}`);

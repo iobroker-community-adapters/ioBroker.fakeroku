@@ -2,11 +2,20 @@
   "i18n": true,
   "type": "panel",
   "items": {
+    "_intro": {
+      "type": "staticText",
+      "text": "introText",
+      "xs": 12,
+      "sm": 12,
+      "md": 12,
+      "lg": 12,
+      "xl": 12
+    },
     "networkInterface": {
       "type": "ip",
       "label": "networkInterface",
       "tooltip": "networkInterfaceTooltip",
-      "listenOnAllPorts": false,
+      "listenOnAllPorts": true,
       "onlyIp4": true,
       "xs": 12,
       "sm": 12,

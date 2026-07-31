@@ -40,13 +40,13 @@ export function matchesRokuSearch(message: string): boolean {
 
 /**
  * Build the SSDP 200-OK response for one emulated Roku, in Roku's exact format
- * (USN without the node-ssdp `::device` suffix), advertising the given interface IP.
+ * (USN without the node-ssdp `::device` suffix), advertising the given IP.
  *
  * @param device the emulated Roku
- * @param interfaceIp the selected network-interface IP to advertise
+ * @param advertiseIp the routable IP to advertise in the LOCATION
  * @returns the response datagram text
  */
-export function buildSearchResponse(device: RokuAdvert, interfaceIp: string): string {
+export function buildSearchResponse(device: RokuAdvert, advertiseIp: string): string {
   return [
     "HTTP/1.1 200 OK",
     `Cache-Control: max-age=${MAX_AGE}`,
@@ -54,7 +54,7 @@ export function buildSearchResponse(device: RokuAdvert, interfaceIp: string): st
     `USN: uuid:roku:ecp:${device.uuid}`,
     "Ext: ",
     `Server: ${SERVER_SIG}`,
-    `LOCATION: http://${interfaceIp}:${device.port}/`,
+    `LOCATION: http://${advertiseIp}:${device.port}/`,
     "",
     "",
   ].join("\r\n");
@@ -65,15 +65,15 @@ export function buildSearchResponse(device: RokuAdvert, interfaceIp: string): st
  * find it without actively searching.
  *
  * @param device the emulated Roku
- * @param interfaceIp the selected network-interface IP to advertise
+ * @param advertiseIp the routable IP to advertise in the LOCATION
  * @returns the NOTIFY datagram text
  */
-export function buildAliveNotify(device: RokuAdvert, interfaceIp: string): string {
+export function buildAliveNotify(device: RokuAdvert, advertiseIp: string): string {
   return [
     "NOTIFY * HTTP/1.1",
     "Host: 239.255.255.250:1900",
     `Cache-Control: max-age=${MAX_AGE}`,
-    `LOCATION: http://${interfaceIp}:${device.port}/`,
+    `LOCATION: http://${advertiseIp}:${device.port}/`,
     "NT: roku:ecp",
     "NTS: ssdp:alive",
     `Server: ${SERVER_SIG}`,

@@ -3,6 +3,19 @@
     "name": "fakeroku",
     "version": "0.5.0",
     "news": {
+      "NEXT": {
+        "en": "Runs without any setup now — the adapter detects the network address to advertise on its own. Leftover entries from an earlier version disappear from the object tree.",
+        "de": "Läuft jetzt ohne jede Einrichtung — der Adapter erkennt die anzukündigende Netzwerkadresse selbst. Altlasten aus einer früheren Version verschwinden aus dem Objektbaum.",
+        "ru": "Теперь работает без настройки — адаптер сам определяет сетевой адрес для объявления. Остатки от прежней версии исчезают из дерева объектов.",
+        "pt": "Funciona agora sem qualquer configuração — o adaptador deteta sozinho o endereço de rede a anunciar. Entradas antigas de uma versão anterior desaparecem da árvore de objetos.",
+        "nl": "Draait nu zonder installatie — de adapter detecteert zelf het netwerkadres om aan te kondigen. Oude restanten van een eerdere versie verdwijnen uit de objectenboom.",
+        "fr": "Fonctionne désormais sans configuration — l'adaptateur détecte seul l'adresse réseau à annoncer. Les entrées résiduelles d'une version antérieure disparaissent de l'arbre d'objets.",
+        "it": "Ora funziona senza configurazione — l'adattatore rileva da solo l'indirizzo di rete da annunciare. Le voci residue di una versione precedente scompaiono dall'albero degli oggetti.",
+        "es": "Ahora funciona sin configuración — el adaptador detecta por sí mismo la dirección de red que anunciar. Las entradas sobrantes de una versión anterior desaparecen del árbol de objetos.",
+        "pl": "Działa teraz bez konfiguracji — adapter sam wykrywa adres sieciowy do rozgłaszania. Pozostałości po wcześniejszej wersji znikają z drzewa obiektów.",
+        "uk": "Тепер працює без налаштування — адаптер сам визначає мережеву адресу для оголошення. Залишки від попередньої версії зникають з дерева об'єктів.",
+        "zh-cn": "现在无需任何设置即可运行——适配器会自行检测要广播的网络地址。早期版本遗留的条目会从对象树中消失。"
+      },
       "0.5.0": {
         "en": "Complete rewrite with the full Roku control surface including device-info, and a clean new data model: a command datapoint plus fixed keys states.",
         "de": "Komplette Neufassung mit voller Roku-Oberfläche inklusive device-info und sauberem neuem Datenmodell: ein command-Datenpunkt plus feste keys-Zustände.",
@@ -80,19 +93,6 @@
         "pl": "emulować wiele roku",
         "uk": "емулювати кілька rokus",
         "zh-cn": "模拟多个 roku"
-      },
-      "0.1.1": {
-        "en": "fix package.json",
-        "de": "package.json korrigiert",
-        "ru": "исправлен package.json",
-        "pt": "corrigir pacote.json",
-        "nl": "pakket.json repareren",
-        "fr": "réparer package.json",
-        "it": "correggere pacchetto.json",
-        "es": "arreglar paquete.json",
-        "pl": "napraw pakiet.json",
-        "uk": "виправити package.json",
-        "zh-cn": "修复 package.json"
       }
     },
     "titleLang": {
@@ -163,7 +163,7 @@
     }
   },
   "native": {
-    "networkInterface": "",
+    "networkInterface": "0.0.0.0",
     "devices": [
       {
         "name": "ioBroker",

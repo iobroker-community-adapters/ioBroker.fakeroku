@@ -11,20 +11,30 @@ export type SsdpLogger = Pick<ioBroker.Log, "debug" | "warn" | "error">;
 export interface RokuSsdpResponderConfig {
   /** Emulated Rokus to answer for. */
   devices: RokuAdvert[];
-  /** Selected network-interface IP to bind the multicast join to and advertise. */
-  interfaceIp: string;
+  /**
+   * Interface IP to join the multicast group on, or `undefined` to let the OS
+   * pick its default interface (the auto case). A concrete value is only needed
+   * on multi-homed hosts — see the class doc.
+   */
+  bindIp: string | undefined;
+  /** Routable IP announced in the SSDP LOCATION so the controller reaches the ECP server — never `0.0.0.0`. */
+  advertiseIp: string;
   /** Logger. */
   logger: SsdpLogger;
 }
 
 /**
- * Interface-bound Roku SSDP responder. Answers M-SEARCH(roku:ecp) with Roku's
- * exact response format (built by hand — node-ssdp appends a `::device` suffix
- * to the USN that Roku never uses) and can proactively announce ssdp:alive.
+ * Roku SSDP responder. Answers M-SEARCH(roku:ecp) with Roku's exact response
+ * format (built by hand — node-ssdp appends a `::device` suffix to the USN that
+ * Roku never uses) and can proactively announce ssdp:alive.
  *
- * The multicast group is joined on the SELECTED interface, not the OS default —
- * the old adapter joined `0.0.0.0`, which on multi-homed hosts (e.g. a box bound
- * to 10.47.88.2) can attach to the wrong network and make discovery fail silently.
+ * The multicast group is joined on {@link RokuSsdpResponderConfig.bindIp} when a
+ * concrete interface is selected, or on the OS default when it is `undefined`.
+ * Explicit selection exists because on a multi-homed host the OS default can
+ * attach to the wrong network and make discovery fail silently — but on the
+ * common single-LAN host the default just works, so the adapter runs with no
+ * configuration. The LOCATION always carries the routable
+ * {@link RokuSsdpResponderConfig.advertiseIp}, never the bind wildcard.
  *
  * Owns no timers: the adapter drives {@link announce} on a managed interval and
  * bounds {@link start} with a managed timeout.
@@ -48,10 +58,16 @@ export class RokuSsdpResponder {
       socket.bind(SSDP_PORT, () => {
         socket.removeListener("error", onBindError);
         try {
-          socket.addMembership(MULTICAST_ADDR, this.config.interfaceIp);
+          socket.addMembership(MULTICAST_ADDR, this.config.bindIp);
         } catch (e) {
-          reject(e instanceof Error ? e : new Error(String(e)));
-          return;
+          // A join failure is usually an OS routing issue (the chosen interface
+          // is not in the multicast table). Don't die: a paired controller still
+          // reaches the ECP port by the advertised IP, and NOTIFY may still leave
+          // via the default route. Warn so the "no discovery" symptom is findable.
+          const where = this.config.bindIp ?? "default interface";
+          this.config.logger.warn(
+            `SSDP multicast join failed on ${where}: ${e instanceof Error ? e.message : String(e)} — discovery may be incomplete`,
+          );
         }
         socket.on("error", (err: Error) => {
           this.config.logger.error(`SSDP socket error: ${err.message}`);
@@ -62,7 +78,9 @@ export class RokuSsdpResponder {
       });
     });
 
-    this.config.logger.debug(`Roku SSDP responder bound on ${this.config.interfaceIp}:${SSDP_PORT}`);
+    this.config.logger.debug(
+      `Roku SSDP responder on :${SSDP_PORT}, advertising ${this.config.advertiseIp} (join: ${this.config.bindIp ?? "default"})`,
+    );
   }
 
   private onMessage(text: string, address: string, port: number): void {
@@ -70,7 +88,7 @@ export class RokuSsdpResponder {
       return;
     }
     for (const device of this.config.devices) {
-      const response = Buffer.from(buildSearchResponse(device, this.config.interfaceIp));
+      const response = Buffer.from(buildSearchResponse(device, this.config.advertiseIp));
       this.socket?.send(response, port, address, err => {
         if (err) {
           this.config.logger.warn(`SSDP response send failed: ${err.message}`);
@@ -85,7 +103,7 @@ export class RokuSsdpResponder {
       return;
     }
     for (const device of this.config.devices) {
-      const notify = Buffer.from(buildAliveNotify(device, this.config.interfaceIp));
+      const notify = Buffer.from(buildAliveNotify(device, this.config.advertiseIp));
       this.socket.send(notify, SSDP_PORT, MULTICAST_ADDR, err => {
         if (err) {
           this.config.logger.debug(`SSDP NOTIFY send failed: ${err.message}`);

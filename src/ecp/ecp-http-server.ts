@@ -13,8 +13,8 @@ export interface EcpServerConfig {
   friendlyName: string;
   /** Apps advertised at /query/apps. */
   apps: AppEntry[];
-  /** Interface IP to bind to. */
-  interfaceIp: string;
+  /** Interface IP to bind the HTTP server to, or `undefined` to bind all interfaces (auto). */
+  bindIp: string | undefined;
   /** Logger. */
   logger: SsdpLogger;
   /** Called for every accepted POST command. */
@@ -42,14 +42,14 @@ export class EcpHttpServer {
     await new Promise<void>((resolve, reject) => {
       const onError = (err: Error): void => reject(err);
       server.once("error", onError);
-      server.listen(this.config.device.port, this.config.interfaceIp, () => {
+      server.listen(this.config.device.port, this.config.bindIp, () => {
         server.removeListener("error", onError);
         server.on("error", (err: Error) => this.config.logger.error(`ECP server error: ${err.message}`));
         resolve();
       });
     });
     this.config.logger.debug(
-      `ECP server "${this.config.friendlyName}" on ${this.config.interfaceIp}:${this.config.device.port}`,
+      `ECP server "${this.config.friendlyName}" on ${this.config.bindIp ?? "0.0.0.0"}:${this.config.device.port}`,
     );
   }
 

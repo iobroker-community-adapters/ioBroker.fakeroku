@@ -45,19 +45,20 @@ class EcpHttpServer {
   server;
   /** Bind the HTTP server to the interface + port. Rejects on bind error. */
   async start() {
+    var _a;
     const server = http.createServer((req, res) => this.handle(req, res));
     this.server = server;
     await new Promise((resolve, reject) => {
       const onError = (err) => reject(err);
       server.once("error", onError);
-      server.listen(this.config.device.port, this.config.interfaceIp, () => {
+      server.listen(this.config.device.port, this.config.bindIp, () => {
         server.removeListener("error", onError);
         server.on("error", (err) => this.config.logger.error(`ECP server error: ${err.message}`));
         resolve();
       });
     });
     this.config.logger.debug(
-      `ECP server "${this.config.friendlyName}" on ${this.config.interfaceIp}:${this.config.device.port}`
+      `ECP server "${this.config.friendlyName}" on ${(_a = this.config.bindIp) != null ? _a : "0.0.0.0"}:${this.config.device.port}`
     );
   }
   handle(req, res) {

@@ -1,7 +1,7 @@
 import type { CommandEvent } from "./ecp-command";
 
 /**
- * The fixed standard Roku remote key set. These get pre-created `button.press`
+ * The fixed standard Roku remote key set. These get pre-created `sensor` boolean
  * states so the tree is usable from the first second — no lazy growth like the
  * old adapter (where only keys the Harmony had ever sent existed).
  */

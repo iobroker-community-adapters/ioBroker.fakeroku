@@ -1,7 +1,8 @@
 {
   "networkInterface": "Network interface (bind + advertise)",
-  "networkInterfaceTooltip": "The network card the emulated Rokus bind to and advertise on. Pick your LAN address; do not leave it on 'all interfaces'.",
+  "networkInterfaceTooltip": "The network card the emulated Rokus bind to and advertise on. Leave it on 'all interfaces' — the routable IP is detected automatically, so it works out of the box. Only pick a specific address on a host with several network cards.",
   "devicesTable": "Emulated Roku devices",
   "columnName": "Name",
-  "columnPort": "ECP port"
+  "columnPort": "ECP port",
+  "introText": "Emulates Roku devices on your LAN so an ECP/SSDP remote (Harmony Hub, Sofabaton X1, the Roku app) triggers events in ioBroker. Add a device below, then add a **Roku** device in the remote's app pointing at this ioBroker host — each keypress then lands in the device's objects."
 }

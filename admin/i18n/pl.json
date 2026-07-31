@@ -1,7 +1,8 @@
 {
   "networkInterface": "Interfejs sieciowy (bind + rozgłaszanie)",
-  "networkInterfaceTooltip": "Karta sieciowa, do której podłączają się i rozgłaszają emulowane Roku. Wybierz swój adres LAN; nie zostawiaj na 'wszystkich interfejsach'.",
+  "networkInterfaceTooltip": "Karta sieciowa, do której podłączają się i rozgłaszają emulowane Roku. Zostaw na 'wszystkich interfejsach' — routowalny adres IP jest wykrywany automatycznie, więc działa bez konfiguracji. Wybierz konkretny adres tylko na hoście z kilkoma kartami sieciowymi.",
   "devicesTable": "Emulowane urządzenia Roku",
   "columnName": "Nazwa",
-  "columnPort": "Port ECP"
+  "columnPort": "Port ECP",
+  "introText": "Emuluje urządzenia Roku w sieci LAN, aby pilot ECP/SSDP (Harmony Hub, Sofabaton X1, aplikacja Roku) wyzwalał zdarzenia w ioBroker. Dodaj urządzenie poniżej, a następnie w aplikacji pilota dodaj urządzenie **Roku** wskazujące na tego hosta ioBroker — każde naciśnięcie trafia wtedy do obiektów urządzenia."
 }

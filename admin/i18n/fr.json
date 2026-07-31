@@ -1,7 +1,8 @@
 {
   "networkInterface": "Interface réseau (liaison + annonce)",
-  "networkInterfaceTooltip": "La carte réseau à laquelle les Roku émulés se lient et s'annoncent. Choisissez votre adresse LAN ; ne la laissez pas sur 'toutes les interfaces'.",
+  "networkInterfaceTooltip": "La carte réseau à laquelle les Roku émulés se lient et s'annoncent. Laissez-la sur 'toutes les interfaces' : l'IP routable est détectée automatiquement, cela fonctionne sans réglage. Ne choisissez une adresse précise que sur un hôte avec plusieurs cartes réseau.",
   "devicesTable": "Appareils Roku émulés",
   "columnName": "Nom",
-  "columnPort": "Port ECP"
+  "columnPort": "Port ECP",
+  "introText": "Émule des appareils Roku sur votre réseau local pour qu'une télécommande ECP/SSDP (Harmony Hub, Sofabaton X1, l'app Roku) déclenche des événements dans ioBroker. Ajoutez un appareil ci-dessous, puis ajoutez un appareil **Roku** dans l'app de la télécommande pointant vers cet hôte ioBroker — chaque appui apparaît alors dans les objets de l'appareil."
 }

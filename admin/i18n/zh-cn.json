@@ -1,7 +1,8 @@
 {
   "networkInterface": "网络接口（绑定 + 广播）",
-  "networkInterfaceTooltip": "模拟 Roku 绑定并广播的网卡。请选择您的 LAN 地址；不要保留为“所有接口”。",
+  "networkInterfaceTooltip": "模拟 Roku 绑定并广播的网卡。保留为“所有接口”即可——可路由的 IP 会被自动检测，因此无需配置即可运行。仅在有多块网卡的主机上才选择具体地址。",
   "devicesTable": "模拟的 Roku 设备",
   "columnName": "名称",
-  "columnPort": "ECP 端口"
+  "columnPort": "ECP 端口",
+  "introText": "在您的局域网中模拟 Roku 设备，使 ECP/SSDP 遥控器（Harmony Hub、Sofabaton X1、Roku 应用）能在 ioBroker 中触发事件。在下方添加设备，然后在遥控器应用中添加一个指向此 ioBroker 主机的 **Roku** 设备——之后每次按键都会进入该设备的对象。"
 }

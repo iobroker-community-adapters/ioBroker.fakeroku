@@ -36,7 +36,7 @@ function matchesRokuSearch(message) {
   const st = (_a = message.match(/^ST:\s*(.+?)\s*$/im)) == null ? void 0 : _a[1];
   return st === "roku:ecp" || st === "ssdp:all" || st === "upnp:rootdevice";
 }
-function buildSearchResponse(device, interfaceIp) {
+function buildSearchResponse(device, advertiseIp) {
   return [
     "HTTP/1.1 200 OK",
     `Cache-Control: max-age=${MAX_AGE}`,
@@ -44,17 +44,17 @@ function buildSearchResponse(device, interfaceIp) {
     `USN: uuid:roku:ecp:${device.uuid}`,
     "Ext: ",
     `Server: ${SERVER_SIG}`,
-    `LOCATION: http://${interfaceIp}:${device.port}/`,
+    `LOCATION: http://${advertiseIp}:${device.port}/`,
     "",
     ""
   ].join("\r\n");
 }
-function buildAliveNotify(device, interfaceIp) {
+function buildAliveNotify(device, advertiseIp) {
   return [
     "NOTIFY * HTTP/1.1",
     "Host: 239.255.255.250:1900",
     `Cache-Control: max-age=${MAX_AGE}`,
-    `LOCATION: http://${interfaceIp}:${device.port}/`,
+    `LOCATION: http://${advertiseIp}:${device.port}/`,
     "NT: roku:ecp",
     "NTS: ssdp:alive",
     `Server: ${SERVER_SIG}`,

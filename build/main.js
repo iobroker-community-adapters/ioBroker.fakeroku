@@ -37,6 +37,8 @@ var import_device_info = require("./ecp/device-info");
 var import_ecp_http_server = require("./ecp/ecp-http-server");
 var import_state_model = require("./ecp/state-model");
 var import_device_identity = require("./lib/device-identity");
+var import_detect_ip = require("./lib/detect-ip");
+var import_object_cleanup = require("./lib/object-cleanup");
 var import_pure_helpers = require("./lib/pure-helpers");
 const SSDP_START_TIMEOUT_MS = 5e3;
 const SSDP_NOTIFY_INTERVAL_MS = 3e5;
@@ -63,9 +65,11 @@ class Fakeroku extends utils.Adapter {
     var _a;
     try {
       await this.setState("info.connection", { val: false, ack: true });
-      const interfaceIp = this.config.networkInterface;
-      if (!interfaceIp) {
-        this.log.warn("No network interface selected \u2014 discovery/ECP disabled. Choose one in the settings.");
+      const configuredIp = this.config.networkInterface;
+      const bindIp = configuredIp && configuredIp !== "0.0.0.0" ? configuredIp : void 0;
+      const advertiseIp = bindIp != null ? bindIp : (0, import_detect_ip.detectPrimaryIPv4)();
+      if (!advertiseIp) {
+        this.log.warn("No routable IPv4 address found to advertise \u2014 set the network interface in the settings.");
         return;
       }
       const configured = ((_a = this.config.devices) != null ? _a : []).filter((d) => d && typeof d.name === "string" && d.name.length > 0);
@@ -82,7 +86,7 @@ class Fakeroku extends utils.Adapter {
           device: advert,
           friendlyName: d.name,
           apps: import_device_info.DEFAULT_APPS,
-          interfaceIp,
+          bindIp,
           logger: this.log,
           onCommand: (cmd) => this.applyCommand(deviceId, cmd)
         });
@@ -90,7 +94,8 @@ class Fakeroku extends utils.Adapter {
         this.ecpServers.push(server);
         adverts.push(advert);
       }
-      this.ssdp = new import_ssdp_responder.RokuSsdpResponder({ devices: adverts, interfaceIp, logger: this.log });
+      await this.cleanupOrphans(new Set(configured.map((d) => (0, import_pure_helpers.sanitizeId)(d.name))));
+      this.ssdp = new import_ssdp_responder.RokuSsdpResponder({ devices: adverts, bindIp, advertiseIp, logger: this.log });
       await this.startWithTimeout(this.ssdp.start(), SSDP_START_TIMEOUT_MS);
       this.ssdp.announce();
       this.notifyTimer = this.setInterval(() => {
@@ -98,14 +103,14 @@ class Fakeroku extends utils.Adapter {
         return (_a2 = this.ssdp) == null ? void 0 : _a2.announce();
       }, SSDP_NOTIFY_INTERVAL_MS);
       await this.setState("info.connection", { val: true, ack: true });
-      this.log.info(`Emulating ${adverts.length} Roku device(s) on ${interfaceIp}`);
+      this.log.info(`Emulating ${adverts.length} Roku device(s), advertising on ${advertiseIp}`);
     } catch (e) {
       this.log.error(`onReady failed: ${e instanceof Error ? e.message : String(e)}`);
     }
   }
   /**
    * Create the fixed object tree for one emulated Roku: the device, `command` +
-   * `commandType`, and every standard remote key as a `button.press` state — all
+   * `commandType`, and every standard remote key as a `sensor` boolean state — all
    * up front, so the tree is usable before any key is ever pressed.
    *
    * @param deviceId the id-safe device path segment
@@ -133,6 +138,28 @@ class Fakeroku extends utils.Adapter {
         common: { name: key, type: "boolean", role: "sensor", read: true, write: false, def: false },
         native: {}
       });
+    }
+  }
+  /**
+   * Remove objects left over from an earlier version or config — the legacy
+   * `apps` node, keys no longer standard, and whole device sub-trees no longer
+   * configured (a renamed/removed device). The adapter otherwise only ever
+   * creates objects, so without this the tree would accrete stale entries.
+   *
+   * @param configuredDeviceIds the id-safe names of the currently configured devices
+   */
+  async cleanupOrphans(configuredDeviceIds) {
+    const objects = await this.getAdapterObjectsAsync();
+    const prefix = `${this.namespace}.`;
+    const existingIds = Object.keys(objects).filter((id) => id.startsWith(prefix)).map((id) => id.slice(prefix.length));
+    const toDelete = (0, import_object_cleanup.planObjectCleanup)(existingIds, configuredDeviceIds, new Set(import_state_model.STANDARD_KEYS));
+    for (const id of toDelete) {
+      await this.delObjectAsync(id, { recursive: true }).catch((e) => {
+        this.log.debug(`cleanup: could not delete ${id}: ${e instanceof Error ? e.message : String(e)}`);
+      });
+    }
+    if (toDelete.length > 0) {
+      this.log.info(`Removed ${toDelete.length} orphaned object(s) from an earlier version or config.`);
     }
   }
   /**

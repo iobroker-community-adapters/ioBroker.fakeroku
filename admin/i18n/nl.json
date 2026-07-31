@@ -1,7 +1,8 @@
 {
   "networkInterface": "Netwerkinterface (binden + aankondigen)",
-  "networkInterfaceTooltip": "De netwerkkaart waaraan de geëmuleerde Roku's zich binden en aankondigen. Kies je LAN-adres; laat het niet op 'alle interfaces' staan.",
+  "networkInterfaceTooltip": "De netwerkkaart waaraan de geëmuleerde Roku's zich binden en aankondigen. Laat het op 'alle interfaces' staan — het routeerbare IP wordt automatisch gedetecteerd, dus het werkt meteen. Kies alleen een specifiek adres op een host met meerdere netwerkkaarten.",
   "devicesTable": "Geëmuleerde Roku-apparaten",
   "columnName": "Naam",
-  "columnPort": "ECP-poort"
+  "columnPort": "ECP-poort",
+  "introText": "Emuleert Roku-apparaten op je LAN zodat een ECP/SSDP-afstandsbediening (Harmony Hub, Sofabaton X1, de Roku-app) gebeurtenissen in ioBroker activeert. Voeg hieronder een apparaat toe en voeg daarna in de app van de afstandsbediening een **Roku**-apparaat toe dat naar deze ioBroker-host wijst — elke toetsdruk komt dan in de objecten van het apparaat."
 }

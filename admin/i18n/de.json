@@ -1,7 +1,8 @@
 {
   "networkInterface": "Netzwerkschnittstelle (Binden + Ankündigen)",
-  "networkInterfaceTooltip": "Die Netzwerkkarte, an die sich die emulierten Rokus binden und über die sie sich ankündigen. Wähle deine LAN-Adresse; nicht auf 'alle Schnittstellen' lassen.",
+  "networkInterfaceTooltip": "Die Netzwerkkarte, an die sich die emulierten Rokus binden und über die sie sich ankündigen. Auf 'alle Schnittstellen' lassen — die passende IP wird automatisch erkannt, es läuft also ohne Einstellung. Nur bei mehreren Netzwerkkarten eine feste Adresse wählen.",
   "devicesTable": "Emulierte Roku-Geräte",
   "columnName": "Name",
-  "columnPort": "ECP-Port"
+  "columnPort": "ECP-Port",
+  "introText": "Emuliert Roku-Geräte im LAN, damit eine ECP/SSDP-Fernbedienung (Harmony Hub, Sofabaton X1, die Roku-App) Ereignisse in ioBroker auslöst. Unten ein Gerät anlegen, dann in der App der Fernbedienung ein **Roku**-Gerät hinzufügen, das auf diesen ioBroker-Host zeigt — jeder Tastendruck landet dann in den Objekten des Geräts."
 }

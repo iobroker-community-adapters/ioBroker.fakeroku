@@ -1,7 +1,8 @@
 {
   "networkInterface": "Interfaz de red (enlace + anuncio)",
-  "networkInterfaceTooltip": "La tarjeta de red a la que se enlazan y anuncian los Roku emulados. Elige tu dirección LAN; no la dejes en 'todas las interfaces'.",
+  "networkInterfaceTooltip": "La tarjeta de red a la que se enlazan y anuncian los Roku emulados. Déjala en 'todas las interfaces': la IP enrutable se detecta automáticamente y funciona sin configurar. Elige una dirección concreta solo en un host con varias tarjetas de red.",
   "devicesTable": "Dispositivos Roku emulados",
   "columnName": "Nombre",
-  "columnPort": "Puerto ECP"
+  "columnPort": "Puerto ECP",
+  "introText": "Emula dispositivos Roku en tu LAN para que un mando ECP/SSDP (Harmony Hub, Sofabaton X1, la app de Roku) active eventos en ioBroker. Añade un dispositivo abajo y luego añade un dispositivo **Roku** en la app del mando apuntando a este host de ioBroker; cada pulsación aparece en los objetos del dispositivo."
 }
