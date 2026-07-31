@@ -72,7 +72,7 @@ becomes `true`, or watch `.command` for the last button as text.
 	Placeholder for the next version (at the beginning of the line):
 	### **WORK IN PROGRESS**
 -->
-### **WORK IN PROGRESS**
+### 0.6.0 (2026-07-31)
 - Runs without any setup now — the adapter detects the routable network address on its own instead of sitting idle until a network interface is picked
 - Leftover entries from an earlier version disappear from the object tree on start, so the tree no longer keeps unused nodes around
 - The admin page now opens with a short explanation of what the adapter does and how to set it up
@@ -91,12 +91,6 @@ becomes `true`, or watch `.command` for the last button as text.
 
 ### 0.2.2 (2023-07-24)
 * (Apollon77) fixed issues with controller v5
-
-### 0.2.1
-  (Pmant) fix jQuery error in admin
-  (ykuendig) add translations
-
-[Older changelogs can be found here](CHANGELOG_OLD.md)
 
 [Older changelogs can be found there](CHANGELOG_OLD.md)
 

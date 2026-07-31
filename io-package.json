@@ -1,9 +1,9 @@
 {
   "common": {
     "name": "fakeroku",
-    "version": "0.5.0",
+    "version": "0.6.0",
     "news": {
-      "NEXT": {
+      "0.6.0": {
         "en": "Runs without any setup now — the adapter detects the network address to advertise on its own. Leftover entries from an earlier version disappear from the object tree.",
         "de": "Läuft jetzt ohne jede Einrichtung — der Adapter erkennt die anzukündigende Netzwerkadresse selbst. Altlasten aus einer früheren Version verschwinden aus dem Objektbaum.",
         "ru": "Теперь работает без настройки — адаптер сам определяет сетевой адрес для объявления. Остатки от прежней версии исчезают из дерева объектов.",
