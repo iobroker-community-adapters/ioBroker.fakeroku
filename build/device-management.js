@@ -124,7 +124,7 @@ class FakerokuDeviceManagement extends import_dm_utils.DeviceManagement {
   getInstanceInfo() {
     return {
       apiVersion: "v3",
-      actions: [{ id: "add", icon: "add", title: (0, import_i18n.t)("dmAdd"), handler: async (context) => this.addDevice(context) }]
+      actions: [{ id: "add", icon: "add", description: (0, import_i18n.t)("dmAdd"), handler: async (context) => this.addDevice(context) }]
     };
   }
   /**
@@ -156,14 +156,14 @@ class FakerokuDeviceManagement extends import_dm_utils.DeviceManagement {
     const devices = await this.readDevices();
     const current = devices[index];
     if (!current) {
-      return { refresh: "instance" };
+      return { refresh: "devices" };
     }
     const data = await context.showForm(buildDeviceForm(), { title: (0, import_i18n.t)("dmEditTitle"), data: { ...current } });
     if (data && typeof data.name === "string" && data.name.trim()) {
       devices[index] = cleanDevice(data);
       await this.writeDevices(devices);
     }
-    return { refresh: "instance" };
+    return { refresh: "devices" };
   }
   /**
    * Delete a device after confirmation.
@@ -176,14 +176,14 @@ class FakerokuDeviceManagement extends import_dm_utils.DeviceManagement {
     const devices = await this.readDevices();
     const target = devices[index];
     if (!target) {
-      return { refresh: "instance" };
+      return { refresh: "devices" };
     }
     const confirmed = await context.showConfirmation((0, import_i18n.t)("dmDeleteConfirm", target.name || ""));
     if (confirmed) {
       devices.splice(index, 1);
       await this.writeDevices(devices);
     }
-    return { refresh: "instance" };
+    return { refresh: "devices" };
   }
 }
 // Annotate the CommonJS export names for ESM import in node:

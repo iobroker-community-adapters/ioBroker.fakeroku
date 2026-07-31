@@ -1,8 +1,21 @@
 {
   "common": {
     "name": "fakeroku",
-    "version": "0.7.0",
+    "version": "0.7.1",
     "news": {
+      "0.7.1": {
+        "en": "Fixed the device management from 0.7.0: your emulated Rokus now show up as cards again and the button to add a new one works — both were missing before.",
+        "de": "Geräteverwaltung aus 0.7.0 repariert: Die emulierten Rokus erscheinen wieder als Karten und der Knopf zum Anlegen eines neuen funktioniert — beides fehlte zuvor.",
+        "ru": "Исправлено управление устройствами из 0.7.0: эмулированные Roku снова показываются карточками, а кнопка добавления нового работает — раньше не было ни того, ни другого.",
+        "pt": "Corrigida a gestão de dispositivos da 0.7.0: os Rokus emulados voltam a aparecer como cartões e o botão para adicionar um novo funciona — faltavam ambos antes.",
+        "nl": "Apparaatbeheer uit 0.7.0 hersteld: je geëmuleerde Rokus verschijnen weer als kaarten en de knop om een nieuwe toe te voegen werkt — beide ontbraken eerder.",
+        "fr": "Gestion des appareils de la 0.7.0 corrigée : vos Roku émulés réapparaissent en cartes et le bouton pour en ajouter un fonctionne — les deux manquaient avant.",
+        "it": "Corretta la gestione dispositivi della 0.7.0: i Roku emulati riappaiono come schede e il pulsante per aggiungerne uno funziona — prima mancavano entrambi.",
+        "es": "Corregida la gestión de dispositivos de la 0.7.0: tus Roku emulados vuelven a aparecer como tarjetas y el botón para añadir uno funciona — antes faltaban ambos.",
+        "pl": "Naprawiono zarządzanie urządzeniami z 0.7.0: emulowane Roku znów pojawiają się jako karty, a przycisk dodawania nowego działa — wcześniej brakowało obu.",
+        "uk": "Виправлено керування пристроями з 0.7.0: емульовані Roku знову показуються картками, а кнопка додавання нового працює — раніше бракувало обох.",
+        "zh-cn": "修复了 0.7.0 的设备管理：模拟的 Roku 重新以卡片显示，添加新设备的按钮也恢复正常——之前两者都不见了。"
+      },
       "0.7.0": {
         "en": "Pick Player or TV per device now — a TV adds volume, power, channel and input keys. Devices are managed as cards with dialogs instead of a table.",
         "de": "Pro Gerät jetzt Player oder TV wählbar — ein TV bringt Lautstärke-, Power-, Kanal- und Eingangstasten dazu. Geräte werden als Karten mit Dialogen verwaltet statt als Tabelle.",
@@ -80,19 +93,6 @@
         "pl": "Adapter wymaga node.js > = 18 i kontroler js- > = 5 teraz\nZaktualizowano zależności",
         "uk": "Адаптер вимагає node.js >= 18 і js-controller >= 5 тепер\nЗалежність було оновлено",
         "zh-cn": "适配器需要节点.js QQ18和js控制器 QQ 现在5号\n依赖关系已更新"
-      },
-      "0.2.2": {
-        "en": "fixed issues with controller v5",
-        "de": "problemstellungen mit controller v5",
-        "ru": "фиксированные проблемы с контроллером v5",
-        "pt": "problemas fixos com controlador v5",
-        "nl": "vertaling:",
-        "fr": "problèmes fixes avec controller v5",
-        "it": "problemi fissi con controller v5",
-        "es": "problemas fijos con controlador v5",
-        "pl": "zastrzeżenia regulatora v5",
-        "uk": "фіксовані питання з контролером v5",
-        "zh-cn": "a. 控制容忍的固定问题"
       }
     },
     "titleLang": {
@@ -160,6 +160,9 @@
     ],
     "adminUI": {
       "config": "json"
+    },
+    "supportedMessages": {
+      "deviceManager": true
     }
   },
   "native": {

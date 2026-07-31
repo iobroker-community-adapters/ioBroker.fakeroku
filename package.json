@@ -1,6 +1,6 @@
 {
   "name": "iobroker.fakeroku",
-  "version": "0.7.0",
+  "version": "0.7.1",
   "description": "ioBroker adapter that emulates Roku devices, letting ECP/SSDP remotes (Logitech Harmony, Sofabaton, Roku app) trigger events in ioBroker",
   "author": {
     "name": "krobi",

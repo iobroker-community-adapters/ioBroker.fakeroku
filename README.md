@@ -75,6 +75,9 @@ becomes `true`, or watch `.command` for the last button as text.
 	Placeholder for the next version (at the beginning of the line):
 	### **WORK IN PROGRESS**
 -->
+### 0.7.1 (2026-07-31)
+- Fixed the device management from 0.7.0: your emulated Rokus now show up as cards again and the button to add a new one works — both were missing before
+
 ### 0.7.0 (2026-07-31)
 - Each emulated Roku can now be a Player or a TV — a TV additionally exposes volume, power, channel and input keys, a Player the 16 standard keys
 - Devices are now managed as cards with add/edit/delete dialogs instead of a table, and the settings page gained a network section and support links
@@ -91,10 +94,6 @@ becomes `true`, or watch `.command` for the last button as text.
 
 ### 0.4.0 (2026-03-07)
 - Adapter requires node.js >= 20, admin >= 7.7.22, js-controller >= 6.0.11
-
-### 0.3.0 (2024-06-11)
-* (mcm1957) Adapter requires node.js >= 18 and js-controller >= 5 now
-* (mcm1957) Dependencies have been updated
 
 [Older changelogs can be found there](CHANGELOG_OLD.md)
 
