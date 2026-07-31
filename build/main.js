@@ -32,6 +32,9 @@ __export(main_exports, {
 });
 module.exports = __toCommonJS(main_exports);
 var utils = __toESM(require("@iobroker/adapter-core"));
+var import_adapter_core = require("@iobroker/adapter-core");
+var import_node_path = require("node:path");
+var import_device_management = require("./device-management");
 var import_ssdp_responder = require("./discovery/ssdp-responder");
 var import_device_info = require("./ecp/device-info");
 var import_ecp_http_server = require("./ecp/ecp-http-server");
@@ -49,6 +52,10 @@ class Fakeroku extends utils.Adapter {
   notifyTimer;
   ecpServers = [];
   pulseTimers = /* @__PURE__ */ new Set();
+  /** Per device, the key names it exposes — so a keypress only writes keys this device carries. */
+  deviceKeys = /* @__PURE__ */ new Map();
+  /** Device-manager backend: the emulated Rokus as cards with add/edit/delete. */
+  deviceManagement;
   /**
    * @param options adapter options passed through by js-controller
    */
@@ -59,12 +66,14 @@ class Fakeroku extends utils.Adapter {
     });
     this.on("ready", this.onReady.bind(this));
     this.on("unload", this.onUnload.bind(this));
+    this.deviceManagement = new import_device_management.FakerokuDeviceManagement(this);
   }
   /** Create each device's object tree, start its ECP server, then the shared SSDP responder. */
   async onReady() {
     var _a;
     try {
       await this.setState("info.connection", { val: false, ack: true });
+      await import_adapter_core.I18n.init((0, import_node_path.join)(this.adapterDir, "admin"), this);
       const configuredIp = this.config.networkInterface;
       const bindIp = configuredIp && configuredIp !== "0.0.0.0" ? configuredIp : void 0;
       const advertiseIp = bindIp != null ? bindIp : (0, import_detect_ip.detectPrimaryIPv4)();
@@ -80,12 +89,16 @@ class Fakeroku extends utils.Adapter {
       const adverts = [];
       for (const d of configured) {
         const deviceId = (0, import_pure_helpers.sanitizeId)(d.name);
+        const deviceType = d.type === "tv" ? "tv" : "player";
+        const keys = (0, import_state_model.keysForType)(deviceType);
+        this.deviceKeys.set(deviceId, new Set(keys));
         const advert = { uuid: (0, import_device_identity.deriveUuid)(d.name), port: Number(d.port) || DEFAULT_ECP_PORT };
-        await this.createDeviceStates(deviceId, d.name);
+        await this.createDeviceStates(deviceId, d.name, keys);
         const server = new import_ecp_http_server.EcpHttpServer({
           device: advert,
           friendlyName: d.name,
           apps: import_device_info.DEFAULT_APPS,
+          deviceType,
           bindIp,
           logger: this.log,
           onCommand: (cmd) => this.applyCommand(deviceId, cmd)
@@ -110,13 +123,14 @@ class Fakeroku extends utils.Adapter {
   }
   /**
    * Create the fixed object tree for one emulated Roku: the device, `command` +
-   * `commandType`, and every standard remote key as a `sensor` boolean state — all
-   * up front, so the tree is usable before any key is ever pressed.
+   * `commandType`, and one `sensor` boolean state per key the device type exposes —
+   * all up front, so the tree is usable before any key is ever pressed.
    *
    * @param deviceId the id-safe device path segment
    * @param friendlyName the configured device name
+   * @param keys the key names to create for this device (from its type)
    */
-  async createDeviceStates(deviceId, friendlyName) {
+  async createDeviceStates(deviceId, friendlyName, keys) {
     await this.extendObject(deviceId, { type: "device", common: { name: friendlyName }, native: {} });
     await this.extendObject(`${deviceId}.command`, {
       type: "state",
@@ -129,7 +143,7 @@ class Fakeroku extends utils.Adapter {
       native: {}
     });
     await this.extendObject(`${deviceId}.keys`, { type: "channel", common: { name: "keys" }, native: {} });
-    for (const key of import_state_model.STANDARD_KEYS) {
+    for (const key of keys) {
       await this.extendObject(`${deviceId}.keys.${key}`, {
         type: "state",
         // "sensor" = generic boolean read-only (active/inactive). The docs suggest
@@ -152,7 +166,7 @@ class Fakeroku extends utils.Adapter {
     const objects = await this.getAdapterObjectsAsync();
     const prefix = `${this.namespace}.`;
     const existingIds = Object.keys(objects).filter((id) => id.startsWith(prefix)).map((id) => id.slice(prefix.length));
-    const toDelete = (0, import_object_cleanup.planObjectCleanup)(existingIds, configuredDeviceIds, new Set(import_state_model.STANDARD_KEYS));
+    const toDelete = (0, import_object_cleanup.planObjectCleanup)(existingIds, configuredDeviceIds, this.deviceKeys);
     for (const id of toDelete) {
       await this.delObjectAsync(id, { recursive: true }).catch((e) => {
         this.log.debug(`cleanup: could not delete ${id}: ${e instanceof Error ? e.message : String(e)}`);
@@ -173,7 +187,8 @@ class Fakeroku extends utils.Adapter {
     const write = (0, import_state_model.commandToStateWrite)(cmd);
     void this.setState(`${deviceId}.command`, { val: write.command, ack: true });
     void this.setState(`${deviceId}.commandType`, { val: write.commandType, ack: true });
-    if (write.pulseKey) {
+    const keys = this.deviceKeys.get(deviceId);
+    if (write.pulseKey && (keys == null ? void 0 : keys.has(write.pulseKey))) {
       const id = `${deviceId}.keys.${write.pulseKey}`;
       void this.setState(id, { val: true, ack: true });
       const timer = this.setTimeout(() => {
@@ -185,7 +200,7 @@ class Fakeroku extends utils.Adapter {
       if (timer) {
         this.pulseTimers.add(timer);
       }
-    } else if (write.holdKey) {
+    } else if (write.holdKey && (keys == null ? void 0 : keys.has(write.holdKey.key))) {
       void this.setState(`${deviceId}.keys.${write.holdKey.key}`, { val: write.holdKey.value, ack: true });
     }
   }

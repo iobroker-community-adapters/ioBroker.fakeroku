@@ -3,6 +3,19 @@
     "name": "fakeroku",
     "version": "0.6.0",
     "news": {
+      "NEXT": {
+        "en": "Pick Player or TV per device now — a TV adds volume, power, channel and input keys. Devices are managed as cards with dialogs instead of a table.",
+        "de": "Pro Gerät jetzt Player oder TV wählbar — ein TV bringt Lautstärke-, Power-, Kanal- und Eingangstasten dazu. Geräte werden als Karten mit Dialogen verwaltet statt als Tabelle.",
+        "ru": "Теперь для каждого устройства можно выбрать Player или TV — TV добавляет кнопки громкости, питания, канала и входа. Устройства управляются карточками с диалогами вместо таблицы.",
+        "pt": "Agora escolhe Player ou TV por dispositivo — um TV acrescenta teclas de volume, energia, canal e entrada. Os dispositivos são geridos como cartões com diálogos, não uma tabela.",
+        "nl": "Kies nu per apparaat Player of TV — een TV voegt volume-, aan/uit-, kanaal- en ingangstoetsen toe. Apparaten worden als kaarten met dialogen beheerd in plaats van een tabel.",
+        "fr": "Choisissez désormais Player ou TV par appareil — un TV ajoute les touches volume, alimentation, chaîne et entrée. Les appareils se gèrent en cartes avec dialogues, pas un tableau.",
+        "it": "Ora scegli Player o TV per dispositivo — un TV aggiunge i tasti volume, accensione, canale e ingresso. I dispositivi si gestiscono come schede con finestre, non una tabella.",
+        "es": "Ahora eliges Player o TV por dispositivo — un TV añade teclas de volumen, encendido, canal y entrada. Los dispositivos se gestionan como tarjetas con diálogos, no una tabla.",
+        "pl": "Teraz dla każdego urządzenia wybierasz Player lub TV — TV dodaje przyciski głośności, zasilania, kanału i wejścia. Urządzenia zarządzane są jako karty z oknami, nie tabela.",
+        "uk": "Тепер для кожного пристрою можна вибрати Player або TV — TV додає кнопки гучності, живлення, каналу та входу. Пристрої керуються картками з діалогами, а не таблицею.",
+        "zh-cn": "现在可为每个设备选择 Player 或 TV——TV 会增加音量、电源、频道和输入按键。设备改为以卡片和对话框管理，不再是表格。"
+      },
       "0.6.0": {
         "en": "Runs without any setup now — the adapter detects the network address to advertise on its own. Leftover entries from an earlier version disappear from the object tree.",
         "de": "Läuft jetzt ohne jede Einrichtung — der Adapter erkennt die anzukündigende Netzwerkadresse selbst. Altlasten aus einer früheren Version verschwinden aus dem Objektbaum.",
@@ -80,19 +93,6 @@
         "pl": "zastrzeżenia regulatora v5",
         "uk": "фіксовані питання з контролером v5",
         "zh-cn": "a. 控制容忍的固定问题"
-      },
-      "0.2.0": {
-        "en": "emulate multiple rokus",
-        "de": "emuliere mehrere rokus",
-        "ru": "эмуляция нескольких Roku",
-        "pt": "emular vários rokus",
-        "nl": "meerdere roku's emuleren",
-        "fr": "émuler plusieurs rokus",
-        "it": "emulare più roku",
-        "es": "emular múltiples rokus",
-        "pl": "emulować wiele roku",
-        "uk": "емулювати кілька rokus",
-        "zh-cn": "模拟多个 roku"
       }
     },
     "titleLang": {
@@ -167,7 +167,8 @@
     "devices": [
       {
         "name": "ioBroker",
-        "port": 8060
+        "port": 8060,
+        "type": "player"
       }
     ]
   },

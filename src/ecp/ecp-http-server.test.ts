@@ -26,6 +26,7 @@ describe("EcpHttpServer", () => {
       device: { uuid: "abc123", port: PORT },
       friendlyName: "Test Roku",
       apps: [{ id: "12", name: "Netflix" }],
+      deviceType: "player",
       bindIp: "127.0.0.1",
       logger: noopLog,
       onCommand: c => commands.push(c),

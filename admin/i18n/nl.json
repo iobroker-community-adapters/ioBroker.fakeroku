@@ -1,8 +1,22 @@
 {
+  "headerNetwork": "Netwerk",
   "networkInterface": "Netwerkinterface (binden + aankondigen)",
   "networkInterfaceTooltip": "De netwerkkaart waaraan de geëmuleerde Roku's zich binden en aankondigen. Laat het op 'alle interfaces' staan — het routeerbare IP wordt automatisch gedetecteerd, dus het werkt meteen. Kies alleen een specifiek adres op een host met meerdere netwerkkaarten.",
-  "devicesTable": "Geëmuleerde Roku-apparaten",
-  "columnName": "Naam",
-  "columnPort": "ECP-poort",
-  "introText": "Emuleert Roku-apparaten op je LAN zodat een ECP/SSDP-afstandsbediening (Harmony Hub, Sofabaton X1, de Roku-app) gebeurtenissen in ioBroker activeert. Voeg hieronder een apparaat toe en voeg daarna in de app van de afstandsbediening een **Roku**-apparaat toe dat naar deze ioBroker-host wijst — elke toetsdruk komt dan in de objecten van het apparaat."
+  "headerDevices": "Geëmuleerde Roku-apparaten",
+  "devicesHelp": "Elke kaart is één geëmuleerde Roku. Voeg er een toe en voeg daarna in je Harmony- of Sofabaton-app een **Roku**-apparaat toe dat naar deze ioBroker-host wijst — elke toetsdruk komt in de objecten van het apparaat.",
+  "deviceName": "Naam",
+  "devicePort": "ECP-poort",
+  "deviceTypeLabel": "Type",
+  "deviceTypePlayer": "Player (streaming-box)",
+  "deviceTypeTv": "TV (met volume, aan/uit, kanaal, ingang)",
+  "deviceTypeHint": "„Player“ biedt de 16 standaardtoetsen. „TV“ voegt volume-, aan/uit-, kanaal- en ingangstoetsen toe.",
+  "dmAdd": "Roku-apparaat toevoegen",
+  "dmEdit": "Bewerken",
+  "dmDelete": "Verwijderen",
+  "dmEditTitle": "Roku-apparaat bewerken",
+  "dmDeleteConfirm": "Het Roku-apparaat „%s“ verwijderen?",
+  "supportHeader": "Ondersteunen",
+  "aboutInfo": "Als deze adapter nuttig voor je is, helpt een kleine donatie om hem te onderhouden — bedankt!",
+  "donateKofi": "Ko-fi",
+  "donatePaypal": "PayPal"
 }

@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": ["../../src/lib/i18n.ts"],
+  "sourcesContent": ["import { I18n } from \"@iobroker/adapter-core\";\nimport type translations from \"../../admin/i18n/en.json\";\n\ntype I18nKey = keyof typeof translations;\n\n/**\n * Translation object for a user-facing string, with optional `%s` interpolation.\n * Returns all admin languages (via adapter-core `I18n.getTranslatedObject`) so\n * device-manager titles, dialogs and confirmations render correctly regardless\n * of the admin language.\n *\n * @param key translation key from admin/i18n/en.json\n * @param args optional values substituted into the key's `%s` placeholders\n * @returns the translated string object\n */\nexport function t(key: I18nKey, ...args: (string | number | boolean | null)[]): ioBroker.StringOrTranslated {\n  return I18n.getTranslatedObject(key, ...args);\n}\n"],
+  "mappings": ";;;;;;;;;;;;;;;;;;AAAA;AAAA;AAAA;AAAA;AAAA;AAAA,0BAAqB;AAed,SAAS,EAAE,QAAiB,MAAyE;AAC1G,SAAO,yBAAK,oBAAoB,KAAK,GAAG,IAAI;AAC9C;",
+  "names": []
+}

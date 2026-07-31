@@ -38,9 +38,12 @@ Install the adapter from the ioBroker admin.
   on. Leave it on "all interfaces" and the adapter runs out of the box — it detects
   the routable IP automatically. Pick a specific address only on a host with several
   network cards.
-- **Emulated Roku devices** — a table of devices, each with a **name** and an
-  **ECP port** (default `8060`, the real Roku port). You can emulate several Rokus
-  from one instance.
+- **Emulated Roku devices** — managed as cards: **+ Add** opens a dialog with a
+  **name**, an **ECP port** (default `8060`, the real Roku port) and a **type**.
+  You can emulate several Rokus from one instance.
+- **Type** — *Player* (default) exposes the 16 standard navigation and playback keys;
+  *TV* additionally exposes volume, power, channel and input keys. Choose *TV* only if
+  you want those extra keys as ioBroker triggers.
 
 To add the emulated Roku to a Harmony hub, add a "Roku" device in the Harmony app
 and point it at the ioBroker host.
@@ -53,7 +56,7 @@ For every emulated Roku (`fakeroku.0.<name>`):
 |---|---|---|
 | `.command` | string, read-only | The last command as plain text (`Home`, `Lit_a`, `launch:12`, `search:news`). One datapoint for everything — no object-per-character sprawl. |
 | `.commandType` | string, read-only | `keypress` / `keydown` / `keyup` / `launch` / `install` / `input` / `search`. |
-| `.keys.<Key>` | boolean, read-only | One state per standard remote key (Home, Play, arrows, Volume*, Power, HDMI inputs …), all created up front. A keypress pulses it `true` for a moment; keydown/keyup hold it. |
+| `.keys.<Key>` | boolean, read-only | One state per remote key the device type exposes — a *Player* has the 16 navigation/playback keys, a *TV* adds Volume\*, Power, Channel\*, HDMI/AV inputs — all created up front. A keypress pulses it `true` for a moment; keydown/keyup hold it. |
 
 Free keyboard input (`Lit_x`) and app launches show up in `.command` only — they do
 not get their own objects.
@@ -72,6 +75,10 @@ becomes `true`, or watch `.command` for the last button as text.
 	Placeholder for the next version (at the beginning of the line):
 	### **WORK IN PROGRESS**
 -->
+### **WORK IN PROGRESS**
+- Each emulated Roku can now be a Player or a TV — a TV additionally exposes volume, power, channel and input keys, a Player the 16 standard keys
+- Devices are now managed as cards with add/edit/delete dialogs instead of a table, and the settings page gained a network section and support links
+
 ### 0.6.0 (2026-07-31)
 - Runs without any setup now — the adapter detects the routable network address on its own instead of sitting idle until a network interface is picked
 - Leftover entries from an earlier version disappear from the object tree on start, so the tree no longer keeps unused nodes around

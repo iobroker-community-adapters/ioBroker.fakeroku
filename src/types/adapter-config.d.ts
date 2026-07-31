@@ -5,8 +5,8 @@ declare global {
     interface AdapterConfig {
       /** Selected network-interface IP to bind SSDP/ECP to and advertise. */
       networkInterface: string;
-      /** Emulated Roku devices. */
-      devices: { name: string; port: number }[];
+      /** Emulated Roku devices. `type` defaults to "player" when absent (pre-0.7.0 configs). */
+      devices: { name: string; port: number; type?: "player" | "tv" }[];
     }
   }
 }

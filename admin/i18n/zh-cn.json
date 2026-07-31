@@ -1,8 +1,22 @@
 {
+  "headerNetwork": "网络",
   "networkInterface": "网络接口（绑定 + 广播）",
   "networkInterfaceTooltip": "模拟 Roku 绑定并广播的网卡。保留为“所有接口”即可——可路由的 IP 会被自动检测，因此无需配置即可运行。仅在有多块网卡的主机上才选择具体地址。",
-  "devicesTable": "模拟的 Roku 设备",
-  "columnName": "名称",
-  "columnPort": "ECP 端口",
-  "introText": "在您的局域网中模拟 Roku 设备，使 ECP/SSDP 遥控器（Harmony Hub、Sofabaton X1、Roku 应用）能在 ioBroker 中触发事件。在下方添加设备，然后在遥控器应用中添加一个指向此 ioBroker 主机的 **Roku** 设备——之后每次按键都会进入该设备的对象。"
+  "headerDevices": "模拟的 Roku 设备",
+  "devicesHelp": "每张卡片是一个模拟的 Roku。添加一个后，在 Harmony 或 Sofabaton 应用中添加一个指向此 ioBroker 主机的 **Roku** 设备——每次按键都会进入该设备的对象。",
+  "deviceName": "名称",
+  "devicePort": "ECP 端口",
+  "deviceTypeLabel": "类型",
+  "deviceTypePlayer": "播放器（流媒体盒子）",
+  "deviceTypeTv": "电视（带音量、电源、频道、输入）",
+  "deviceTypeHint": "“播放器”提供 16 个标准遥控按键。“电视”额外提供音量、电源、频道和输入按键。",
+  "dmAdd": "添加 Roku 设备",
+  "dmEdit": "编辑",
+  "dmDelete": "删除",
+  "dmEditTitle": "编辑 Roku 设备",
+  "dmDeleteConfirm": "删除 Roku 设备“%s”？",
+  "supportHeader": "支持",
+  "aboutInfo": "如果此适配器对您有用，一点捐赠有助于维护它——谢谢！",
+  "donateKofi": "Ko-fi",
+  "donatePaypal": "PayPal"
 }

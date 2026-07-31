@@ -2,14 +2,10 @@
   "i18n": true,
   "type": "panel",
   "items": {
-    "_intro": {
-      "type": "staticText",
-      "text": "introText",
-      "xs": 12,
-      "sm": 12,
-      "md": 12,
-      "lg": 12,
-      "xl": 12
+    "_headerNetwork": {
+      "type": "header",
+      "text": "headerNetwork",
+      "size": 3
     },
     "networkInterface": {
       "type": "ip",
@@ -23,18 +19,71 @@
       "lg": 6,
       "xl": 6
     },
-    "devices": {
-      "type": "table",
-      "label": "devicesTable",
+    "_headerDevices": {
+      "newLine": true,
+      "type": "header",
+      "text": "headerDevices",
+      "size": 3
+    },
+    "_devicesHelp": {
+      "type": "staticText",
+      "text": "devicesHelp",
       "xs": 12,
       "sm": 12,
       "md": 12,
       "lg": 12,
       "xl": 12,
-      "items": [
-        { "type": "text", "attr": "name", "title": "columnName", "width": "60%" },
-        { "type": "number", "attr": "port", "title": "columnPort", "width": "40%", "default": 8060 }
-      ]
+      "style": { "fontSize": 14, "marginBottom": 8 }
+    },
+    "_deviceManager": {
+      "type": "deviceManager",
+      "xs": 12,
+      "sm": 12,
+      "md": 12,
+      "lg": 12,
+      "xl": 12
+    },
+    "_supportHeader": {
+      "newLine": true,
+      "type": "header",
+      "text": "supportHeader",
+      "size": 5
+    },
+    "_aboutInfo": {
+      "type": "staticText",
+      "text": "aboutInfo",
+      "xs": 12,
+      "sm": 12,
+      "md": 12,
+      "lg": 12,
+      "xl": 12,
+      "style": { "fontSize": 14, "marginBottom": 16 }
+    },
+    "_kofiLink": {
+      "type": "staticLink",
+      "href": "https://ko-fi.com/krobipd",
+      "label": "donateKofi",
+      "button": true,
+      "variant": "outlined",
+      "color": "primary",
+      "xs": 12,
+      "sm": 6,
+      "md": 4,
+      "lg": 4,
+      "xl": 4
+    },
+    "_paypalLink": {
+      "type": "staticLink",
+      "href": "https://paypal.me/krobipd",
+      "label": "donatePaypal",
+      "button": true,
+      "variant": "outlined",
+      "color": "primary",
+      "xs": 12,
+      "sm": 6,
+      "md": 4,
+      "lg": 4,
+      "xl": 4
     }
   }
 }

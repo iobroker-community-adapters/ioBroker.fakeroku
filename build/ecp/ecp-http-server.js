@@ -105,9 +105,9 @@ class EcpHttpServer {
   routeGet(url) {
     switch (url.split("?")[0]) {
       case "/":
-        return (0, import_device_info.buildDescXml)(this.config.device, this.config.friendlyName);
+        return (0, import_device_info.buildDescXml)(this.config.device, this.config.friendlyName, this.config.deviceType);
       case "/query/device-info":
-        return (0, import_device_info.buildDeviceInfoXml)(this.config.device, this.config.friendlyName);
+        return (0, import_device_info.buildDeviceInfoXml)(this.config.device, this.config.friendlyName, this.config.deviceType);
       case "/query/apps":
         return (0, import_device_info.buildAppsXml)(this.config.apps);
       default:

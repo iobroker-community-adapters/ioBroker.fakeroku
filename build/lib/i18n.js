@@ -16,36 +16,17 @@ var __copyProps = (to, from, except, desc) => {
   return to;
 };
 var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
-var object_cleanup_exports = {};
-__export(object_cleanup_exports, {
-  planObjectCleanup: () => planObjectCleanup
+var i18n_exports = {};
+__export(i18n_exports, {
+  t: () => t
 });
-module.exports = __toCommonJS(object_cleanup_exports);
-function planObjectCleanup(existingIds, configuredDeviceIds, validKeysByDevice) {
-  const del = /* @__PURE__ */ new Set();
-  for (const id of existingIds) {
-    const parts = id.split(".");
-    const device = parts[0];
-    if (device === "info") {
-      continue;
-    }
-    if (!configuredDeviceIds.has(device)) {
-      del.add(device);
-      continue;
-    }
-    if (parts[1] === "apps") {
-      del.add(`${device}.apps`);
-    } else if (parts[1] === "keys" && parts.length === 3) {
-      const valid = validKeysByDevice.get(device);
-      if (valid && !valid.has(parts[2])) {
-        del.add(`${device}.keys.${parts[2]}`);
-      }
-    }
-  }
-  return [...del];
+module.exports = __toCommonJS(i18n_exports);
+var import_adapter_core = require("@iobroker/adapter-core");
+function t(key, ...args) {
+  return import_adapter_core.I18n.getTranslatedObject(key, ...args);
 }
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
-  planObjectCleanup
+  t
 });
-//# sourceMappingURL=object-cleanup.js.map
+//# sourceMappingURL=i18n.js.map

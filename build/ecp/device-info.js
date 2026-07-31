@@ -26,8 +26,24 @@ __export(device_info_exports, {
 module.exports = __toCommonJS(device_info_exports);
 const SOFTWARE_VERSION = "14.1.4";
 const SOFTWARE_BUILD = "4200";
-const MODEL_NAME = "Roku Ultra";
-const MODEL_NUMBER = "4800X";
+const PROFILES = {
+  player: {
+    modelName: "Roku Ultra",
+    modelNumber: "4800X",
+    deviceType: "urn:roku-com:device:player:1-0",
+    isTv: false,
+    supportsTvPowerControl: false,
+    supportsAudioVolumeControl: false
+  },
+  tv: {
+    modelName: "Roku TV",
+    modelNumber: "C4A4X",
+    deviceType: "urn:roku-com:device:tv:1-0",
+    isTv: true,
+    supportsTvPowerControl: true,
+    supportsAudioVolumeControl: true
+  }
+};
 const DEFAULT_APPS = [
   { id: "12", name: "Netflix" },
   { id: "837", name: "YouTube" },
@@ -37,16 +53,17 @@ const DEFAULT_APPS = [
 function xmlEscape(s) {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
-function buildDescXml(device, friendlyName) {
+function buildDescXml(device, friendlyName, type) {
+  const p = PROFILES[type];
   return `<?xml version="1.0" encoding="UTF-8" ?>
 <root xmlns="urn:schemas-upnp-org:device-1-0">
   <specVersion><major>1</major><minor>0</minor></specVersion>
   <device>
-    <deviceType>urn:roku-com:device:player:1-0</deviceType>
+    <deviceType>${p.deviceType}</deviceType>
     <friendlyName>${xmlEscape(friendlyName)}</friendlyName>
     <manufacturer>Roku</manufacturer>
-    <modelName>${MODEL_NAME}</modelName>
-    <modelNumber>${MODEL_NUMBER}</modelNumber>
+    <modelName>${p.modelName}</modelName>
+    <modelNumber>${p.modelNumber}</modelNumber>
     <serialNumber>${device.uuid}</serialNumber>
     <UDN>uuid:roku:ecp:${device.uuid}</UDN>
     <serviceList>
@@ -61,23 +78,26 @@ function buildDescXml(device, friendlyName) {
   </device>
 </root>`;
 }
-function buildDeviceInfoXml(device, friendlyName) {
+function buildDeviceInfoXml(device, friendlyName, type) {
+  const p = PROFILES[type];
   return `<device-info>
   <udn>${device.uuid}</udn>
   <serial-number>${device.uuid}</serial-number>
   <device-id>${device.uuid}</device-id>
   <vendor-name>Roku</vendor-name>
-  <model-name>${MODEL_NAME}</model-name>
-  <model-number>${MODEL_NUMBER}</model-number>
+  <model-name>${p.modelName}</model-name>
+  <model-number>${p.modelNumber}</model-number>
   <model-region>US</model-region>
   <friendly-device-name>${xmlEscape(friendlyName)}</friendly-device-name>
-  <is-tv>false</is-tv>
+  <is-tv>${p.isTv}</is-tv>
   <is-stick>false</is-stick>
   <software-version>${SOFTWARE_VERSION}</software-version>
   <software-build>${SOFTWARE_BUILD}</software-build>
   <power-mode>PowerOn</power-mode>
   <supports-suspend>false</supports-suspend>
-  <supports-find-remote>false</supports-find-remote>
+  <supports-find-remote>true</supports-find-remote>
+  <supports-tv-power-control>${p.supportsTvPowerControl}</supports-tv-power-control>
+  <supports-audio-volume-control>${p.supportsAudioVolumeControl}</supports-audio-volume-control>
   <developer-enabled>false</developer-enabled>
   <search-enabled>true</search-enabled>
   <voice-search-enabled>true</voice-search-enabled>

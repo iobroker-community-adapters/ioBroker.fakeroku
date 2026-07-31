@@ -18,11 +18,13 @@ var __copyProps = (to, from, except, desc) => {
 var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 var state_model_exports = {};
 __export(state_model_exports, {
-  STANDARD_KEYS: () => STANDARD_KEYS,
-  commandToStateWrite: () => commandToStateWrite
+  BASE_KEYS: () => BASE_KEYS,
+  TV_KEYS: () => TV_KEYS,
+  commandToStateWrite: () => commandToStateWrite,
+  keysForType: () => keysForType
 });
 module.exports = __toCommonJS(state_model_exports);
-const STANDARD_KEYS = [
+const BASE_KEYS = [
   "Home",
   "Rev",
   "Fwd",
@@ -38,6 +40,9 @@ const STANDARD_KEYS = [
   "Backspace",
   "Enter",
   "Search",
+  "FindRemote"
+];
+const TV_KEYS = [
   "VolumeUp",
   "VolumeDown",
   "VolumeMute",
@@ -48,10 +53,12 @@ const STANDARD_KEYS = [
   "InputHDMI2",
   "InputHDMI3",
   "InputHDMI4",
-  "InputAV1",
-  "FindRemote"
+  "InputAV1"
 ];
-const STANDARD_KEY_SET = new Set(STANDARD_KEYS);
+const ALL_KEYS = /* @__PURE__ */ new Set([...BASE_KEYS, ...TV_KEYS]);
+function keysForType(type) {
+  return type === "tv" ? [...BASE_KEYS, ...TV_KEYS] : BASE_KEYS;
+}
 function describeCommand(cmd) {
   var _a, _b, _c;
   switch (cmd.type) {
@@ -74,7 +81,7 @@ function commandToStateWrite(cmd) {
     pulseKey: null,
     holdKey: null
   };
-  if (cmd.key && STANDARD_KEY_SET.has(cmd.key)) {
+  if (cmd.key && ALL_KEYS.has(cmd.key)) {
     if (cmd.type === "keypress") {
       write.pulseKey = cmd.key;
     } else if (cmd.type === "keydown") {
@@ -87,7 +94,9 @@ function commandToStateWrite(cmd) {
 }
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
-  STANDARD_KEYS,
-  commandToStateWrite
+  BASE_KEYS,
+  TV_KEYS,
+  commandToStateWrite,
+  keysForType
 });
 //# sourceMappingURL=state-model.js.map

@@ -4,6 +4,7 @@ import type { SsdpLogger } from "../discovery/ssdp-responder";
 import { type CommandEvent, parseEcpCommand } from "./ecp-command";
 import { type AppEntry, buildAppsXml, buildDescXml, buildDeviceInfoXml } from "./device-info";
 import { isLanClient } from "./lan-guard";
+import type { DeviceType } from "./state-model";
 
 /** Configuration for one emulated Roku's ECP HTTP server. */
 export interface EcpServerConfig {
@@ -13,6 +14,8 @@ export interface EcpServerConfig {
   friendlyName: string;
   /** Apps advertised at /query/apps. */
   apps: AppEntry[];
+  /** The emulated device type (player / tv) — drives the device-info response. */
+  deviceType: DeviceType;
   /** Interface IP to bind the HTTP server to, or `undefined` to bind all interfaces (auto). */
   bindIp: string | undefined;
   /** Logger. */
@@ -100,9 +103,9 @@ export class EcpHttpServer {
   private routeGet(url: string): string | null {
     switch (url.split("?")[0]) {
       case "/":
-        return buildDescXml(this.config.device, this.config.friendlyName);
+        return buildDescXml(this.config.device, this.config.friendlyName, this.config.deviceType);
       case "/query/device-info":
-        return buildDeviceInfoXml(this.config.device, this.config.friendlyName);
+        return buildDeviceInfoXml(this.config.device, this.config.friendlyName, this.config.deviceType);
       case "/query/apps":
         return buildAppsXml(this.config.apps);
       default:

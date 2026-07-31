@@ -1,8 +1,22 @@
 {
+  "headerNetwork": "Réseau",
   "networkInterface": "Interface réseau (liaison + annonce)",
   "networkInterfaceTooltip": "La carte réseau à laquelle les Roku émulés se lient et s'annoncent. Laissez-la sur 'toutes les interfaces' : l'IP routable est détectée automatiquement, cela fonctionne sans réglage. Ne choisissez une adresse précise que sur un hôte avec plusieurs cartes réseau.",
-  "devicesTable": "Appareils Roku émulés",
-  "columnName": "Nom",
-  "columnPort": "Port ECP",
-  "introText": "Émule des appareils Roku sur votre réseau local pour qu'une télécommande ECP/SSDP (Harmony Hub, Sofabaton X1, l'app Roku) déclenche des événements dans ioBroker. Ajoutez un appareil ci-dessous, puis ajoutez un appareil **Roku** dans l'app de la télécommande pointant vers cet hôte ioBroker — chaque appui apparaît alors dans les objets de l'appareil."
+  "headerDevices": "Appareils Roku émulés",
+  "devicesHelp": "Chaque carte est un Roku émulé. Ajoutez-en un, puis ajoutez un appareil **Roku** dans votre app Harmony ou Sofabaton pointant vers cet hôte ioBroker — chaque appui atterrit dans les objets de l'appareil.",
+  "deviceName": "Nom",
+  "devicePort": "Port ECP",
+  "deviceTypeLabel": "Type",
+  "deviceTypePlayer": "Player (box de streaming)",
+  "deviceTypeTv": "TV (avec volume, alimentation, chaîne, entrée)",
+  "deviceTypeHint": "« Player » expose les 16 touches standard de la télécommande. « TV » ajoute les touches volume, alimentation, chaîne et entrée.",
+  "dmAdd": "Ajouter un appareil Roku",
+  "dmEdit": "Modifier",
+  "dmDelete": "Supprimer",
+  "dmEditTitle": "Modifier l'appareil Roku",
+  "dmDeleteConfirm": "Supprimer l'appareil Roku « %s » ?",
+  "supportHeader": "Soutenir",
+  "aboutInfo": "Si cet adaptateur vous est utile, un petit don aide à le maintenir — merci !",
+  "donateKofi": "Ko-fi",
+  "donatePaypal": "PayPal"
 }

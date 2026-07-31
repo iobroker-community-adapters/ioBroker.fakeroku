@@ -1,10 +1,13 @@
 import * as utils from "@iobroker/adapter-core";
+import { I18n } from "@iobroker/adapter-core";
+import { join } from "node:path";
+import { FakerokuDeviceManagement } from "./device-management";
 import type { RokuAdvert } from "./discovery/ssdp-messages";
 import { RokuSsdpResponder } from "./discovery/ssdp-responder";
 import { DEFAULT_APPS } from "./ecp/device-info";
 import type { CommandEvent } from "./ecp/ecp-command";
 import { EcpHttpServer } from "./ecp/ecp-http-server";
-import { commandToStateWrite, STANDARD_KEYS } from "./ecp/state-model";
+import { commandToStateWrite, type DeviceType, keysForType } from "./ecp/state-model";
 import { deriveUuid } from "./lib/device-identity";
 import { detectPrimaryIPv4 } from "./lib/detect-ip";
 import { planObjectCleanup } from "./lib/object-cleanup";
@@ -30,6 +33,10 @@ export class Fakeroku extends utils.Adapter {
   private notifyTimer: ioBroker.Interval | undefined;
   private readonly ecpServers: EcpHttpServer[] = [];
   private readonly pulseTimers = new Set<ioBroker.Timeout>();
+  /** Per device, the key names it exposes — so a keypress only writes keys this device carries. */
+  private readonly deviceKeys = new Map<string, ReadonlySet<string>>();
+  /** Device-manager backend: the emulated Rokus as cards with add/edit/delete. */
+  private readonly deviceManagement: FakerokuDeviceManagement;
 
   /**
    * @param options adapter options passed through by js-controller
@@ -42,12 +49,14 @@ export class Fakeroku extends utils.Adapter {
 
     this.on("ready", this.onReady.bind(this));
     this.on("unload", this.onUnload.bind(this));
+    this.deviceManagement = new FakerokuDeviceManagement(this);
   }
 
   /** Create each device's object tree, start its ECP server, then the shared SSDP responder. */
   private async onReady(): Promise<void> {
     try {
       await this.setState("info.connection", { val: false, ack: true });
+      await I18n.init(join(this.adapterDir, "admin"), this);
 
       // Empty AND "0.0.0.0" both mean "auto": bind all interfaces, advertise the
       // detected primary IP so the adapter runs without configuration. js-controller
@@ -70,12 +79,16 @@ export class Fakeroku extends utils.Adapter {
       const adverts: RokuAdvert[] = [];
       for (const d of configured) {
         const deviceId = sanitizeId(d.name);
+        const deviceType: DeviceType = d.type === "tv" ? "tv" : "player";
+        const keys = keysForType(deviceType);
+        this.deviceKeys.set(deviceId, new Set(keys));
         const advert: RokuAdvert = { uuid: deriveUuid(d.name), port: Number(d.port) || DEFAULT_ECP_PORT };
-        await this.createDeviceStates(deviceId, d.name);
+        await this.createDeviceStates(deviceId, d.name, keys);
         const server = new EcpHttpServer({
           device: advert,
           friendlyName: d.name,
           apps: DEFAULT_APPS,
+          deviceType,
           bindIp,
           logger: this.log,
           onCommand: cmd => this.applyCommand(deviceId, cmd),
@@ -101,13 +114,14 @@ export class Fakeroku extends utils.Adapter {
 
   /**
    * Create the fixed object tree for one emulated Roku: the device, `command` +
-   * `commandType`, and every standard remote key as a `sensor` boolean state — all
-   * up front, so the tree is usable before any key is ever pressed.
+   * `commandType`, and one `sensor` boolean state per key the device type exposes —
+   * all up front, so the tree is usable before any key is ever pressed.
    *
    * @param deviceId the id-safe device path segment
    * @param friendlyName the configured device name
+   * @param keys the key names to create for this device (from its type)
    */
-  private async createDeviceStates(deviceId: string, friendlyName: string): Promise<void> {
+  private async createDeviceStates(deviceId: string, friendlyName: string, keys: readonly string[]): Promise<void> {
     await this.extendObject(deviceId, { type: "device", common: { name: friendlyName }, native: {} });
     await this.extendObject(`${deviceId}.command`, {
       type: "state",
@@ -120,7 +134,7 @@ export class Fakeroku extends utils.Adapter {
       native: {},
     });
     await this.extendObject(`${deviceId}.keys`, { type: "channel", common: { name: "keys" }, native: {} });
-    for (const key of STANDARD_KEYS) {
+    for (const key of keys) {
       await this.extendObject(`${deviceId}.keys.${key}`, {
         type: "state",
         // "sensor" = generic boolean read-only (active/inactive). The docs suggest
@@ -146,7 +160,7 @@ export class Fakeroku extends utils.Adapter {
     const existingIds = Object.keys(objects)
       .filter(id => id.startsWith(prefix))
       .map(id => id.slice(prefix.length));
-    const toDelete = planObjectCleanup(existingIds, configuredDeviceIds, new Set(STANDARD_KEYS));
+    const toDelete = planObjectCleanup(existingIds, configuredDeviceIds, this.deviceKeys);
     for (const id of toDelete) {
       await this.delObjectAsync(id, { recursive: true }).catch((e: unknown) => {
         this.log.debug(`cleanup: could not delete ${id}: ${e instanceof Error ? e.message : String(e)}`);
@@ -168,7 +182,10 @@ export class Fakeroku extends utils.Adapter {
     const write = commandToStateWrite(cmd);
     void this.setState(`${deviceId}.command`, { val: write.command, ack: true });
     void this.setState(`${deviceId}.commandType`, { val: write.commandType, ack: true });
-    if (write.pulseKey) {
+    // Only write keys.<Key> if THIS device's type carries the key — a player has no
+    // TV key objects, so a stray TV keypress lands in `command` only, never a missing state.
+    const keys = this.deviceKeys.get(deviceId);
+    if (write.pulseKey && keys?.has(write.pulseKey)) {
       const id = `${deviceId}.keys.${write.pulseKey}`;
       void this.setState(id, { val: true, ack: true });
       const timer = this.setTimeout(() => {
@@ -180,7 +197,7 @@ export class Fakeroku extends utils.Adapter {
       if (timer) {
         this.pulseTimers.add(timer);
       }
-    } else if (write.holdKey) {
+    } else if (write.holdKey && keys?.has(write.holdKey.key)) {
       void this.setState(`${deviceId}.keys.${write.holdKey.key}`, { val: write.holdKey.value, ack: true });
     }
   }

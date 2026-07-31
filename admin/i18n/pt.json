@@ -1,8 +1,22 @@
 {
+  "headerNetwork": "Rede",
   "networkInterface": "Interface de rede (vincular + anunciar)",
   "networkInterfaceTooltip": "A placa de rede à qual os Roku emulados se vinculam e anunciam. Deixe em 'todas as interfaces' — o IP roteável é detetado automaticamente, por isso funciona sem configurar. Escolha um endereço específico apenas num host com várias placas de rede.",
-  "devicesTable": "Dispositivos Roku emulados",
-  "columnName": "Nome",
-  "columnPort": "Porta ECP",
-  "introText": "Emula dispositivos Roku na sua LAN para que um comando ECP/SSDP (Harmony Hub, Sofabaton X1, a app Roku) acione eventos no ioBroker. Adicione um dispositivo abaixo e depois adicione um dispositivo **Roku** na app do comando a apontar para este host ioBroker — cada tecla passa então para os objetos do dispositivo."
+  "headerDevices": "Dispositivos Roku emulados",
+  "devicesHelp": "Cada cartão é um Roku emulado. Adicione um e depois adicione um dispositivo **Roku** na app Harmony ou Sofabaton a apontar para este host ioBroker — cada tecla cai nos objetos do dispositivo.",
+  "deviceName": "Nome",
+  "devicePort": "Porta ECP",
+  "deviceTypeLabel": "Tipo",
+  "deviceTypePlayer": "Player (box de streaming)",
+  "deviceTypeTv": "TV (com volume, energia, canal, entrada)",
+  "deviceTypeHint": "«Player» expõe as 16 teclas padrão do comando. «TV» adiciona teclas de volume, energia, canal e entrada.",
+  "dmAdd": "Adicionar dispositivo Roku",
+  "dmEdit": "Editar",
+  "dmDelete": "Eliminar",
+  "dmEditTitle": "Editar dispositivo Roku",
+  "dmDeleteConfirm": "Eliminar o dispositivo Roku «%s»?",
+  "supportHeader": "Apoiar",
+  "aboutInfo": "Se este adaptador lhe é útil, um pequeno donativo ajuda a mantê-lo — obrigado!",
+  "donateKofi": "Ko-fi",
+  "donatePaypal": "PayPal"
 }

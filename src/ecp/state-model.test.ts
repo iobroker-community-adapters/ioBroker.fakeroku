@@ -1,10 +1,23 @@
-import { commandToStateWrite, STANDARD_KEYS } from "./state-model";
+import { BASE_KEYS, commandToStateWrite, keysForType, TV_KEYS } from "./state-model";
 
-describe("STANDARD_KEYS", () => {
-  it("covers the core Roku remote (Home, Play, arrows, volume, power, HDMI)", () => {
-    for (const k of ["Home", "Play", "Up", "VolumeUp", "PowerOff", "InputHDMI1"]) {
-      expect(STANDARD_KEYS).toContain(k);
+describe("keysForType", () => {
+  it("a player exposes the base keys and no TV keys", () => {
+    const keys = keysForType("player");
+    expect(keys).toEqual([...BASE_KEYS]);
+    expect(keys).toContain("Home");
+    expect(keys).not.toContain("VolumeUp");
+  });
+  it("a TV exposes base + TV keys (volume, power, channel, input)", () => {
+    const keys = keysForType("tv");
+    expect(keys).toEqual([...BASE_KEYS, ...TV_KEYS]);
+    for (const k of ["VolumeUp", "PowerOff", "ChannelUp", "InputHDMI1"]) {
+      expect(keys).toContain(k);
     }
+  });
+  it("base has 16 keys, TV adds 11 for 27 total", () => {
+    expect(BASE_KEYS.length).toBe(16);
+    expect(TV_KEYS.length).toBe(11);
+    expect(keysForType("tv").length).toBe(27);
   });
 });
 
@@ -16,6 +29,9 @@ describe("commandToStateWrite", () => {
       pulseKey: "Home",
       holdKey: null,
     });
+  });
+  it("flags a TV key as a pulse too (the adapter guards per device)", () => {
+    expect(commandToStateWrite({ type: "keypress", key: "VolumeUp" }).pulseKey).toBe("VolumeUp");
   });
   it("holds on keydown and releases on keyup", () => {
     expect(commandToStateWrite({ type: "keydown", key: "Select" }).holdKey).toEqual({ key: "Select", value: true });

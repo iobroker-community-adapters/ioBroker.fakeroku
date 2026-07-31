@@ -1,8 +1,22 @@
 {
+  "headerNetwork": "Sieć",
   "networkInterface": "Interfejs sieciowy (bind + rozgłaszanie)",
   "networkInterfaceTooltip": "Karta sieciowa, do której podłączają się i rozgłaszają emulowane Roku. Zostaw na 'wszystkich interfejsach' — routowalny adres IP jest wykrywany automatycznie, więc działa bez konfiguracji. Wybierz konkretny adres tylko na hoście z kilkoma kartami sieciowymi.",
-  "devicesTable": "Emulowane urządzenia Roku",
-  "columnName": "Nazwa",
-  "columnPort": "Port ECP",
-  "introText": "Emuluje urządzenia Roku w sieci LAN, aby pilot ECP/SSDP (Harmony Hub, Sofabaton X1, aplikacja Roku) wyzwalał zdarzenia w ioBroker. Dodaj urządzenie poniżej, a następnie w aplikacji pilota dodaj urządzenie **Roku** wskazujące na tego hosta ioBroker — każde naciśnięcie trafia wtedy do obiektów urządzenia."
+  "headerDevices": "Emulowane urządzenia Roku",
+  "devicesHelp": "Każda karta to jeden emulowany Roku. Dodaj urządzenie, a następnie w aplikacji Harmony lub Sofabaton dodaj urządzenie **Roku** wskazujące na tego hosta ioBroker — każde naciśnięcie trafia do obiektów urządzenia.",
+  "deviceName": "Nazwa",
+  "devicePort": "Port ECP",
+  "deviceTypeLabel": "Typ",
+  "deviceTypePlayer": "Player (przystawka)",
+  "deviceTypeTv": "TV (z głośnością, zasilaniem, kanałem, wejściem)",
+  "deviceTypeHint": "„Player“ udostępnia 16 standardowych przycisków pilota. „TV“ dodaje przyciski głośności, zasilania, kanału i wejścia.",
+  "dmAdd": "Dodaj urządzenie Roku",
+  "dmEdit": "Edytuj",
+  "dmDelete": "Usuń",
+  "dmEditTitle": "Edytuj urządzenie Roku",
+  "dmDeleteConfirm": "Usunąć urządzenie Roku „%s“?",
+  "supportHeader": "Wsparcie",
+  "aboutInfo": "Jeśli ten adapter jest dla Ciebie przydatny, mała darowizna pomaga go utrzymać — dziękuję!",
+  "donateKofi": "Ko-fi",
+  "donatePaypal": "PayPal"
 }

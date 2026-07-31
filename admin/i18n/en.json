@@ -1,8 +1,22 @@
 {
+  "headerNetwork": "Network",
   "networkInterface": "Network interface (bind + advertise)",
   "networkInterfaceTooltip": "The network card the emulated Rokus bind to and advertise on. Leave it on 'all interfaces' — the routable IP is detected automatically, so it works out of the box. Only pick a specific address on a host with several network cards.",
-  "devicesTable": "Emulated Roku devices",
-  "columnName": "Name",
-  "columnPort": "ECP port",
-  "introText": "Emulates Roku devices on your LAN so an ECP/SSDP remote (Harmony Hub, Sofabaton X1, the Roku app) triggers events in ioBroker. Add a device below, then add a **Roku** device in the remote's app pointing at this ioBroker host — each keypress then lands in the device's objects."
+  "headerDevices": "Emulated Roku devices",
+  "devicesHelp": "Each card is one emulated Roku. Add one, then add a **Roku** device in your Harmony or Sofabaton app pointing at this ioBroker host — every keypress lands in the device's objects.",
+  "deviceName": "Name",
+  "devicePort": "ECP port",
+  "deviceTypeLabel": "Type",
+  "deviceTypePlayer": "Player (streaming box)",
+  "deviceTypeTv": "TV (adds volume, power, channel, input)",
+  "deviceTypeHint": "\"Player\" exposes the 16 standard remote keys. \"TV\" additionally exposes volume, power, channel and input keys.",
+  "dmAdd": "Add Roku device",
+  "dmEdit": "Edit",
+  "dmDelete": "Delete",
+  "dmEditTitle": "Edit Roku device",
+  "dmDeleteConfirm": "Delete the Roku device \"%s\"?",
+  "supportHeader": "Support",
+  "aboutInfo": "If this adapter is useful to you, a small donation helps keep it maintained — thank you!",
+  "donateKofi": "Ko-fi",
+  "donatePaypal": "PayPal"
 }

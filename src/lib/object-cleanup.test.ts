@@ -1,33 +1,35 @@
 import { planObjectCleanup } from "./object-cleanup";
 
-const KEYS = new Set(["Home", "Play", "Select"]);
+/** One configured device "ioBroker" exposing the given keys. */
+const valid = (keys: string[]): ReadonlyMap<string, ReadonlySet<string>> => new Map([["ioBroker", new Set(keys)]]);
+const BASE = valid(["Home", "Play", "Select"]);
 
 describe("planObjectCleanup", () => {
   it("removes the legacy apps node of a configured device", () => {
-    const plan = planObjectCleanup(["ioBroker", "ioBroker.command", "ioBroker.apps"], new Set(["ioBroker"]), KEYS);
+    const plan = planObjectCleanup(["ioBroker", "ioBroker.command", "ioBroker.apps"], new Set(["ioBroker"]), BASE);
     expect(plan).toEqual(["ioBroker.apps"]);
   });
 
-  it("removes a non-standard key but keeps standard ones", () => {
+  it("removes a key not in this device's type (e.g. a TV key after switching to player)", () => {
     const plan = planObjectCleanup(
-      ["ioBroker.keys.Home", "ioBroker.keys.Play", "ioBroker.keys.Enter"],
+      ["ioBroker.keys.Home", "ioBroker.keys.Play", "ioBroker.keys.VolumeUp"],
       new Set(["ioBroker"]),
-      KEYS,
+      BASE,
     );
-    expect(plan).toEqual(["ioBroker.keys.Enter"]);
+    expect(plan).toEqual(["ioBroker.keys.VolumeUp"]);
   });
 
   it("removes a whole orphaned device tree (rename/removal), de-duplicated", () => {
     const plan = planObjectCleanup(
       ["ioBroker.command", "OldName", "OldName.command", "OldName.keys.Home"],
       new Set(["ioBroker"]),
-      KEYS,
+      BASE,
     );
     expect(plan).toEqual(["OldName"]);
   });
 
   it("never touches the adapter's own info channel", () => {
-    const plan = planObjectCleanup(["info", "info.connection"], new Set(["ioBroker"]), KEYS);
+    const plan = planObjectCleanup(["info", "info.connection"], new Set(["ioBroker"]), BASE);
     expect(plan).toEqual([]);
   });
 
@@ -35,7 +37,7 @@ describe("planObjectCleanup", () => {
     const plan = planObjectCleanup(
       ["ioBroker", "ioBroker.command", "ioBroker.commandType", "ioBroker.keys", "ioBroker.keys.Home"],
       new Set(["ioBroker"]),
-      KEYS,
+      BASE,
     );
     expect(plan).toEqual([]);
   });
