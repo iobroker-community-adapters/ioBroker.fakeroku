@@ -1,4 +1,7 @@
 # Older changes
+## 0.2.2 (2023-07-24)
+* (Apollon77) fixed issues with controller v5
+
 ## 0.2.1
   (Pmant) fix jQuery error in admin
   (ykuendig) add translations

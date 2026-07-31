@@ -1,9 +1,9 @@
 {
   "common": {
     "name": "fakeroku",
-    "version": "0.6.0",
+    "version": "0.7.0",
     "news": {
-      "NEXT": {
+      "0.7.0": {
         "en": "Pick Player or TV per device now — a TV adds volume, power, channel and input keys. Devices are managed as cards with dialogs instead of a table.",
         "de": "Pro Gerät jetzt Player oder TV wählbar — ein TV bringt Lautstärke-, Power-, Kanal- und Eingangstasten dazu. Geräte werden als Karten mit Dialogen verwaltet statt als Tabelle.",
         "ru": "Теперь для каждого устройства можно выбрать Player или TV — TV добавляет кнопки громкости, питания, канала и входа. Устройства управляются карточками с диалогами вместо таблицы.",
