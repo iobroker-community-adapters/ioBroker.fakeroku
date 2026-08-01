@@ -1,8 +1,21 @@
 {
   "common": {
     "name": "fakeroku",
-    "version": "0.7.1",
+    "version": "0.8.0",
     "news": {
+      "0.8.0": {
+        "en": "Devices from the old fakeroku keep working after the update — pairing is preserved. Adding a device now pre-selects a free port and blocks duplicate names or ports.",
+        "de": "Geräte vom alten fakeroku funktionieren nach dem Update weiter — die Kopplung bleibt erhalten. Beim Anlegen wird ein freier Port vorgewählt und doppelte Namen oder Ports abgelehnt.",
+        "ru": "Устройства из старого fakeroku продолжают работать после обновления — сопряжение сохраняется. При добавлении предлагается свободный порт, повторяющиеся имена и порты отклоняются.",
+        "pt": "Os dispositivos do antigo fakeroku continuam a funcionar após a atualização — o emparelhamento é mantido. Ao adicionar, pré-seleciona uma porta livre e recusa nomes ou portas duplicados.",
+        "nl": "Apparaten van de oude fakeroku blijven na de update werken — de koppeling blijft behouden. Bij toevoegen wordt een vrije poort voorgeselecteerd en dubbele namen of poorten geweigerd.",
+        "fr": "Les appareils de l'ancien fakeroku fonctionnent toujours après la mise à jour — l'appairage est conservé. À l'ajout, un port libre est présélectionné et les doublons de nom ou port refusés.",
+        "it": "I dispositivi del vecchio fakeroku funzionano dopo l'aggiornamento — l'accoppiamento è mantenuto. Aggiungendo si preseleziona una porta libera e si rifiutano nomi o porte duplicati.",
+        "es": "Los dispositivos del antiguo fakeroku siguen funcionando tras la actualización — el emparejamiento se conserva. Al añadir se preselecciona un puerto libre y se rechazan nombres o puertos duplicados.",
+        "pl": "Urządzenia ze starego fakeroku działają po aktualizacji — parowanie zostaje zachowane. Przy dodawaniu wybierany jest wolny port, a zduplikowane nazwy lub porty są odrzucane.",
+        "uk": "Пристрої зі старого fakeroku працюють після оновлення — сполучення зберігається. Під час додавання пропонується вільний порт, а повторювані імена чи порти відхиляються.",
+        "zh-cn": "旧 fakeroku 的设备在更新后继续可用——配对得以保留。添加设备时会预选一个空闲端口，并拒绝重复的名称或端口。"
+      },
       "0.7.1": {
         "en": "Fixed the device management from 0.7.0: your emulated Rokus now show up as cards again and the button to add a new one works — both were missing before.",
         "de": "Geräteverwaltung aus 0.7.0 repariert: Die emulierten Rokus erscheinen wieder als Karten und der Knopf zum Anlegen eines neuen funktioniert — beides fehlte zuvor.",
@@ -69,19 +82,6 @@
         "zh-cn": "适配器需要节点.js >= 20 现在.\n适任者需要管理员 \\ 7.7.22 现在\n适配器需要js控制器 现在6.0.11\n依赖关系已更新"
       },
       "0.3.0": {
-        "en": "Adapter requires node.js >= 18 and js-controller >= 5 now\nDependencies have been updated",
-        "de": "Adapter benötigt node.js >= 18 und js-controller >= 5 jetzt\nAbhängigkeiten wurden aktualisiert",
-        "ru": "Адаптер требует node.js >= 18 и js-контроллер >= 5 сейчас\nЗависимость обновлена",
-        "pt": "Adapter requer node.js >= 18 e js-controller >= 5 agora\nAs dependências foram atualizadas",
-        "nl": "Voor adaptor zijn node.js < 18 en js-controller > Nu 5\nAfhankelijkheden zijn bijgewerkt",
-        "fr": "L'adaptateur nécessite node.js >= 18 et js-controller >= 5 maintenant\nLes dépendances ont été actualisées",
-        "it": "Adattatore richiede node.js >= 18 e js-controller >= 5 ora\nLe dipendenze sono state aggiornate",
-        "es": "Adaptador requiere node.js √≥= 18 y js-controller 5 ahora\nSe han actualizado las dependencias",
-        "pl": "Adapter wymaga node.js > = 18 i kontroler js- > = 5 teraz\nZaktualizowano zależności",
-        "uk": "Адаптер вимагає node.js >= 18 і js-controller >= 5 тепер\nЗалежність було оновлено",
-        "zh-cn": "适配器需要节点.js QQ18和js控制器 QQ 现在5号\n依赖关系已更新"
-      },
-      "0.2.3": {
         "en": "Adapter requires node.js >= 18 and js-controller >= 5 now\nDependencies have been updated",
         "de": "Adapter benötigt node.js >= 18 und js-controller >= 5 jetzt\nAbhängigkeiten wurden aktualisiert",
         "ru": "Адаптер требует node.js >= 18 и js-контроллер >= 5 сейчас\nЗависимость обновлена",

@@ -74,7 +74,7 @@ class Fakeroku extends utils.Adapter {
     try {
       await this.setState("info.connection", { val: false, ack: true });
       await import_adapter_core.I18n.init((0, import_node_path.join)(this.adapterDir, "admin"), this);
-      const configuredIp = this.config.networkInterface;
+      const configuredIp = this.config.networkInterface || this.config.BIND;
       const bindIp = configuredIp && configuredIp !== "0.0.0.0" ? configuredIp : void 0;
       const advertiseIp = bindIp != null ? bindIp : (0, import_detect_ip.detectPrimaryIPv4)();
       if (!advertiseIp) {
@@ -92,7 +92,7 @@ class Fakeroku extends utils.Adapter {
         const deviceType = d.type === "tv" ? "tv" : "player";
         const keys = (0, import_state_model.keysForType)(deviceType);
         this.deviceKeys.set(deviceId, new Set(keys));
-        const advert = { uuid: (0, import_device_identity.deriveUuid)(d.name), port: Number(d.port) || DEFAULT_ECP_PORT };
+        const advert = { uuid: d.uuid || (0, import_device_identity.deriveUuid)(d.name), port: Number(d.port) || DEFAULT_ECP_PORT };
         await this.createDeviceStates(deviceId, d.name, keys);
         const server = new import_ecp_http_server.EcpHttpServer({
           device: advert,

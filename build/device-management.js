@@ -20,18 +20,49 @@ var device_management_exports = {};
 __export(device_management_exports, {
   FakerokuDeviceManagement: () => FakerokuDeviceManagement,
   buildDeviceForm: () => buildDeviceForm,
-  cleanDevice: () => cleanDevice
+  cleanDevice: () => cleanDevice,
+  findClash: () => findClash,
+  nextFreePort: () => nextFreePort
 });
 module.exports = __toCommonJS(device_management_exports);
 var import_dm_utils = require("@iobroker/dm-utils");
+var import_device_identity = require("./lib/device-identity");
 var import_i18n = require("./lib/i18n");
 const DEFAULT_PORT = 8060;
-function buildDeviceForm() {
+function nextFreePort(usedPorts) {
+  const taken = new Set(usedPorts);
+  let port = DEFAULT_PORT;
+  while (taken.has(port)) {
+    port++;
+  }
+  return port;
+}
+function buildDeviceForm(usedNames, usedPorts) {
+  const nameList = JSON.stringify(usedNames.map((n) => n.trim().toLowerCase()));
+  const portList = JSON.stringify([...usedPorts]);
   return {
     type: "panel",
     items: {
-      name: { type: "text", label: (0, import_i18n.t)("deviceName"), default: "Roku", sm: 12, md: 6 },
-      port: { type: "number", label: (0, import_i18n.t)("devicePort"), default: DEFAULT_PORT, min: 1, max: 65535, sm: 12, md: 3 },
+      name: {
+        type: "text",
+        label: (0, import_i18n.t)("deviceName"),
+        validator: `!${nameList}.includes((data.name||'').trim().toLowerCase())`,
+        validatorErrorText: (0, import_i18n.t)("deviceNameInUse"),
+        validatorNoSaveOnError: true,
+        sm: 12,
+        md: 6
+      },
+      port: {
+        type: "number",
+        label: (0, import_i18n.t)("devicePort"),
+        min: 1,
+        max: 65535,
+        validator: `!${portList}.includes(Number(data.port))`,
+        validatorErrorText: (0, import_i18n.t)("devicePortInUse"),
+        validatorNoSaveOnError: true,
+        sm: 12,
+        md: 3
+      },
       type: {
         type: "select",
         label: (0, import_i18n.t)("deviceTypeLabel"),
@@ -43,6 +74,7 @@ function buildDeviceForm() {
         sm: 12,
         md: 3
       },
+      _portHint: { type: "staticText", text: (0, import_i18n.t)("devicePortHint"), sm: 12 },
       _typeHint: { type: "staticText", text: (0, import_i18n.t)("deviceTypeHint"), sm: 12 }
     }
   };
@@ -52,6 +84,21 @@ function cleanDevice(raw) {
   const port = Number(raw.port) || DEFAULT_PORT;
   const type = raw.type === "tv" ? "tv" : "player";
   return { name, port, type };
+}
+function findClash(devices, candidate, exceptIndex) {
+  const name = candidate.name.trim().toLowerCase();
+  for (let i = 0; i < devices.length; i++) {
+    if (i === exceptIndex) {
+      continue;
+    }
+    if (devices[i].name.trim().toLowerCase() === name) {
+      return (0, import_i18n.t)("deviceNameInUse");
+    }
+    if (Number(devices[i].port) === candidate.port) {
+      return (0, import_i18n.t)("devicePortInUse");
+    }
+  }
+  return null;
 }
 class FakerokuDeviceManagement extends import_dm_utils.DeviceManagement {
   get objId() {
@@ -87,7 +134,8 @@ class FakerokuDeviceManagement extends import_dm_utils.DeviceManagement {
     devices.forEach((device, index) => context.addDevice(this.toDeviceInfo(device, index)));
   }
   /**
-   * Build one device card (name + type/port subtitle) with edit/delete actions.
+   * Build one device card. Manufacturer, model (Player/TV) and the ECP port each
+   * get their own line — the port via `identifier` (labelled in getInstanceInfo).
    *
    * @param device the stored device
    * @param index its list position — the (per-session stable) card id
@@ -98,8 +146,9 @@ class FakerokuDeviceManagement extends import_dm_utils.DeviceManagement {
     return {
       id: String(index),
       name: device.name || `Roku ${index + 1}`,
+      identifier: String(device.port || DEFAULT_PORT),
       manufacturer: "Roku",
-      model: `${kind} \xB7 port ${device.port || DEFAULT_PORT}`,
+      model: kind,
       actions: [
         {
           id: "edit",
@@ -117,36 +166,47 @@ class FakerokuDeviceManagement extends import_dm_utils.DeviceManagement {
     };
   }
   /**
-   * The "+ add" action above the list.
+   * The "+ add" action above the list, plus the label for the port shown on each card.
    *
    * @returns the instance action descriptor
    */
   getInstanceInfo() {
     return {
       apiVersion: "v3",
+      identifierLabel: (0, import_i18n.t)("portLabel"),
       actions: [{ id: "add", icon: "add", description: (0, import_i18n.t)("dmAdd"), handler: async (context) => this.addDevice(context) }]
     };
   }
   /**
-   * Manual add: show the empty form and append a named result.
+   * Manual add: pre-select a free port, show the form, and append the device with
+   * a stable derived uuid.
    *
    * @param context the action context
    * @returns a directive to reload the manager
    */
   async addDevice(context) {
-    const data = await context.showForm(buildDeviceForm(), {
+    const devices = await this.readDevices();
+    const usedNames = devices.map((d) => d.name);
+    const usedPorts = devices.map((d) => Number(d.port));
+    const data = await context.showForm(buildDeviceForm(usedNames, usedPorts), {
       title: (0, import_i18n.t)("dmAdd"),
-      data: { type: "player", port: DEFAULT_PORT }
+      data: { type: "player", port: nextFreePort(usedPorts) }
     });
     if (data && typeof data.name === "string" && data.name.trim()) {
-      const devices = await this.readDevices();
-      devices.push(cleanDevice(data));
+      const clean = cleanDevice(data);
+      const clash = findClash(devices, clean, -1);
+      if (clash) {
+        await context.showMessage(clash);
+        return { refresh: true };
+      }
+      devices.push({ ...clean, uuid: (0, import_device_identity.deriveUuid)(clean.name) });
       await this.writeDevices(devices);
     }
     return { refresh: true };
   }
   /**
-   * Edit a device via the pre-filled form.
+   * Edit a device via the pre-filled form. Its own name/port are excluded from
+   * the clash check, and its uuid is preserved so the pairing survives a rename.
    *
    * @param index the device's list position
    * @param context the action context
@@ -158,9 +218,20 @@ class FakerokuDeviceManagement extends import_dm_utils.DeviceManagement {
     if (!current) {
       return { refresh: "devices" };
     }
-    const data = await context.showForm(buildDeviceForm(), { title: (0, import_i18n.t)("dmEditTitle"), data: { ...current } });
+    const usedNames = devices.filter((_, i) => i !== index).map((d) => d.name);
+    const usedPorts = devices.filter((_, i) => i !== index).map((d) => Number(d.port));
+    const data = await context.showForm(buildDeviceForm(usedNames, usedPorts), {
+      title: (0, import_i18n.t)("dmEditTitle"),
+      data: { ...current }
+    });
     if (data && typeof data.name === "string" && data.name.trim()) {
-      devices[index] = cleanDevice(data);
+      const clean = cleanDevice(data);
+      const clash = findClash(devices, clean, index);
+      if (clash) {
+        await context.showMessage(clash);
+        return { refresh: "devices" };
+      }
+      devices[index] = { ...clean, uuid: current.uuid || (0, import_device_identity.deriveUuid)(clean.name) };
       await this.writeDevices(devices);
     }
     return { refresh: "devices" };
@@ -190,6 +261,8 @@ class FakerokuDeviceManagement extends import_dm_utils.DeviceManagement {
 0 && (module.exports = {
   FakerokuDeviceManagement,
   buildDeviceForm,
-  cleanDevice
+  cleanDevice,
+  findClash,
+  nextFreePort
 });
 //# sourceMappingURL=device-management.js.map

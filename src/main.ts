@@ -62,7 +62,9 @@ export class Fakeroku extends utils.Adapter {
       // detected primary IP so the adapter runs without configuration. js-controller
       // never rewrites an existing native default, so instances from before 0.5.1
       // still carry "" — both must take the auto path. A concrete IP is honoured as-is.
-      const configuredIp = this.config.networkInterface;
+      // Migration: a pre-0.5.0 instance has no `networkInterface`, only the old `BIND` —
+      // adopt it so a multi-homed host keeps the interface the user had configured.
+      const configuredIp = this.config.networkInterface || this.config.BIND;
       const bindIp = configuredIp && configuredIp !== "0.0.0.0" ? configuredIp : undefined;
       const advertiseIp = bindIp ?? detectPrimaryIPv4();
       if (!advertiseIp) {
@@ -82,7 +84,10 @@ export class Fakeroku extends utils.Adapter {
         const deviceType: DeviceType = d.type === "tv" ? "tv" : "player";
         const keys = keysForType(deviceType);
         this.deviceKeys.set(deviceId, new Set(keys));
-        const advert: RokuAdvert = { uuid: deriveUuid(d.name), port: Number(d.port) || DEFAULT_ECP_PORT };
+        // Adopt the device's persisted uuid (old adapter or an earlier run) so the SSDP
+        // identity — and thus the controller pairing — survives an update; derive a stable
+        // one from the name only for a device that never had one.
+        const advert: RokuAdvert = { uuid: d.uuid || deriveUuid(d.name), port: Number(d.port) || DEFAULT_ECP_PORT };
         await this.createDeviceStates(deviceId, d.name, keys);
         const server = new EcpHttpServer({
           device: advert,

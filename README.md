@@ -39,8 +39,9 @@ Install the adapter from the ioBroker admin.
   the routable IP automatically. Pick a specific address only on a host with several
   network cards.
 - **Emulated Roku devices** — managed as cards: **+ Add** opens a dialog with a
-  **name**, an **ECP port** (default `8060`, the real Roku port) and a **type**.
-  You can emulate several Rokus from one instance.
+  **name**, an **ECP port** (`8060` the real Roku port; a free one is pre-selected,
+  and the dialog refuses a name or port already in use) and a **type**. You can
+  emulate several Rokus from one instance — each needs its own port.
 - **Type** — *Player* (default) exposes the 16 standard navigation and playback keys;
   *TV* additionally exposes volume, power, channel and input keys. Choose *TV* only if
   you want those extra keys as ioBroker triggers.
@@ -75,6 +76,10 @@ becomes `true`, or watch `.command` for the last button as text.
 	Placeholder for the next version (at the beginning of the line):
 	### **WORK IN PROGRESS**
 -->
+### 0.8.0 (2026-08-01)
+- Devices from the old fakeroku keep working after updating — the emulated Roku's identity and network binding are carried over, so a paired remote stays paired without re-pairing
+- Adding a device now pre-selects a free port and refuses a name or port already in use, so two Rokus can't collide; each device card shows the port on its own line
+
 ### 0.7.1 (2026-07-31)
 - Fixed the device management from 0.7.0: your emulated Rokus now show up as cards again and the button to add a new one works — both were missing before
 
@@ -91,9 +96,6 @@ becomes `true`, or watch `.command` for the last button as text.
 - Complete rewrite with the full Roku control surface, including `device-info` with a current Roku version — the part modern remotes check at pairing, beyond what a classic Harmony hub needs
 - New clean data model: a `command` datapoint plus fixed `keys.<Key>` states, all created up front instead of appearing only after the first keypress
 - Discovery binds to the chosen network interface, command handling is restricted to the local network
-
-### 0.4.0 (2026-03-07)
-- Adapter requires node.js >= 20, admin >= 7.7.22, js-controller >= 6.0.11
 
 [Older changelogs can be found there](CHANGELOG_OLD.md)
 
