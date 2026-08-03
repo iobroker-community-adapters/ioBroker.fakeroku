@@ -81,6 +81,9 @@ becomes `true`, or watch `.command` for the last button as text.
 	Placeholder for the next version (at the beginning of the line):
 	### **WORK IN PROGRESS**
 -->
+### **WORK IN PROGRESS**
+- Device cards drop the redundant "Roku" manufacturer line — they now show just the model (Player/TV) and the ECP port
+
 ### 0.8.0 (2026-08-01)
 - Devices from the old fakeroku keep working after updating — the emulated Roku's identity and network binding are carried over, so a paired remote stays paired without re-pairing
 - Adding a device now pre-selects a free port and refuses a name or port already in use, so two Rokus can't collide; each device card shows the port on its own line

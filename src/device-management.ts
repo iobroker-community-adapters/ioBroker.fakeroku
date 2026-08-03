@@ -183,8 +183,9 @@ export class FakerokuDeviceManagement extends DeviceManagement {
   }
 
   /**
-   * Build one device card. Manufacturer, model (Player/TV) and the ECP port each
-   * get their own line — the port via `identifier` (labelled in getInstanceInfo).
+   * Build one device card. The model (Player/TV) and the ECP port each get their
+   * own line — the port via `identifier` (labelled in getInstanceInfo). No
+   * manufacturer line: it is always "Roku" and tells the user nothing for an emulator.
    *
    * @param device the stored device
    * @param index its list position — the (per-session stable) card id
@@ -196,7 +197,6 @@ export class FakerokuDeviceManagement extends DeviceManagement {
       id: String(index),
       name: device.name || `Roku ${index + 1}`,
       identifier: String(device.port || DEFAULT_PORT),
-      manufacturer: "Roku",
       model: kind,
       actions: [
         {
