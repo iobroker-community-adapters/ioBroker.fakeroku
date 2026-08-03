@@ -3,7 +3,7 @@
 Adapter-spezifischer Kontext. Globale Dev-Standards: `../CLAUDE.md` + `../CLAUDE_*.md`.
 
 ## Projekt
-Roku-Emulator im LAN: ein ECP/SSDP-Controller (Logitech Harmony, Sofabaton, Roku-App) findet einen emulierten Roku und löst über Tastendrücke Ereignisse in ioBroker aus — die **Eingabe-Seite**, Gegenstück zum harmony-Adapter (Ausgabe). Greenfield-Neubau ab **v0.5.0** des community-`fakeroku` (Pmant 2017, Community-Wartung bis 0.4.0); Übernahme durch krobi. Feld-/Protokoll-Details: `../../Ressourcen/rokuemu/`.
+Roku-Emulator im LAN: ein ECP/SSDP-Controller (Logitech Harmony, Sofabaton) findet einen emulierten Roku und löst über Tastendrücke Ereignisse in ioBroker aus — die **Eingabe-Seite**, Gegenstück zum harmony-Adapter (Ausgabe). Greenfield-Neubau ab **v0.5.0** des community-`fakeroku` (Pmant 2017, Community-Wartung bis 0.4.0); Übernahme durch krobi. Feld-/Protokoll-Details: `../../Ressourcen/rokuemu/`.
 
 ## Architektur (`src/`)
 - **`discovery/ssdp-responder.ts`** — handgebauter `dgram`-SSDP-Responder (Port 1900, Multicast 239.255.255.250), **interface-gebunden** (joint die Gruppe auf dem gewählten Interface, nicht 0.0.0.0). ⚠️ `node-ssdp` taugt NICHT: hängt `::device` ans USN, ein echtes Roku sendet `uuid:roku:ecp:<uuid>` OHNE Suffix.

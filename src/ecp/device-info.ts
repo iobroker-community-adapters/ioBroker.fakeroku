@@ -2,11 +2,13 @@ import type { RokuAdvert } from "../discovery/ssdp-messages";
 import type { DeviceType } from "./state-model";
 
 /**
- * A fake but CURRENT Roku OS version. This is the pairing lever: modern remotes
- * (Sofabaton X1, the Roku app) read /query/device-info and reject a too-old
- * version — emulated_roku hardcodes 7.5.0 / "Roku 4" (2016) and fails there, the
- * old fakeroku had no device-info at all. The exact "new enough" value is not
- * documented; verify against real hardware (a Sofabaton) and bump if needed.
+ * A fake but CURRENT Roku OS version. This is the pairing lever: a modern remote
+ * like a Sofabaton reads /query/device-info at pairing and rejects a too-old
+ * version (HA forum #501046) — emulated_roku hardcodes 7.5.0 / "Roku 4" (2016) and
+ * fails there, the old fakeroku had no device-info at all. The exact "new enough"
+ * value is not documented; verify against real hardware (a Sofabaton) and bump if
+ * needed. (The official Roku app is a different case: it uses ECP-2 and never reads
+ * device-info — see the README note.)
  */
 const SOFTWARE_VERSION = "14.1.4";
 const SOFTWARE_BUILD = "4200";

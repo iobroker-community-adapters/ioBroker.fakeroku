@@ -25,7 +25,7 @@ const DEFAULT_ECP_PORT = 8060;
  * ioBroker.fakeroku — Roku emulator (input side).
  *
  * Emulates one or more Roku devices on the LAN so that ECP/SSDP remotes
- * (Logitech Harmony, Sofabaton X1, the Roku app) trigger events in ioBroker:
+ * (Logitech Harmony or a Sofabaton X1/X2) trigger events in ioBroker:
  * a keypress lands in `<device>.command` and pulses `<device>.keys.<Key>`.
  */
 export class Fakeroku extends utils.Adapter {

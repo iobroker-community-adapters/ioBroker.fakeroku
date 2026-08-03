@@ -7,18 +7,23 @@
 **Support:** [![Ko-fi](https://img.shields.io/badge/Ko--fi-Support-ff5e5b?logo=ko-fi)](https://ko-fi.com/krobipd) [![PayPal](https://img.shields.io/badge/Donate-PayPal-blue.svg)](https://paypal.me/krobipd)
 
 Emulates one or more **Roku devices** on your LAN so that ECP/SSDP remotes — a
-Logitech Harmony Hub, a Sofabaton X1, the Roku mobile app — can trigger events in
+Logitech Harmony Hub or a Sofabaton X1/X2 — can trigger events in
 ioBroker. It is the **input** counterpart to the Logitech Harmony adapter: a button
 on the remote becomes a datapoint in ioBroker.
 
 Unlike the classic fake-Roku, this build answers the full Roku control surface
-including `/query/device-info` with a **current** Roku version — the part modern
-remotes check at pairing time, so it works beyond a classic Harmony hub.
+including `/query/device-info` with a **current** Roku version, so it works beyond a
+classic Harmony hub.
+
+> **The official Roku mobile app is not supported.** It drives Rokus over Roku's
+> proprietary, undocumented ECP-2 WebSocket channel, which this emulator does not
+> implement. Use a Harmony hub or a Sofabaton — those speak the classic ECP this
+> adapter serves.
 
 ## Features
 
 - Emulates one or more Roku devices on the LAN — the Roku control protocol (ECP) over HTTP plus SSDP discovery on port 1900.
-- Full Roku control surface including `/query/device-info` with a current Roku version — the part modern remotes check when pairing.
+- Full Roku control surface including `/query/device-info` with a current Roku version, beyond what a classic Harmony hub needs.
 - Clean data model per device: a `command` datapoint plus fixed `keys.<Key>` states, all created up front.
 - Several emulated Rokus from a single instance; discovery bound to the chosen network interface; command handling restricted to the LAN.
 
