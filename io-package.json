@@ -1,8 +1,21 @@
 {
   "common": {
     "name": "fakeroku",
-    "version": "0.8.0",
+    "version": "0.9.0",
     "news": {
+      "0.9.0": {
+        "en": "Device cards drop the redundant 'Roku' manufacturer line — a card now shows just the model (Player/TV) and the ECP port.",
+        "de": "Gerätekarten lassen die überflüssige 'Roku'-Hersteller-Zeile weg — eine Karte zeigt jetzt nur Modell (Player/TV) und ECP-Port.",
+        "ru": "Карточки устройств убирают лишнюю строку производителя «Roku» — теперь карточка показывает только модель (Player/TV) и порт ECP.",
+        "pt": "Os cartões de dispositivo deixam cair a linha redundante do fabricante 'Roku' — um cartão mostra agora só o modelo (Player/TV) e a porta ECP.",
+        "nl": "Apparaatkaarten laten de overbodige 'Roku'-fabrikantregel weg — een kaart toont nu alleen het model (Player/TV) en de ECP-poort.",
+        "fr": "Les cartes d'appareil suppriment la ligne de fabricant 'Roku' redondante — une carte affiche désormais juste le modèle (Player/TV) et le port ECP.",
+        "it": "Le schede dispositivo rimuovono la riga produttore 'Roku' superflua — una scheda mostra ora solo il modello (Player/TV) e la porta ECP.",
+        "es": "Las tarjetas de dispositivo quitan la línea de fabricante 'Roku' redundante — una tarjeta muestra ahora solo el modelo (Player/TV) y el puerto ECP.",
+        "pl": "Karty urządzeń usuwają zbędny wiersz producenta 'Roku' — karta pokazuje teraz tylko model (Player/TV) i port ECP.",
+        "uk": "Картки пристроїв прибирають зайвий рядок виробника «Roku» — тепер картка показує лише модель (Player/TV) і порт ECP.",
+        "zh-cn": "设备卡片去掉多余的制造商“Roku”行——卡片现在只显示型号（Player/TV）和 ECP 端口。"
+      },
       "0.8.0": {
         "en": "Devices from the old fakeroku keep working after the update — pairing is preserved. Adding a device now pre-selects a free port and blocks duplicate names or ports.",
         "de": "Geräte vom alten fakeroku funktionieren nach dem Update weiter — die Kopplung bleibt erhalten. Beim Anlegen wird ein freier Port vorgewählt und doppelte Namen oder Ports abgelehnt.",
@@ -80,19 +93,6 @@
         "pl": "Adapter wymaga node.js > = 20 teraz.\nAdapter wymaga admin > = 7.7.22\nAdapter wymaga sterownika js- > = 6.0.11\nZaktualizowano zależności",
         "uk": "Адаптер вимагає node.js >= 20 тепер.\nАдаптер вимагає адмін >= 7.7.22 тепер\nАдаптер вимагає js-controller >=6.0.11 тепер\nЗалежність було оновлено",
         "zh-cn": "适配器需要节点.js >= 20 现在.\n适任者需要管理员 \\ 7.7.22 现在\n适配器需要js控制器 现在6.0.11\n依赖关系已更新"
-      },
-      "0.3.0": {
-        "en": "Adapter requires node.js >= 18 and js-controller >= 5 now\nDependencies have been updated",
-        "de": "Adapter benötigt node.js >= 18 und js-controller >= 5 jetzt\nAbhängigkeiten wurden aktualisiert",
-        "ru": "Адаптер требует node.js >= 18 и js-контроллер >= 5 сейчас\nЗависимость обновлена",
-        "pt": "Adapter requer node.js >= 18 e js-controller >= 5 agora\nAs dependências foram atualizadas",
-        "nl": "Voor adaptor zijn node.js < 18 en js-controller > Nu 5\nAfhankelijkheden zijn bijgewerkt",
-        "fr": "L'adaptateur nécessite node.js >= 18 et js-controller >= 5 maintenant\nLes dépendances ont été actualisées",
-        "it": "Adattatore richiede node.js >= 18 e js-controller >= 5 ora\nLe dipendenze sono state aggiornate",
-        "es": "Adaptador requiere node.js √≥= 18 y js-controller 5 ahora\nSe han actualizado las dependencias",
-        "pl": "Adapter wymaga node.js > = 18 i kontroler js- > = 5 teraz\nZaktualizowano zależności",
-        "uk": "Адаптер вимагає node.js >= 18 і js-controller >= 5 тепер\nЗалежність було оновлено",
-        "zh-cn": "适配器需要节点.js QQ18和js控制器 QQ 现在5号\n依赖关系已更新"
       }
     },
     "titleLang": {

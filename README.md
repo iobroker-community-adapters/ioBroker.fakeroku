@@ -81,8 +81,8 @@ becomes `true`, or watch `.command` for the last button as text.
 	Placeholder for the next version (at the beginning of the line):
 	### **WORK IN PROGRESS**
 -->
-### **WORK IN PROGRESS**
-- Device cards drop the redundant "Roku" manufacturer line — they now show just the model (Player/TV) and the ECP port
+### 0.9.0 (2026-08-03)
+- Device cards drop the redundant "Roku" manufacturer line — an emulator's maker is always Roku, so a card now shows just the model (Player/TV) and the ECP port
 
 ### 0.8.0 (2026-08-01)
 - Devices from the old fakeroku keep working after updating — the emulated Roku's identity and network binding are carried over, so a paired remote stays paired without re-pairing
@@ -99,11 +99,6 @@ becomes `true`, or watch `.command` for the last button as text.
 - Runs without any setup now — the adapter detects the routable network address on its own instead of sitting idle until a network interface is picked
 - Leftover entries from an earlier version disappear from the object tree on start, so the tree no longer keeps unused nodes around
 - The admin page now opens with a short explanation of what the adapter does and how to set it up
-
-### 0.5.0 (2026-07-30)
-- Complete rewrite with the full Roku control surface, including `device-info` with a current Roku version — the part modern remotes check at pairing, beyond what a classic Harmony hub needs
-- New clean data model: a `command` datapoint plus fixed `keys.<Key>` states, all created up front instead of appearing only after the first keypress
-- Discovery binds to the chosen network interface, command handling is restricted to the local network
 
 [Older changelogs can be found there](CHANGELOG_OLD.md)
 
