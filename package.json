@@ -1,6 +1,6 @@
 {
   "name": "iobroker.fakeroku",
-  "version": "0.9.0",
+  "version": "0.6.0",
   "description": "ioBroker adapter that emulates Roku devices, letting ECP/SSDP remotes (Logitech Harmony, Sofabaton) trigger events in ioBroker",
   "author": {
     "name": "krobi",
@@ -22,7 +22,7 @@
       "role": "Coding assistance"
     }
   ],
-  "homepage": "https://github.com/krobipd/ioBroker.fakeroku",
+  "homepage": "https://github.com/iobroker-community-adapters/ioBroker.fakeroku",
   "license": "MIT",
   "keywords": [
     "ioBroker",
@@ -34,7 +34,7 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/krobipd/ioBroker.fakeroku"
+    "url": "https://github.com/iobroker-community-adapters/ioBroker.fakeroku"
   },
   "engines": {
     "node": ">=22"
@@ -84,7 +84,7 @@
     "translate": "translate-adapter"
   },
   "bugs": {
-    "url": "https://github.com/krobipd/ioBroker.fakeroku/issues"
+    "url": "https://github.com/iobroker-community-adapters/ioBroker.fakeroku/issues"
   },
   "readmeFilename": "README.md"
 }

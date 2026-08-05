@@ -1,8 +1,8 @@
-# <img src="https://cdn.jsdelivr.net/gh/krobipd/ioBroker.fakeroku@main/admin/fakeroku.svg" width="48" align="top" /> ioBroker.fakeroku
+# <img src="https://cdn.jsdelivr.net/gh/iobroker-community-adapters/ioBroker.fakeroku@main/admin/fakeroku.svg" width="48" align="top" /> ioBroker.fakeroku
 
 **Release:** [![npm version](https://img.shields.io/npm/v/iobroker.fakeroku)](https://www.npmjs.com/package/iobroker.fakeroku) ![stable](https://iobroker.live/badges/fakeroku-stable.svg) ![Installations](https://iobroker.live/badges/fakeroku-installed.svg) [![npm downloads](https://img.shields.io/npm/dt/iobroker.fakeroku)](https://www.npmjs.com/package/iobroker.fakeroku)
 
-**Build:** [![Test and Release](https://github.com/krobipd/ioBroker.fakeroku/actions/workflows/test-and-release.yml/badge.svg)](https://github.com/krobipd/ioBroker.fakeroku/actions/workflows/test-and-release.yml) ![Node](https://img.shields.io/badge/node-%3E%3D22-brightgreen) ![TypeScript](https://img.shields.io/badge/TypeScript-strict-blue) [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+**Build:** [![Test and Release](https://github.com/iobroker-community-adapters/ioBroker.fakeroku/actions/workflows/test-and-release.yml/badge.svg)](https://github.com/iobroker-community-adapters/ioBroker.fakeroku/actions/workflows/test-and-release.yml) ![Node](https://img.shields.io/badge/node-%3E%3D22-brightgreen) ![TypeScript](https://img.shields.io/badge/TypeScript-strict-blue) [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
 **Support:** [![Ko-fi](https://img.shields.io/badge/Ko--fi-Support-ff5e5b?logo=ko-fi)](https://ko-fi.com/krobipd) [![PayPal](https://img.shields.io/badge/Donate-PayPal-blue.svg)](https://paypal.me/krobipd)
 
@@ -81,24 +81,11 @@ becomes `true`, or watch `.command` for the last button as text.
 	Placeholder for the next version (at the beginning of the line):
 	### **WORK IN PROGRESS**
 -->
-### 0.9.0 (2026-08-03)
-- Device cards drop the redundant "Roku" manufacturer line — an emulator's maker is always Roku, so a card now shows just the model (Player/TV) and the ECP port
-
-### 0.8.0 (2026-08-01)
-- Devices from the old fakeroku keep working after updating — the emulated Roku's identity and network binding are carried over, so a paired remote stays paired without re-pairing
-- Adding a device now pre-selects a free port and refuses a name or port already in use, so two Rokus can't collide; each device card shows the port on its own line
-
-### 0.7.1 (2026-07-31)
-- Fixed the device management from 0.7.0: your emulated Rokus now show up as cards again and the button to add a new one works — both were missing before
-
-### 0.7.0 (2026-07-31)
-- Each emulated Roku can now be a Player or a TV — a TV additionally exposes volume, power, channel and input keys, a Player the 16 standard keys
-- Devices are now managed as cards with add/edit/delete dialogs instead of a table, and the settings page gained a network section and support links
-
-### 0.6.0 (2026-07-31)
-- Runs without any setup now — the adapter detects the routable network address on its own instead of sitting idle until a network interface is picked
-- Leftover entries from an earlier version disappear from the object tree on start, so the tree no longer keeps unused nodes around
-- The admin page now opens with a short explanation of what the adapter does and how to set it up
+### 0.6.0 (2026-08-05)
+- Complete rewrite. The adapter now answers the full Roku control surface — including device-info with a current Roku version — so Logitech Harmony and Sofabaton remotes pair and work reliably.
+- Works out of the box: it detects the network address to advertise on its own, no manual interface picking.
+- Manage multiple emulated Rokus from the admin UI, each as a Player or a TV.
+- Cleaner object tree — one datapoint per remote button with the correct types, plus a last-command datapoint; leftover objects from older versions are removed on start.
 
 [Older changelogs can be found there](CHANGELOG_OLD.md)
 
@@ -114,8 +101,8 @@ users it is simply a new version of the same adapter:
 - The **[ioBroker Community Adapters](https://github.com/iobroker-community-adapters)**
   team — notably [mcm1957](https://github.com/mcm1957) and
   [foxriver76](https://github.com/foxriver76) — maintained and modernized the adapter
-  from 2023 to 2026, releasing versions up to 0.4.0.
-- From **0.5.0** on, [krobi](https://github.com/krobipd) rewrote the adapter from the
+  from 2023 to 2026, releasing versions up to 0.5.1.
+- From **0.6.0** on, [krobi](https://github.com/krobipd) rewrote the adapter from the
   ground up in TypeScript and added the full ECP surface including `device-info`.
 
 ## License
