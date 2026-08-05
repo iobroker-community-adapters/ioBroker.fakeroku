@@ -30,7 +30,7 @@ States are automatically created when fakeRoku receives a key for the first time
 	Placeholder for the next version (at the beginning of the line):
 	### __WORK IN PROGRESS__
 -->
-### __WORK IN PROGRESS__
+### 0.5.1 (2026-08-05)
 - (copilot) Adapter requires node.js >= 22 now
 * (mcm1957) Dependencies have been updated
 
@@ -50,6 +50,7 @@ States are automatically created when fakeRoku receives a key for the first time
 ### 0.2.1
   (Pmant) fix jQuery error in admin
   (ykuendig) add translations
+
 
 [Older changelogs can be found there](CHANGELOG_OLD.md)
 

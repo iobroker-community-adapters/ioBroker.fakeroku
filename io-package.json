@@ -1,8 +1,21 @@
 {
   "common": {
     "name": "fakeroku",
-    "version": "0.5.0",
+    "version": "0.5.1",
     "news": {
+      "0.5.1": {
+        "en": "Adapter requires node.js >= 22 now\nDependencies have been updated",
+        "de": "Der Adapter benötigt jetzt Node.js >= 22.\nDie Abhängigkeiten wurden aktualisiert.",
+        "ru": "Для работы адаптера требуется Node.js версии >= 22.\nЗависимости обновлены.",
+        "pt": "O adaptador agora requer Node.js >= 22.\nAs dependências foram atualizadas.",
+        "nl": "De adapter vereist nu Node.js versie 22 of hoger.\nAfhankelijkheden zijn bijgewerkt.",
+        "fr": "L'adaptateur nécessite désormais Node.js >= 22.\nLes dépendances ont été mises à jour",
+        "it": "L'adattatore ora richiede Node.js >= 22\nLe dipendenze sono state aggiornate",
+        "es": "El adaptador ahora requiere node.js >= 22.\nSe han actualizado las dependencias.",
+        "pl": "Adapter wymaga teraz node.js >= 22\nZaktualizowano zależności",
+        "uk": "Адаптер тепер вимагає node.js >= 22\nЗалежності оновлено",
+        "zh-cn": "适配器现在需要 node.js 版本 >= 22。\n依赖项已更新"
+      },
       "0.5.0": {
         "en": "Adapter requires node.js >= 22 now\nDependencies have been updated",
         "de": "Der Adapter benötigt jetzt Node.js >= 22.\nDie Abhängigkeiten wurden aktualisiert.",
@@ -80,19 +93,6 @@
         "pl": "emulować wiele roku",
         "uk": "емулювати кілька rokus",
         "zh-cn": "模拟多个 roku"
-      },
-      "0.1.1": {
-        "en": "fix package.json",
-        "de": "fix package.json",
-        "ru": "fix package.json",
-        "pt": "corrigir pacote.json",
-        "nl": "pakket.json repareren",
-        "fr": "réparer package.json",
-        "it": "correggere pacchetto.json",
-        "es": "arreglar paquete.json",
-        "pl": "napraw pakiet.json",
-        "uk": "виправити package.json",
-        "zh-cn": "修复 package.json"
       }
     },
     "titleLang": {
