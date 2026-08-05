@@ -1,4 +1,4 @@
-# <img src="https://cdn.jsdelivr.net/gh/iobroker-community-adapters/ioBroker.fakeroku@main/admin/fakeroku.svg" width="48" align="top" /> ioBroker.fakeroku
+# <img src="https://cdn.jsdelivr.net/gh/iobroker-community-adapters/ioBroker.fakeroku@master/admin/fakeroku.svg" width="48" align="top" /> ioBroker.fakeroku
 
 **Release:** [![npm version](https://img.shields.io/npm/v/iobroker.fakeroku)](https://www.npmjs.com/package/iobroker.fakeroku) ![stable](https://iobroker.live/badges/fakeroku-stable.svg) ![Installations](https://iobroker.live/badges/fakeroku-installed.svg) [![npm downloads](https://img.shields.io/npm/dt/iobroker.fakeroku)](https://www.npmjs.com/package/iobroker.fakeroku)
 
@@ -86,6 +86,10 @@ becomes `true`, or watch `.command` for the last button as text.
 - Works out of the box: it detects the network address to advertise on its own, no manual interface picking.
 - Manage multiple emulated Rokus from the admin UI, each as a Player or a TV.
 - Cleaner object tree — one datapoint per remote button with the correct types, plus a last-command datapoint; leftover objects from older versions are removed on start.
+
+### 0.5.1 (2026-08-05)
+- Adapter requires Node.js >= 22 now
+- Dependencies have been updated
 
 [Older changelogs can be found there](CHANGELOG_OLD.md)
 

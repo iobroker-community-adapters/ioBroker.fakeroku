@@ -29,19 +29,6 @@
         "uk": "Адаптер тепер вимагає node.js >= 22\nЗалежності оновлено",
         "zh-cn": "适配器现在需要 node.js 版本 >= 22。\n依赖项已更新"
       },
-      "0.5.0": {
-        "en": "Adapter requires node.js >= 22 now\nDependencies have been updated",
-        "de": "Der Adapter benötigt jetzt Node.js >= 22.\nDie Abhängigkeiten wurden aktualisiert.",
-        "ru": "Для работы адаптера требуется Node.js версии >= 22.\nЗависимости обновлены.",
-        "pt": "O adaptador agora requer Node.js >= 22.\nAs dependências foram atualizadas.",
-        "nl": "De adapter vereist nu Node.js versie 22 of hoger.\nAfhankelijkheden zijn bijgewerkt.",
-        "fr": "L'adaptateur nécessite désormais Node.js >= 22.\nLes dépendances ont été mises à jour",
-        "it": "L'adattatore ora richiede Node.js >= 22\nLe dipendenze sono state aggiornate",
-        "es": "El adaptador ahora requiere node.js >= 22.\nSe han actualizado las dependencias.",
-        "pl": "Adapter wymaga teraz node.js >= 22\nZaktualizowano zależności",
-        "uk": "Адаптер тепер вимагає node.js >= 22\nЗалежності оновлено",
-        "zh-cn": "适配器现在需要 node.js 版本 >= 22。\n依赖项已更新"
-      },
       "0.4.0": {
         "en": "Adapter requires node.js >= 20 now.\nAdapter requires admin >= 7.7.22 now\nAdapter requires js-controller >= 6.0.11 now\nDependencies have been updated",
         "de": "Adapter benötigt jetzt node.js >= 20.\nAdapter benötigt admin >= 7.7.22 jetzt\nAdapter benötigt jetzt js-controller >= 6.0.11\nAbhängigkeiten wurden aktualisiert",
@@ -132,8 +119,8 @@
     "platform": "Javascript/Node.js",
     "mode": "daemon",
     "icon": "fakeroku.png",
-    "extIcon": "https://raw.githubusercontent.com/iobroker-community-adapters/ioBroker.fakeroku/main/admin/fakeroku.png",
-    "readme": "https://github.com/iobroker-community-adapters/ioBroker.fakeroku/blob/main/README.md",
+    "extIcon": "https://raw.githubusercontent.com/iobroker-community-adapters/ioBroker.fakeroku/master/admin/fakeroku.png",
+    "readme": "https://github.com/iobroker-community-adapters/ioBroker.fakeroku/blob/master/README.md",
     "loglevel": "info",
     "tier": 2,
     "compact": false,
