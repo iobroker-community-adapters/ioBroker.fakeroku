@@ -32,6 +32,7 @@ States are automatically created when fakeRoku receives a key for the first time
 -->
 ### **WORK IN PROGRESS**
 - (copilot) Adapter requires node.js >= 22 now
+* (mcm1957) Dependencies have been updated
 
 ### 0.4.0 (2026-03-07)
 - (iobroker-bot) Adapter requires node.js >= 20 now.
