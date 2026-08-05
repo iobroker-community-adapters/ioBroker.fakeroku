@@ -1,8 +1,21 @@
 {
   "common": {
     "name": "fakeroku",
-    "version": "0.6.0",
+    "version": "1.0.0",
     "news": {
+      "1.0.0": {
+        "en": "Version 1.0.0 marks the rewrite as stable. On update, a one-time notice explains the remote-key data points are now boolean instead of text, so check scripts and visualizations that read them.",
+        "de": "Version 1.0.0 macht den Neubau zur stabilen Version. Beim Update erklärt ein einmaliger Hinweis, dass die Tasten jetzt boolean statt Text sind — prüfe Skripte und Visualisierungen.",
+        "ru": "Версия 1.0.0 делает переработку стабильной. При обновлении однократное уведомление поясняет, что кнопки теперь boolean вместо текста — проверьте скрипты и визуализации.",
+        "pt": "A versão 1.0.0 torna a reescrita estável. Ao atualizar, um aviso único explica que as teclas agora são boolean em vez de texto — verifique scripts e visualizações.",
+        "nl": "Versie 1.0.0 maakt de herbouw stabiel. Bij het updaten legt een eenmalige melding uit dat de knoppen nu boolean zijn in plaats van tekst — controleer scripts en visualisaties.",
+        "fr": "La version 1.0.0 stabilise la réécriture. À la mise à jour, un avis unique explique que les touches sont désormais boolean au lieu de texte — vérifiez scripts et visualisations.",
+        "it": "La versione 1.0.0 rende stabile la riscrittura. All'aggiornamento, un avviso una tantum spiega che i tasti ora sono boolean invece di testo — controlla script e visualizzazioni.",
+        "es": "La versión 1.0.0 estabiliza la reescritura. Al actualizar, un aviso único explica que las teclas ahora son boolean en vez de texto — revisa scripts y visualizaciones.",
+        "pl": "Wersja 1.0.0 stabilizuje przebudowę. Przy aktualizacji jednorazowe powiadomienie wyjaśnia, że przyciski są teraz boolean zamiast tekstu — sprawdź skrypty i wizualizacje.",
+        "uk": "Версія 1.0.0 робить переробку стабільною. Під час оновлення одноразове сповіщення пояснює, що кнопки тепер boolean замість тексту — перевірте скрипти та візуалізації.",
+        "zh-cn": "版本 1.0.0 将重写标记为稳定版。更新时一次性提示会说明按键现在为 boolean 而非文本——请检查读取它们的脚本和可视化。"
+      },
       "0.6.0": {
         "en": "Complete rewrite. The adapter now answers the full Roku control surface including device-info with a current Roku version, so Logitech Harmony and Sofabaton remotes work reliably. It runs out of the box, lets you manage several emulated Rokus (Player or TV) from the admin UI, and uses a cleaner object tree with correct data types.",
         "de": "Komplett neu aufgebaut. Der Adapter bedient jetzt die volle Roku-Steueroberfläche inklusive device-info mit aktueller Roku-Version, sodass Logitech Harmony und Sofabaton zuverlässig funktionieren. Er läuft ohne Einrichtung, mehrere emulierte Rokus (Player oder TV) lassen sich im Admin verwalten, und der Objektbaum ist sauberer mit korrekten Datentypen.",
@@ -150,7 +163,49 @@
     },
     "supportedMessages": {
       "deviceManager": true
-    }
+    },
+    "messages": [
+      {
+        "condition": {
+          "operand": "and",
+          "rules": [
+            "oldVersion<1.0.0",
+            "newVersion>=1.0.0"
+          ]
+        },
+        "title": {
+          "en": "Major change: new data types",
+          "de": "Große Änderung: neue Datentypen",
+          "ru": "Важное изменение: новые типы данных",
+          "pt": "Mudança importante: novos tipos de dados",
+          "nl": "Grote wijziging: nieuwe datatypes",
+          "fr": "Changement majeur : nouveaux types de données",
+          "it": "Modifica importante: nuovi tipi di dati",
+          "es": "Cambio importante: nuevos tipos de datos",
+          "pl": "Ważna zmiana: nowe typy danych",
+          "uk": "Важлива зміна: нові типи даних",
+          "zh-cn": "重大变更：新的数据类型"
+        },
+        "text": {
+          "en": "fakeroku has been completely rebuilt. The data points now use real types instead of text (e.g. the remote keys as boolean). Please check any scripts and visualizations that read them.",
+          "de": "fakeroku wurde komplett neu gebaut. Die Datenpunkte haben jetzt echte Datentypen statt Text (z. B. die Tasten als boolean). Bitte prüfe Skripte und Visualisierungen, die darauf zugreifen.",
+          "ru": "fakeroku полностью переработан. Точки данных теперь используют настоящие типы вместо текста (например, кнопки как boolean). Проверьте скрипты и визуализации, которые их читают.",
+          "pt": "O fakeroku foi completamente reconstruído. Os pontos de dados agora usam tipos reais em vez de texto (por exemplo, os botões como boolean). Verifique os scripts e as visualizações que os utilizam.",
+          "nl": "fakeroku is volledig opnieuw opgebouwd. De datapunten gebruiken nu echte typen in plaats van tekst (bijv. de knoppen als boolean). Controleer scripts en visualisaties die ze gebruiken.",
+          "fr": "fakeroku a été entièrement reconstruit. Les points de données utilisent désormais de vrais types au lieu de texte (par exemple les touches en boolean). Veuillez vérifier les scripts et visualisations qui les utilisent.",
+          "it": "fakeroku è stato completamente ricostruito. I punti dati ora usano tipi reali invece del testo (ad es. i tasti come boolean). Controlla script e visualizzazioni che li utilizzano.",
+          "es": "fakeroku se ha reconstruido por completo. Los puntos de datos ahora usan tipos reales en lugar de texto (por ejemplo, los botones como boolean). Revisa los scripts y las visualizaciones que los utilizan.",
+          "pl": "fakeroku został całkowicie przebudowany. Punkty danych używają teraz prawdziwych typów zamiast tekstu (np. przyciski jako boolean). Sprawdź skrypty i wizualizacje, które z nich korzystają.",
+          "uk": "fakeroku повністю перебудовано. Точки даних тепер використовують справжні типи замість тексту (наприклад, кнопки як boolean). Перевірте скрипти та візуалізації, які їх читають.",
+          "zh-cn": "fakeroku 已完全重建。数据点现在使用真实类型而非文本（例如按键为 boolean）。请检查读取它们的脚本和可视化。"
+        },
+        "level": "warn",
+        "buttons": [
+          "agree",
+          "cancel"
+        ]
+      }
+    ]
   },
   "native": {
     "networkInterface": "0.0.0.0",
