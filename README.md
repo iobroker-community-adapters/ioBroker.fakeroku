@@ -82,14 +82,14 @@ becomes `true`, or watch `.command` for the last button as text.
 	### **WORK IN PROGRESS**
 -->
 ### 0.6.0 (2026-08-05)
-- Complete rewrite. The adapter now answers the full Roku control surface — including device-info with a current Roku version — so Logitech Harmony and Sofabaton remotes pair and work reliably.
-- Works out of the box: it detects the network address to advertise on its own, no manual interface picking.
-- Manage multiple emulated Rokus from the admin UI, each as a Player or a TV.
-- Cleaner object tree — one datapoint per remote button with the correct types, plus a last-command datapoint; leftover objects from older versions are removed on start.
+- (krobipd) Complete rewrite. The adapter now answers the full Roku control surface — including device-info with a current Roku version — so Logitech Harmony and Sofabaton remotes pair and work reliably.
+- (krobipd) Works out of the box: it detects the network address to advertise on its own, no manual interface picking.
+- (krobipd) Manage multiple emulated Rokus from the admin UI, each as a Player or a TV.
+- (krobipd) Cleaner object tree — one datapoint per remote button with the correct types, plus a last-command datapoint; leftover objects from older versions are removed on start.
 
 ### 0.5.1 (2026-08-05)
-- Adapter requires Node.js >= 22 now
-- Dependencies have been updated
+- (mcm1957) Adapter requires Node.js >= 22 now
+- (mcm1957) Dependencies have been updated
 
 [Older changelogs can be found there](CHANGELOG_OLD.md)
 
