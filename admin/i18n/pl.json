@@ -19,6 +19,7 @@
   "dmDeleteConfirm": "Usunąć urządzenie Roku „%s“?",
   "deviceNameInUse": "Ta nazwa jest już używana przez inne urządzenie.",
   "devicePortInUse": "Ten port jest już używany przez innego Roku.",
+  "deviceNameInvalid": "Tej nazwy nie można użyć — jest zarezerwowana lub daje ten sam identyfikator obiektu co inne urządzenie.",
   "supportHeader": "Wsparcie",
   "aboutInfo": "Jeśli ten adapter jest dla Ciebie przydatny, mała darowizna pomaga go utrzymać — dziękuję!",
   "donateKofi": "Ko-fi",

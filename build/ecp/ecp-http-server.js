@@ -62,20 +62,25 @@ class EcpHttpServer {
     );
   }
   handle(req, res) {
-    var _a, _b;
+    var _a, _b, _c, _d, _e, _f;
+    const peer = ((_a = req.socket.remoteAddress) != null ? _a : "").replace(/^::ffff:/, "") || "?";
     if (!(0, import_lan_guard.isLanClient)(req.socket.remoteAddress)) {
+      this.config.logger.debug(`ECP request from non-LAN ${peer} rejected (403)`);
       res.statusCode = 403;
       res.end();
       return;
     }
-    const method = (_a = req.method) != null ? _a : "GET";
-    const url = (_b = req.url) != null ? _b : "/";
+    const method = (_b = req.method) != null ? _b : "GET";
+    const url = (_c = req.url) != null ? _c : "/";
     if (method === "GET") {
       const body = this.routeGet(url);
       if (body === null) {
         res.statusCode = 404;
         res.end();
         return;
+      }
+      if (url.split("?")[0] === "/query/device-info") {
+        this.config.logger.debug(`device-info queried from ${peer} (remote pairing/probe)`);
       }
       res.statusCode = 200;
       res.setHeader("Content-Type", "text/xml; charset=utf-8");
@@ -90,6 +95,8 @@ class EcpHttpServer {
         res.end();
         return;
       }
+      const detail = (_f = (_e = (_d = cmd.key) != null ? _d : cmd.appId) != null ? _e : cmd.text) != null ? _f : "";
+      this.config.logger.debug(`ECP ${cmd.type}${detail ? ` ${detail}` : ""} from ${peer}`);
       try {
         this.config.onCommand(cmd);
       } catch (e) {
@@ -119,6 +126,7 @@ class EcpHttpServer {
     if (this.server) {
       try {
         this.server.close();
+        this.server.closeAllConnections();
       } catch {
       }
       this.server = void 0;

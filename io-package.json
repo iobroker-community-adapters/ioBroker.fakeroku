@@ -3,6 +3,19 @@
     "name": "fakeroku",
     "version": "1.0.0",
     "news": {
+      "NEXT": {
+        "en": "More robust: a busy port on one Roku no longer stops the others, and discovery now reaches every network interface even on hosts with several.",
+        "de": "Robuster: ein belegter Port an einem Roku stoppt die anderen nicht mehr, und die Erkennung erreicht jetzt jede Netzwerkkarte, auch bei mehreren.",
+        "ru": "Надёжнее: занятый порт одного Roku больше не останавливает остальные, а обнаружение теперь охватывает все сетевые интерфейсы, даже если их несколько.",
+        "pt": "Mais robusto: uma porta ocupada num Roku já não impede os outros, e a deteção abrange agora todas as interfaces de rede, mesmo com várias.",
+        "nl": "Robuuster: een bezette poort op één Roku stopt de andere niet meer, en detectie bereikt nu elke netwerkkaart, ook bij meerdere.",
+        "fr": "Plus robuste : un port occupé sur un Roku n'arrête plus les autres, et la découverte couvre désormais chaque interface réseau, même s'il y en a plusieurs.",
+        "it": "Più robusto: una porta occupata su un Roku non blocca più gli altri e il rilevamento copre ora ogni interfaccia di rete, anche se sono più di una.",
+        "es": "Más robusto: un puerto ocupado en un Roku ya no detiene a los demás, y la detección abarca ahora cada interfaz de red, incluso si hay varias.",
+        "pl": "Solidniej: zajęty port jednego Roku nie zatrzymuje już pozostałych, a wykrywanie obejmuje teraz każdy interfejs sieciowy, nawet jeśli jest ich kilka.",
+        "uk": "Надійніше: зайнятий порт одного Roku більше не зупиняє інші, а виявлення тепер охоплює кожен мережевий інтерфейс, навіть якщо їх кілька.",
+        "zh-cn": "更稳健：某个 Roku 的端口被占用不再导致其他设备无法启动，且发现现在覆盖每个网络接口，即使有多个网卡。"
+      },
       "1.0.0": {
         "en": "Version 1.0.0 marks the rewrite as stable. On update, a one-time notice explains the remote-key data points are now boolean instead of text, so check scripts and visualizations that read them.",
         "de": "Version 1.0.0 macht den Neubau zur stabilen Version. Beim Update erklärt ein einmaliger Hinweis, dass die Tasten jetzt boolean statt Text sind — prüfe Skripte und Visualisierungen.",
@@ -80,19 +93,6 @@
         "pl": "Adapter wymaga node.js > = 18 i kontroler js- > = 5 teraz\nZaktualizowano zależności",
         "uk": "Адаптер вимагає node.js >= 18 і js-controller >= 5 тепер\nЗалежність було оновлено",
         "zh-cn": "适配器需要节点.js QQ18和js控制器 QQ 现在5号\n依赖关系已更新"
-      },
-      "0.2.2": {
-        "en": "fixed issues with controller v5",
-        "de": "problemstellungen mit controller v5",
-        "ru": "фиксированные проблемы с контроллером v5",
-        "pt": "problemas fixos com controlador v5",
-        "nl": "vertaling:",
-        "fr": "problèmes fixes avec controller v5",
-        "it": "problemi fissi con controller v5",
-        "es": "problemas fijos con controlador v5",
-        "pl": "zastrzeżenia regulatora v5",
-        "uk": "фіксовані питання з контролером v5",
-        "zh-cn": "a. 控制容忍的固定问题"
       }
     },
     "titleLang": {
@@ -111,15 +111,15 @@
     "desc": {
       "en": "Emulates Roku devices so ECP/SSDP remotes (Harmony, Sofabaton) trigger events in ioBroker",
       "de": "Emuliert Roku-Geräte, damit ECP/SSDP-Fernbedienungen (Harmony, Sofabaton) Ereignisse in ioBroker auslösen",
-      "ru": "ioBroker fakeroku драйвер как образец",
-      "pt": "Adaptador emula dispositivos Roku para Harmony Hub",
-      "nl": "Adapter emuleert Roku-apparaten naar Harmony Hub",
-      "fr": "L'adaptateur émule les appareils Roku vers Harmony Hub",
-      "it": "L'adattatore emula i dispositivi Roku su Harmony Hub",
-      "es": "El adaptador emula dispositivos Roku a Harmony Hub",
-      "pl": "Adapter emuluje urządzenia Roku do Harmony Hub",
-      "uk": "Адаптер емулює Roku-Devices до Harmony Hub",
-      "zh-cn": "适配器模拟 Roku-Devices 到 Harmony Hub"
+      "ru": "Эмулирует устройства Roku, чтобы пульты ECP/SSDP (Harmony, Sofabaton) запускали события в ioBroker",
+      "pt": "Emula dispositivos Roku para que controles remotos ECP/SSDP (Harmony, Sofabaton) acionem eventos no ioBroker",
+      "nl": "Emuleert Roku-apparaten zodat ECP/SSDP-afstandsbedieningen (Harmony, Sofabaton) gebeurtenissen in ioBroker activeren",
+      "fr": "Émule des appareils Roku pour que les télécommandes ECP/SSDP (Harmony, Sofabaton) déclenchent des événements dans ioBroker",
+      "it": "Emula dispositivi Roku in modo che i telecomandi ECP/SSDP (Harmony, Sofabaton) attivino eventi in ioBroker",
+      "es": "Emula dispositivos Roku para que los mandos ECP/SSDP (Harmony, Sofabaton) activen eventos en ioBroker",
+      "pl": "Emuluje urządzenia Roku, aby piloty ECP/SSDP (Harmony, Sofabaton) wyzwalały zdarzenia w ioBroker",
+      "uk": "Емулює пристрої Roku, щоб пульти ECP/SSDP (Harmony, Sofabaton) запускали події в ioBroker",
+      "zh-cn": "模拟 Roku 设备，使 ECP/SSDP 遥控器（Harmony、Sofabaton）在 ioBroker 中触发事件"
     },
     "keywords": [
       "fakeroku",
@@ -211,7 +211,7 @@
     "networkInterface": "0.0.0.0",
     "devices": [
       {
-        "name": "ioBroker",
+        "name": "Roku",
         "port": 8060,
         "type": "player"
       }

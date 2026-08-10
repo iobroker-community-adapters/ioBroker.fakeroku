@@ -19,6 +19,7 @@
   "dmDeleteConfirm": "删除 Roku 设备“%s”？",
   "deviceNameInUse": "此名称已被另一台设备使用。",
   "devicePortInUse": "此端口已被另一台 Roku 使用。",
+  "deviceNameInvalid": "无法使用此名称——它是保留名称，或与另一设备生成相同的对象 id。",
   "supportHeader": "支持",
   "aboutInfo": "如果此适配器对您有用，一点捐赠有助于维护它——谢谢！",
   "donateKofi": "Ko-fi",

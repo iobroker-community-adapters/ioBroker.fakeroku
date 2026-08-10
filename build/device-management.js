@@ -26,12 +26,14 @@ __export(device_management_exports, {
 });
 module.exports = __toCommonJS(device_management_exports);
 var import_dm_utils = require("@iobroker/dm-utils");
+var import_constants = require("./lib/constants");
 var import_device_identity = require("./lib/device-identity");
 var import_i18n = require("./lib/i18n");
-const DEFAULT_PORT = 8060;
+var import_pure_helpers = require("./lib/pure-helpers");
+const RESERVED_IDS = /* @__PURE__ */ new Set(["info"]);
 function nextFreePort(usedPorts) {
   const taken = new Set(usedPorts);
-  let port = DEFAULT_PORT;
+  let port = import_constants.DEFAULT_ECP_PORT;
   while (taken.has(port)) {
     port++;
   }
@@ -81,18 +83,25 @@ function buildDeviceForm(usedNames, usedPorts) {
 }
 function cleanDevice(raw) {
   const name = typeof raw.name === "string" ? raw.name.trim() : "";
-  const port = Number(raw.port) || DEFAULT_PORT;
+  const port = Number(raw.port) || import_constants.DEFAULT_ECP_PORT;
   const type = raw.type === "tv" ? "tv" : "player";
   return { name, port, type };
 }
 function findClash(devices, candidate, exceptIndex) {
   const name = candidate.name.trim().toLowerCase();
+  const id = (0, import_pure_helpers.sanitizeId)(candidate.name.trim());
+  if (id === "" || RESERVED_IDS.has(id)) {
+    return (0, import_i18n.t)("deviceNameInvalid");
+  }
   for (let i = 0; i < devices.length; i++) {
     if (i === exceptIndex) {
       continue;
     }
     if (devices[i].name.trim().toLowerCase() === name) {
       return (0, import_i18n.t)("deviceNameInUse");
+    }
+    if ((0, import_pure_helpers.sanitizeId)(devices[i].name.trim()) === id) {
+      return (0, import_i18n.t)("deviceNameInvalid");
     }
     if (Number(devices[i].port) === candidate.port) {
       return (0, import_i18n.t)("devicePortInUse");
@@ -147,7 +156,7 @@ class FakerokuDeviceManagement extends import_dm_utils.DeviceManagement {
     return {
       id: String(index),
       name: device.name || `Roku ${index + 1}`,
-      identifier: String(device.port || DEFAULT_PORT),
+      identifier: String(device.port || import_constants.DEFAULT_ECP_PORT),
       model: kind,
       actions: [
         {

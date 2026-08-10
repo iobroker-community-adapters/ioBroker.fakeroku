@@ -52,4 +52,14 @@ describe("findClash", () => {
   it("excludes the edited device so its own name+port do not clash with itself", () => {
     expect(findClash(devices, { name: "Living room", port: 8060 }, 0)).toBeNull();
   });
+
+  it("rejects a name that maps to the reserved 'info' object id", () => {
+    expect(findClash(devices, { name: "info", port: 9000 }, -1)).toBe("deviceNameInvalid");
+  });
+
+  it("rejects a different name that sanitizes to the same id as another device", () => {
+    // "Living room" and "Living*room" both sanitize to "Living_room" — distinct
+    // names, same object tree. The plain-name check misses it; the id check catches it.
+    expect(findClash(devices, { name: "Living*room", port: 9000 }, -1)).toBe("deviceNameInvalid");
+  });
 });

@@ -39,6 +39,7 @@ var import_ssdp_responder = require("./discovery/ssdp-responder");
 var import_device_info = require("./ecp/device-info");
 var import_ecp_http_server = require("./ecp/ecp-http-server");
 var import_state_model = require("./ecp/state-model");
+var import_constants = require("./lib/constants");
 var import_device_identity = require("./lib/device-identity");
 var import_detect_ip = require("./lib/detect-ip");
 var import_object_cleanup = require("./lib/object-cleanup");
@@ -46,12 +47,14 @@ var import_pure_helpers = require("./lib/pure-helpers");
 const SSDP_START_TIMEOUT_MS = 5e3;
 const SSDP_NOTIFY_INTERVAL_MS = 3e5;
 const KEY_PULSE_MS = 50;
-const DEFAULT_ECP_PORT = 8060;
+const HOLD_MAX_MS = 3e4;
 class Fakeroku extends utils.Adapter {
   ssdp;
   notifyTimer;
   ecpServers = [];
   pulseTimers = /* @__PURE__ */ new Set();
+  /** Per held key id, its watchdog timer — so a keydown without a keyup cannot pin it true forever. */
+  holdTimers = /* @__PURE__ */ new Map();
   /** Per device, the key names it exposes — so a keypress only writes keys this device carries. */
   deviceKeys = /* @__PURE__ */ new Map();
   /** Device-manager backend: the emulated Rokus as cards with add/edit/delete. */
@@ -87,36 +90,69 @@ class Fakeroku extends utils.Adapter {
         return;
       }
       const adverts = [];
+      const seenIds = /* @__PURE__ */ new Set();
       for (const d of configured) {
         const deviceId = (0, import_pure_helpers.sanitizeId)(d.name);
+        if (seenIds.has(deviceId)) {
+          this.log.warn(`Emulated Roku "${d.name}" maps to an object id already in use (${deviceId}) \u2014 skipping it.`);
+          continue;
+        }
         const deviceType = d.type === "tv" ? "tv" : "player";
         const keys = (0, import_state_model.keysForType)(deviceType);
-        this.deviceKeys.set(deviceId, new Set(keys));
-        const advert = { uuid: d.uuid || (0, import_device_identity.deriveUuid)(d.name), port: Number(d.port) || DEFAULT_ECP_PORT };
-        await this.createDeviceStates(deviceId, d.name, keys);
-        const server = new import_ecp_http_server.EcpHttpServer({
-          device: advert,
-          friendlyName: d.name,
-          apps: import_device_info.DEFAULT_APPS,
-          deviceType,
-          bindIp,
-          logger: this.log,
-          onCommand: (cmd) => this.applyCommand(deviceId, cmd)
-        });
-        await server.start();
-        this.ecpServers.push(server);
-        adverts.push(advert);
+        const advert = { uuid: d.uuid || (0, import_device_identity.deriveUuid)(d.name), port: Number(d.port) || import_constants.DEFAULT_ECP_PORT };
+        try {
+          await this.createDeviceStates(deviceId, d.name, keys);
+          const server = new import_ecp_http_server.EcpHttpServer({
+            device: advert,
+            friendlyName: d.name,
+            apps: import_device_info.DEFAULT_APPS,
+            deviceType,
+            bindIp,
+            logger: this.log,
+            onCommand: (cmd) => this.applyCommand(deviceId, cmd)
+          });
+          await server.start();
+          this.ecpServers.push(server);
+          this.deviceKeys.set(deviceId, new Set(keys));
+          seenIds.add(deviceId);
+          adverts.push(advert);
+        } catch (e) {
+          this.log.warn(
+            `Emulated Roku "${d.name}" could not start on port ${advert.port}: ${e instanceof Error ? e.message : String(e)} \u2014 skipping it.`
+          );
+        }
       }
       await this.cleanupOrphans(new Set(configured.map((d) => (0, import_pure_helpers.sanitizeId)(d.name))));
-      this.ssdp = new import_ssdp_responder.RokuSsdpResponder({ devices: adverts, bindIp, advertiseIp, logger: this.log });
-      await this.startWithTimeout(this.ssdp.start(), SSDP_START_TIMEOUT_MS);
-      this.ssdp.announce();
-      this.notifyTimer = this.setInterval(() => {
-        var _a2;
-        return (_a2 = this.ssdp) == null ? void 0 : _a2.announce();
-      }, SSDP_NOTIFY_INTERVAL_MS);
+      if (adverts.length === 0) {
+        this.log.error("No emulated Roku device could be started \u2014 check the configured ports for conflicts.");
+        return;
+      }
+      const membershipInterfaces = bindIp ? [bindIp] : (0, import_detect_ip.detectLocalIPv4s)();
+      this.ssdp = new import_ssdp_responder.RokuSsdpResponder({
+        devices: adverts,
+        bindIp,
+        advertiseIp,
+        membershipInterfaces,
+        logger: this.log,
+        onFatalError: () => this.onSsdpFatal()
+      });
+      try {
+        await this.startWithTimeout(this.ssdp.start(), SSDP_START_TIMEOUT_MS);
+        this.ssdp.announce();
+        this.notifyTimer = this.setInterval(() => {
+          var _a2;
+          return (_a2 = this.ssdp) == null ? void 0 : _a2.announce();
+        }, SSDP_NOTIFY_INTERVAL_MS);
+      } catch (e) {
+        this.log.warn(
+          `SSDP discovery unavailable: ${e instanceof Error ? e.message : String(e)} \u2014 already-paired remotes still work; set the network interface if devices are not found.`
+        );
+        this.ssdp = void 0;
+      }
       await this.setState("info.connection", { val: true, ack: true });
-      this.log.info(`Emulating ${adverts.length} Roku device(s), advertising on ${advertiseIp}`);
+      this.log.info(
+        `Emulating ${adverts.length} Roku device(s), advertising on ${advertiseIp}${this.ssdp ? "" : " (discovery off)"}`
+      );
     } catch (e) {
       this.log.error(`onReady failed: ${e instanceof Error ? e.message : String(e)}`);
     }
@@ -201,8 +237,38 @@ class Fakeroku extends utils.Adapter {
         this.pulseTimers.add(timer);
       }
     } else if (write.holdKey && (keys == null ? void 0 : keys.has(write.holdKey.key))) {
-      void this.setState(`${deviceId}.keys.${write.holdKey.key}`, { val: write.holdKey.value, ack: true });
+      const id = `${deviceId}.keys.${write.holdKey.key}`;
+      void this.setState(id, { val: write.holdKey.value, ack: true });
+      const pending = this.holdTimers.get(id);
+      if (pending) {
+        this.clearTimeout(pending);
+        this.holdTimers.delete(id);
+      }
+      if (write.holdKey.value) {
+        const timer = this.setTimeout(() => {
+          this.holdTimers.delete(id);
+          void this.setState(id, { val: false, ack: true });
+        }, HOLD_MAX_MS);
+        if (timer) {
+          this.holdTimers.set(id, timer);
+        }
+      }
     }
+  }
+  /**
+   * The SSDP responder died at runtime (a socket error after a good start). Stop
+   * announcing into the dead socket and drop the discovery aid. The ECP servers
+   * keep working, so info.connection — which reflects ECP readiness — stays true.
+   */
+  onSsdpFatal() {
+    if (this.notifyTimer) {
+      this.clearInterval(this.notifyTimer);
+      this.notifyTimer = void 0;
+    }
+    this.ssdp = void 0;
+    this.log.warn(
+      "SSDP discovery stopped after a socket error \u2014 already-paired remotes still work; restart the instance to re-enable discovery."
+    );
   }
   /**
    * Bound await: reject if the SSDP start doesn't settle in time, so a stuck
@@ -248,6 +314,10 @@ class Fakeroku extends utils.Adapter {
         this.clearTimeout(t);
       }
       this.pulseTimers.clear();
+      for (const t of this.holdTimers.values()) {
+        this.clearTimeout(t);
+      }
+      this.holdTimers.clear();
       (_a = this.ssdp) == null ? void 0 : _a.stop();
       for (const s of this.ecpServers) {
         s.stop();

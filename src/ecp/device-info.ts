@@ -55,7 +55,7 @@ export interface AppEntry {
   name: string;
 }
 
-/** A minimal, current default app list (no dead 2015 services). Made configurable later. */
+/** A minimal, current default app list served at /query/apps (no dead 2015 services). */
 export const DEFAULT_APPS: AppEntry[] = [
   { id: "12", name: "Netflix" },
   { id: "837", name: "YouTube" },

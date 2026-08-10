@@ -43,36 +43,82 @@ class RokuSsdpResponder {
     this.config = config;
   }
   socket;
-  /** Bind on 1900, join multicast on the selected interface, start answering. Rejects on bind error. */
+  fatalReported = false;
+  /** Bind on 1900, join multicast on the selected interface(s), start answering. Rejects on bind error. */
   async start() {
-    var _a;
     const socket = dgram.createSocket({ type: "udp4", reuseAddr: true });
     this.socket = socket;
     await new Promise((resolve, reject) => {
       const onBindError = (err) => reject(err);
       socket.once("error", onBindError);
       socket.bind(SSDP_PORT, () => {
-        var _a2;
         socket.removeListener("error", onBindError);
-        try {
-          socket.addMembership(MULTICAST_ADDR, this.config.bindIp);
-        } catch (e) {
-          const where = (_a2 = this.config.bindIp) != null ? _a2 : "default interface";
-          this.config.logger.warn(
-            `SSDP multicast join failed on ${where}: ${e instanceof Error ? e.message : String(e)} \u2014 discovery may be incomplete`
-          );
+        this.joinMulticast(socket);
+        if (this.config.bindIp) {
+          try {
+            socket.setMulticastInterface(this.config.bindIp);
+          } catch (e) {
+            this.config.logger.warn(
+              `SSDP: could not pin multicast egress to ${this.config.bindIp}: ${errMsg(e)} \u2014 NOTIFY may use the default interface`
+            );
+          }
         }
-        socket.on("error", (err) => {
-          this.config.logger.error(`SSDP socket error: ${err.message}`);
-          this.stop();
-        });
+        socket.on("error", (err) => this.onSocketError(err));
         socket.on("message", (msg, rinfo) => this.onMessage(msg.toString("utf8"), rinfo.address, rinfo.port));
         resolve();
       });
     });
+    const join = this.config.membershipInterfaces.length ? this.config.membershipInterfaces.join(", ") : "default";
     this.config.logger.debug(
-      `Roku SSDP responder on :${SSDP_PORT}, advertising ${this.config.advertiseIp} (join: ${(_a = this.config.bindIp) != null ? _a : "default"})`
+      `Roku SSDP responder on :${SSDP_PORT}, advertising ${this.config.advertiseIp} (join: ${join})`
     );
+  }
+  /**
+   * Join the multicast group on each selected interface, or on the OS default when
+   * none is known.
+   *
+   * @param socket the bound SSDP socket
+   */
+  joinMulticast(socket) {
+    const ifaces = this.config.membershipInterfaces;
+    if (ifaces.length === 0) {
+      this.tryJoin(socket, void 0);
+      return;
+    }
+    for (const ip of ifaces) {
+      this.tryJoin(socket, ip);
+    }
+  }
+  /**
+   * Join the group on one interface; a failure warns but does not throw, so one bad
+   * interface cannot stop the responder.
+   *
+   * @param socket the bound SSDP socket
+   * @param iface the interface IP to join on, or undefined for the OS default
+   */
+  tryJoin(socket, iface) {
+    try {
+      socket.addMembership(MULTICAST_ADDR, iface);
+    } catch (e) {
+      this.config.logger.warn(
+        `SSDP multicast join failed on ${iface != null ? iface : "default interface"}: ${errMsg(e)} \u2014 discovery may be incomplete`
+      );
+    }
+  }
+  /**
+   * A socket error after a good start — discovery is dead. Close the socket and tell
+   * the adapter once so it can stop announcing and revise its connection state.
+   *
+   * @param err the socket error
+   */
+  onSocketError(err) {
+    this.config.logger.error(`SSDP socket error: ${err.message}`);
+    const notify = this.config.onFatalError;
+    this.stop();
+    if (notify && !this.fatalReported) {
+      this.fatalReported = true;
+      notify(err);
+    }
   }
   onMessage(text, address, port) {
     var _a;
@@ -102,7 +148,7 @@ class RokuSsdpResponder {
       });
     }
   }
-  /** Synchronous close — safe to call from onUnload. */
+  /** Synchronous close — safe to call from onUnload. Closing the socket drops its memberships. */
   stop() {
     if (this.socket) {
       try {
@@ -112,6 +158,9 @@ class RokuSsdpResponder {
       this.socket = void 0;
     }
   }
+}
+function errMsg(e) {
+  return e instanceof Error ? e.message : String(e);
 }
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {

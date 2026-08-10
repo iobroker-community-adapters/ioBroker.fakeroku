@@ -5,11 +5,14 @@ import {
   type DeviceLoadContext,
   type JsonFormSchema,
 } from "@iobroker/dm-utils";
+import { DEFAULT_ECP_PORT } from "./lib/constants";
 import { deriveUuid } from "./lib/device-identity";
-import type { DeviceType } from "./ecp/state-model";
 import { t } from "./lib/i18n";
+import { sanitizeId } from "./lib/pure-helpers";
+import type { DeviceType } from "./ecp/state-model";
 
-const DEFAULT_PORT = 8060;
+/** Object-id segments the adapter reserves for its own tree — a device may not take them. */
+const RESERVED_IDS = new Set(["info"]);
 
 /** One emulated Roku as stored in the adapter's native.devices. */
 interface RokuDeviceConfig {
@@ -34,7 +37,7 @@ type DeviceResult = { refresh: "devices" };
  */
 export function nextFreePort(usedPorts: readonly number[]): number {
   const taken = new Set(usedPorts);
-  let port = DEFAULT_PORT;
+  let port = DEFAULT_ECP_PORT;
   while (taken.has(port)) {
     port++;
   }
@@ -104,7 +107,7 @@ export function buildDeviceForm(usedNames: readonly string[], usedPorts: readonl
  */
 export function cleanDevice(raw: Record<string, unknown>): Omit<RokuDeviceConfig, "uuid"> {
   const name = typeof raw.name === "string" ? raw.name.trim() : "";
-  const port = Number(raw.port) || DEFAULT_PORT;
+  const port = Number(raw.port) || DEFAULT_ECP_PORT;
   const type: DeviceType = raw.type === "tv" ? "tv" : "player";
   return { name, port, type };
 }
@@ -127,12 +130,23 @@ export function findClash(
   exceptIndex: number,
 ): ioBroker.StringOrTranslated | null {
   const name = candidate.name.trim().toLowerCase();
+  // The object-tree path is sanitizeId(name); guard the two ways it can go wrong
+  // regardless of the plain-name check: a name that sanitizes to a reserved id
+  // ("info" would collide with the adapter's own channel), and two different
+  // names that sanitize to the SAME id ("My Roku" and "My*Roku" → "My_Roku").
+  const id = sanitizeId(candidate.name.trim());
+  if (id === "" || RESERVED_IDS.has(id)) {
+    return t("deviceNameInvalid");
+  }
   for (let i = 0; i < devices.length; i++) {
     if (i === exceptIndex) {
       continue;
     }
     if (devices[i].name.trim().toLowerCase() === name) {
       return t("deviceNameInUse");
+    }
+    if (sanitizeId(devices[i].name.trim()) === id) {
+      return t("deviceNameInvalid");
     }
     if (Number(devices[i].port) === candidate.port) {
       return t("devicePortInUse");
@@ -196,7 +210,7 @@ export class FakerokuDeviceManagement extends DeviceManagement {
     return {
       id: String(index),
       name: device.name || `Roku ${index + 1}`,
-      identifier: String(device.port || DEFAULT_PORT),
+      identifier: String(device.port || DEFAULT_ECP_PORT),
       model: kind,
       actions: [
         {

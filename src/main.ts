@@ -8,8 +8,9 @@ import { DEFAULT_APPS } from "./ecp/device-info";
 import type { CommandEvent } from "./ecp/ecp-command";
 import { EcpHttpServer } from "./ecp/ecp-http-server";
 import { commandToStateWrite, type DeviceType, keysForType } from "./ecp/state-model";
+import { DEFAULT_ECP_PORT } from "./lib/constants";
 import { deriveUuid } from "./lib/device-identity";
-import { detectPrimaryIPv4 } from "./lib/detect-ip";
+import { detectLocalIPv4s, detectPrimaryIPv4 } from "./lib/detect-ip";
 import { planObjectCleanup } from "./lib/object-cleanup";
 import { sanitizeId } from "./lib/pure-helpers";
 
@@ -19,7 +20,8 @@ const SSDP_START_TIMEOUT_MS = 5000;
 const SSDP_NOTIFY_INTERVAL_MS = 300_000;
 /** How long a keypress pulses its keys.<Key> state true before falling back to false. */
 const KEY_PULSE_MS = 50;
-const DEFAULT_ECP_PORT = 8060;
+/** Safety cap for a held key: a keydown with no matching keyup resets after this. */
+const HOLD_MAX_MS = 30_000;
 
 /**
  * ioBroker.fakeroku — Roku emulator (input side).
@@ -33,6 +35,8 @@ export class Fakeroku extends utils.Adapter {
   private notifyTimer: ioBroker.Interval | undefined;
   private readonly ecpServers: EcpHttpServer[] = [];
   private readonly pulseTimers = new Set<ioBroker.Timeout>();
+  /** Per held key id, its watchdog timer — so a keydown without a keyup cannot pin it true forever. */
+  private readonly holdTimers = new Map<string, ioBroker.Timeout>();
   /** Per device, the key names it exposes — so a keypress only writes keys this device carries. */
   private readonly deviceKeys = new Map<string, ReadonlySet<string>>();
   /** Device-manager backend: the emulated Rokus as cards with add/edit/delete. */
@@ -79,39 +83,84 @@ export class Fakeroku extends utils.Adapter {
       }
 
       const adverts: RokuAdvert[] = [];
+      const seenIds = new Set<string>();
       for (const d of configured) {
         const deviceId = sanitizeId(d.name);
+        // Two configured names can sanitize to the same object id — the admin guards
+        // against it, but a hand-edited config could still carry it. Skip the duplicate
+        // instead of letting two devices fight over one object tree.
+        if (seenIds.has(deviceId)) {
+          this.log.warn(`Emulated Roku "${d.name}" maps to an object id already in use (${deviceId}) — skipping it.`);
+          continue;
+        }
         const deviceType: DeviceType = d.type === "tv" ? "tv" : "player";
         const keys = keysForType(deviceType);
-        this.deviceKeys.set(deviceId, new Set(keys));
         // Adopt the device's persisted uuid (old adapter or an earlier run) so the SSDP
         // identity — and thus the controller pairing — survives an update; derive a stable
         // one from the name only for a device that never had one.
         const advert: RokuAdvert = { uuid: d.uuid || deriveUuid(d.name), port: Number(d.port) || DEFAULT_ECP_PORT };
-        await this.createDeviceStates(deviceId, d.name, keys);
-        const server = new EcpHttpServer({
-          device: advert,
-          friendlyName: d.name,
-          apps: DEFAULT_APPS,
-          deviceType,
-          bindIp,
-          logger: this.log,
-          onCommand: cmd => this.applyCommand(deviceId, cmd),
-        });
-        await server.start();
-        this.ecpServers.push(server);
-        adverts.push(advert);
+        try {
+          await this.createDeviceStates(deviceId, d.name, keys);
+          const server = new EcpHttpServer({
+            device: advert,
+            friendlyName: d.name,
+            apps: DEFAULT_APPS,
+            deviceType,
+            bindIp,
+            logger: this.log,
+            onCommand: cmd => this.applyCommand(deviceId, cmd),
+          });
+          await server.start();
+          this.ecpServers.push(server);
+          this.deviceKeys.set(deviceId, new Set(keys));
+          seenIds.add(deviceId);
+          adverts.push(advert);
+        } catch (e) {
+          // One device's failure (a busy ECP port) must not take the others down.
+          this.log.warn(
+            `Emulated Roku "${d.name}" could not start on port ${advert.port}: ${e instanceof Error ? e.message : String(e)} — skipping it.`,
+          );
+        }
       }
 
       await this.cleanupOrphans(new Set(configured.map(d => sanitizeId(d.name))));
 
-      this.ssdp = new RokuSsdpResponder({ devices: adverts, bindIp, advertiseIp, logger: this.log });
-      await this.startWithTimeout(this.ssdp.start(), SSDP_START_TIMEOUT_MS);
-      this.ssdp.announce();
-      this.notifyTimer = this.setInterval(() => this.ssdp?.announce(), SSDP_NOTIFY_INTERVAL_MS);
+      if (adverts.length === 0) {
+        // Nothing is controllable — leave info.connection false and stop here.
+        this.log.error("No emulated Roku device could be started — check the configured ports for conflicts.");
+        return;
+      }
+
+      // Discovery is only an aid; the ECP servers above already make the adapter
+      // controllable. Isolate the SSDP start so a busy port 1900 (or a stuck bind)
+      // degrades to "discovery off, already-paired remotes still work" instead of
+      // failing the whole start-up. In the auto case join every routable interface so
+      // a multi-homed host is discoverable on all its LANs; a chosen interface pins
+      // both membership and NOTIFY egress.
+      const membershipInterfaces = bindIp ? [bindIp] : detectLocalIPv4s();
+      this.ssdp = new RokuSsdpResponder({
+        devices: adverts,
+        bindIp,
+        advertiseIp,
+        membershipInterfaces,
+        logger: this.log,
+        onFatalError: () => this.onSsdpFatal(),
+      });
+      try {
+        await this.startWithTimeout(this.ssdp.start(), SSDP_START_TIMEOUT_MS);
+        this.ssdp.announce();
+        this.notifyTimer = this.setInterval(() => this.ssdp?.announce(), SSDP_NOTIFY_INTERVAL_MS);
+      } catch (e) {
+        this.log.warn(
+          `SSDP discovery unavailable: ${e instanceof Error ? e.message : String(e)} — already-paired remotes still work; set the network interface if devices are not found.`,
+        );
+        this.ssdp = undefined;
+      }
 
       await this.setState("info.connection", { val: true, ack: true });
-      this.log.info(`Emulating ${adverts.length} Roku device(s), advertising on ${advertiseIp}`);
+      this.log.info(
+        `Emulating ${adverts.length} Roku device(s), advertising on ${advertiseIp}${this.ssdp ? "" : " (discovery off)"}`,
+      );
     } catch (e) {
       this.log.error(`onReady failed: ${e instanceof Error ? e.message : String(e)}`);
     }
@@ -203,8 +252,42 @@ export class Fakeroku extends utils.Adapter {
         this.pulseTimers.add(timer);
       }
     } else if (write.holdKey && keys?.has(write.holdKey.key)) {
-      void this.setState(`${deviceId}.keys.${write.holdKey.key}`, { val: write.holdKey.value, ack: true });
+      const id = `${deviceId}.keys.${write.holdKey.key}`;
+      void this.setState(id, { val: write.holdKey.value, ack: true });
+      // A keydown holds the key true until its keyup. Arm a watchdog so a lost keyup
+      // (controller disconnects mid-press) cannot pin the key true forever; a keyup
+      // clears it, and a repeated keydown re-arms it.
+      const pending = this.holdTimers.get(id);
+      if (pending) {
+        this.clearTimeout(pending);
+        this.holdTimers.delete(id);
+      }
+      if (write.holdKey.value) {
+        const timer = this.setTimeout(() => {
+          this.holdTimers.delete(id);
+          void this.setState(id, { val: false, ack: true });
+        }, HOLD_MAX_MS);
+        if (timer) {
+          this.holdTimers.set(id, timer);
+        }
+      }
     }
+  }
+
+  /**
+   * The SSDP responder died at runtime (a socket error after a good start). Stop
+   * announcing into the dead socket and drop the discovery aid. The ECP servers
+   * keep working, so info.connection — which reflects ECP readiness — stays true.
+   */
+  private onSsdpFatal(): void {
+    if (this.notifyTimer) {
+      this.clearInterval(this.notifyTimer);
+      this.notifyTimer = undefined;
+    }
+    this.ssdp = undefined;
+    this.log.warn(
+      "SSDP discovery stopped after a socket error — already-paired remotes still work; restart the instance to re-enable discovery.",
+    );
   }
 
   /**
@@ -251,6 +334,10 @@ export class Fakeroku extends utils.Adapter {
         this.clearTimeout(t);
       }
       this.pulseTimers.clear();
+      for (const t of this.holdTimers.values()) {
+        this.clearTimeout(t);
+      }
+      this.holdTimers.clear();
       this.ssdp?.stop();
       for (const s of this.ecpServers) {
         s.stop();

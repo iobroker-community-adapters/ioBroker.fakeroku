@@ -1,6 +1,6 @@
 import * as http from "node:http";
 import type { RokuAdvert } from "../discovery/ssdp-messages";
-import type { SsdpLogger } from "../discovery/ssdp-responder";
+import type { AdapterLogger } from "../lib/logger";
 import { type CommandEvent, parseEcpCommand } from "./ecp-command";
 import { type AppEntry, buildAppsXml, buildDescXml, buildDeviceInfoXml } from "./device-info";
 import { isLanClient } from "./lan-guard";
@@ -19,7 +19,7 @@ export interface EcpServerConfig {
   /** Interface IP to bind the HTTP server to, or `undefined` to bind all interfaces (auto). */
   bindIp: string | undefined;
   /** Logger. */
-  logger: SsdpLogger;
+  logger: AdapterLogger;
   /** Called for every accepted POST command. */
   onCommand: (cmd: CommandEvent) => void;
 }
@@ -57,7 +57,11 @@ export class EcpHttpServer {
   }
 
   private handle(req: http.IncomingMessage, res: http.ServerResponse): void {
+    const peer = (req.socket.remoteAddress ?? "").replace(/^::ffff:/, "") || "?";
     if (!isLanClient(req.socket.remoteAddress)) {
+      // Debug (not warn): a stray WAN scanner must not spam the log, but when a
+      // remote sits on the wrong subnet/VLAN this is the only trace of "why rejected".
+      this.config.logger.debug(`ECP request from non-LAN ${peer} rejected (403)`);
       res.statusCode = 403;
       res.end();
       return;
@@ -71,6 +75,11 @@ export class EcpHttpServer {
         res.statusCode = 404;
         res.end();
         return;
+      }
+      if (url.split("?")[0] === "/query/device-info") {
+        // The pairing probe — the first thing a remote asks and the usual failure
+        // point (a Sofabaton rejects a too-old version). Visible for diagnosis.
+        this.config.logger.debug(`device-info queried from ${peer} (remote pairing/probe)`);
       }
       res.statusCode = 200;
       res.setHeader("Content-Type", "text/xml; charset=utf-8");
@@ -86,6 +95,10 @@ export class EcpHttpServer {
         res.end();
         return;
       }
+      // The received command — without this a keypress leaves no trace at all, so a
+      // "I press a button and nothing happens" report has nothing to go on.
+      const detail = cmd.key ?? cmd.appId ?? cmd.text ?? "";
+      this.config.logger.debug(`ECP ${cmd.type}${detail ? ` ${detail}` : ""} from ${peer}`);
       try {
         this.config.onCommand(cmd);
       } catch (e) {
@@ -118,6 +131,10 @@ export class EcpHttpServer {
     if (this.server) {
       try {
         this.server.close();
+        // close() only stops accepting new sockets; established keep-alive
+        // connections (a controller holding one) keep the event loop busy and can
+        // drag the synchronous onUnload toward a SIGKILL. Force them shut (Node >= 22).
+        this.server.closeAllConnections();
       } catch {
         // already closed
       }

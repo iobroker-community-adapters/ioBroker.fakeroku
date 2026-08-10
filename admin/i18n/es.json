@@ -19,6 +19,7 @@
   "dmDeleteConfirm": "¿Eliminar el dispositivo Roku «%s»?",
   "deviceNameInUse": "Este nombre ya lo usa otro dispositivo.",
   "devicePortInUse": "Este puerto ya lo usa otro Roku.",
+  "deviceNameInvalid": "Este nombre no se puede usar — está reservado o genera el mismo id de objeto que otro dispositivo.",
   "supportHeader": "Apoyar",
   "aboutInfo": "Si este adaptador te resulta útil, una pequeña donación ayuda a mantenerlo — ¡gracias!",
   "donateKofi": "Ko-fi",

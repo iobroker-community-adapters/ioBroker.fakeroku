@@ -18,28 +18,43 @@ var __copyProps = (to, from, except, desc) => {
 var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 var detect_ip_exports = {};
 __export(detect_ip_exports, {
+  detectLocalIPv4s: () => detectLocalIPv4s,
   detectPrimaryIPv4: () => detectPrimaryIPv4,
+  listNonInternalIPv4s: () => listNonInternalIPv4s,
   pickPrimaryIPv4: () => pickPrimaryIPv4
 });
 module.exports = __toCommonJS(detect_ip_exports);
 var import_node_os = require("node:os");
-function pickPrimaryIPv4(interfaces) {
+function isRoutableIPv4(addr) {
+  const isV4 = addr.family === "IPv4" || addr.family === 4;
+  return isV4 && !addr.internal;
+}
+function listNonInternalIPv4s(interfaces) {
+  const out = [];
   for (const addrs of Object.values(interfaces)) {
     for (const addr of addrs != null ? addrs : []) {
-      const isV4 = addr.family === "IPv4" || addr.family === 4;
-      if (isV4 && !addr.internal) {
-        return addr.address;
+      if (isRoutableIPv4(addr)) {
+        out.push(addr.address);
       }
     }
   }
-  return "";
+  return out;
+}
+function pickPrimaryIPv4(interfaces) {
+  var _a;
+  return (_a = listNonInternalIPv4s(interfaces)[0]) != null ? _a : "";
 }
 function detectPrimaryIPv4() {
   return pickPrimaryIPv4((0, import_node_os.networkInterfaces)());
 }
+function detectLocalIPv4s() {
+  return listNonInternalIPv4s((0, import_node_os.networkInterfaces)());
+}
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
+  detectLocalIPv4s,
   detectPrimaryIPv4,
+  listNonInternalIPv4s,
   pickPrimaryIPv4
 });
 //# sourceMappingURL=detect-ip.js.map

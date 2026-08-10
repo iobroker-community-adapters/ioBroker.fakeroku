@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": ["../../src/lib/logger.ts"],
+  "sourcesContent": ["/**\n * The minimal logger shape the network components need \u2014 satisfied by the\n * adapter's `this.log`. Kept in a neutral module so the SSDP responder and the\n * ECP HTTP server both depend on it without depending on each other.\n */\nexport type AdapterLogger = Pick<ioBroker.Log, \"debug\" | \"warn\" | \"error\">;\n"],
+  "mappings": ";;;;;;;;;;;;;;AAAA;AAAA;",
+  "names": []
+}

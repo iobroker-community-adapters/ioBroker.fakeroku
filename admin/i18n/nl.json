@@ -19,6 +19,7 @@
   "dmDeleteConfirm": "Het Roku-apparaat „%s“ verwijderen?",
   "deviceNameInUse": "Deze naam wordt al door een ander apparaat gebruikt.",
   "devicePortInUse": "Deze poort wordt al door een andere Roku gebruikt.",
+  "deviceNameInvalid": "Deze naam kan niet worden gebruikt — hij is gereserveerd of levert dezelfde object-id op als een ander apparaat.",
   "supportHeader": "Ondersteunen",
   "aboutInfo": "Als deze adapter nuttig voor je is, helpt een kleine donatie om hem te onderhouden — bedankt!",
   "donateKofi": "Ko-fi",
