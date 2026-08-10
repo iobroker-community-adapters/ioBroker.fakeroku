@@ -1,4 +1,7 @@
 # Older changes
+## 0.4.0 (2026-03-07)
+- Adapter requires node.js >= 20, admin >= 7.7.22, js-controller >= 6.0.11
+
 ## 0.3.0 (2024-06-11)
 * (mcm1957) Adapter requires node.js >= 18 and js-controller >= 5 now
 * (mcm1957) Dependencies have been updated

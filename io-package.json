@@ -1,9 +1,9 @@
 {
   "common": {
     "name": "fakeroku",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "news": {
-      "NEXT": {
+      "1.1.0": {
         "en": "More robust: a busy port on one Roku no longer stops the others, and discovery now reaches every network interface even on hosts with several.",
         "de": "Robuster: ein belegter Port an einem Roku stoppt die anderen nicht mehr, und die Erkennung erreicht jetzt jede Netzwerkkarte, auch bei mehreren.",
         "ru": "Надёжнее: занятый порт одного Roku больше не останавливает остальные, а обнаружение теперь охватывает все сетевые интерфейсы, даже если их несколько.",

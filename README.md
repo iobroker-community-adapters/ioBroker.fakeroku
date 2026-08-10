@@ -81,7 +81,7 @@ becomes `true`, or watch `.command` for the last button as text.
 	Placeholder for the next version (at the beginning of the line):
 	### **WORK IN PROGRESS**
 -->
-### **WORK IN PROGRESS**
+### 1.1.0 (2026-08-10)
 - (krobipd) Several emulated Rokus are now independent at start-up: if one is set to a port already in use, the others still start instead of the whole instance failing.
 - (krobipd) The adapter keeps serving already-paired remotes, and reports its status correctly, even when network discovery cannot start or later drops out.
 - (krobipd) Discovery now covers every network interface on a host that has more than one, so a remote on any of your local networks can find the emulated Rokus.
@@ -106,9 +106,6 @@ becomes `true`, or watch `.command` for the last button as text.
 - Complete rewrite with the full Roku control surface, including `device-info` with a current Roku version — the part modern remotes check at pairing, beyond what a classic Harmony hub needs
 - New clean data model: a `command` datapoint plus fixed `keys.<Key>` states, all created up front instead of appearing only after the first keypress
 - Discovery binds to the chosen network interface, command handling is restricted to the local network
-
-### 0.4.0 (2026-03-07)
-- Adapter requires node.js >= 20, admin >= 7.7.22, js-controller >= 6.0.11
 
 [Older changelogs can be found there](CHANGELOG_OLD.md)
 
