@@ -21,6 +21,18 @@ describe("parseEcpCommand", () => {
   });
   it("rejects a GET (that is a query, not a command)", () => {
     expect(parseEcpCommand("GET", "/query/device-info")).toBeNull();
+    // …including a GET on a real command path: a plain link (or a browser
+    // prefetch) must never press a key.
+    expect(parseEcpCommand("GET", "/keypress/Home")).toBeNull();
+    expect(parseEcpCommand("PUT", "/keypress/Home")).toBeNull();
+  });
+
+  it("rejects a path the command pattern does not match at all", () => {
+    // Reaching the verb lookup with no match means indexing null — a crash in
+    // the request handler instead of a clean 404.
+    for (const url of ["/", "", "//", "?x=1"]) {
+      expect(parseEcpCommand("POST", url), url).toBeNull();
+    }
   });
   it("rejects an unknown verb", () => {
     expect(parseEcpCommand("POST", "/frobnicate/x")).toBeNull();

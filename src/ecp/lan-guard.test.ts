@@ -14,4 +14,12 @@ describe("isLanClient", () => {
     expect(isLanClient("172.32.0.1")).toBe(false);
     expect(isLanClient(undefined)).toBe(false);
   });
+
+  it("rejects addresses that merely start with the same digits", () => {
+    // 100.64/10 is carrier-grade NAT — public-side address space, not a LAN.
+    // A prefix match on "10" instead of "10." would hand the whole range access.
+    expect(isLanClient("100.64.0.1")).toBe(false);
+    expect(isLanClient("109.1.2.3")).toBe(false);
+    expect(isLanClient("1.2.3.4")).toBe(false);
+  });
 });

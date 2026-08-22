@@ -71,6 +71,30 @@ describe("EcpHttpServer", () => {
     await request("POST", "/keypress/Home");
     expect(debugLogs.some(m => /ECP keypress Home from 127\.0\.0\.1/.test(m))).toBe(true);
   });
+  it("answers 403 to a non-LAN client and runs no command", () => {
+    // A real socket from a public address cannot be produced in-process, so the
+    // handler is driven directly. This is the guard that keeps a port-forwarded
+    // or VLAN-crossing request from pressing keys in someone's living room.
+    commands.length = 0;
+    debugLogs.length = 0;
+    const res = {
+      statusCode: 0,
+      setHeader: (): void => {},
+      end: (): void => {},
+    } as unknown as http.ServerResponse;
+    const req = {
+      socket: { remoteAddress: "8.8.8.8" },
+      method: "POST",
+      url: "/keypress/Home",
+    } as unknown as http.IncomingMessage;
+
+    (server as unknown as { handle(q: http.IncomingMessage, s: http.ServerResponse): void }).handle(req, res);
+
+    expect(res.statusCode).toBe(403);
+    expect(commands).toEqual([]);
+    expect(debugLogs.some(m => m.includes("non-LAN 8.8.8.8"))).toBe(true);
+  });
+
   it("logs a device-info pairing probe at debug", async () => {
     debugLogs.length = 0;
     await request("GET", "/query/device-info");
