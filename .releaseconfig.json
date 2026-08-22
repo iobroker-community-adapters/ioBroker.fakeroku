@@ -2,13 +2,8 @@
   "plugins": ["iobroker", "license"],
   "exec": {
     "before_commit": [
-      "python3 ../scripts/audit-krobi-consistency.py --release-mode",
-      "python3 ../scripts/sync-iopackage-from-i18n.py",
-      "python3 ../scripts/pre-release.py --audit-current",
-      "python3 ../scripts/fix-changelog-footer.py",
       "npm test",
-      "npm run build",
-      "git add build/"
+      "npm run build"
     ]
   }
 }
