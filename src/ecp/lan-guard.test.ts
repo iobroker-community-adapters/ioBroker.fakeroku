@@ -6,6 +6,13 @@ describe("isLanClient", () => {
       expect(isLanClient(ip)).toBe(true);
     }
   });
+  it("accepts a link-local address (a remote that got no DHCP lease)", () => {
+    // 169.254/16 is what a controller self-assigns when the DHCP server is slow or
+    // gone. It is still on the wire in the same LAN — rejecting it locks the user's
+    // remote out exactly in the situation they are already troubleshooting.
+    expect(isLanClient("169.254.10.5")).toBe(true);
+  });
+
   it("accepts IPv6-mapped private IPv4", () => {
     expect(isLanClient("::ffff:10.47.88.5")).toBe(true);
   });

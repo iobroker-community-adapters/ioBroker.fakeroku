@@ -42,6 +42,15 @@ export class Fakeroku extends utils.Adapter {
   /** Device-manager backend: the emulated Rokus as cards with add/edit/delete. */
   private readonly deviceManagement: FakerokuDeviceManagement;
 
+  // Construction seams for the two network-facing collaborators. Production uses
+  // the real classes; the orchestration tests swap them for fakes so onReady's
+  // wiring (per-device isolation, SSDP degradation, timers) is testable without
+  // binding a port. Behaviour is unchanged — same constructors, same arguments.
+  private makeEcpServer: (options: ConstructorParameters<typeof EcpHttpServer>[0]) => EcpHttpServer = options =>
+    new EcpHttpServer(options);
+  private makeSsdpResponder: (options: ConstructorParameters<typeof RokuSsdpResponder>[0]) => RokuSsdpResponder =
+    options => new RokuSsdpResponder(options);
+
   /**
    * @param options adapter options passed through by js-controller
    */
@@ -101,7 +110,7 @@ export class Fakeroku extends utils.Adapter {
         const advert: RokuAdvert = { uuid: d.uuid || deriveUuid(d.name), port: Number(d.port) || DEFAULT_ECP_PORT };
         try {
           await this.createDeviceStates(deviceId, d.name, keys);
-          const server = new EcpHttpServer({
+          const server = this.makeEcpServer({
             device: advert,
             friendlyName: d.name,
             apps: DEFAULT_APPS,
@@ -138,7 +147,7 @@ export class Fakeroku extends utils.Adapter {
       // a multi-homed host is discoverable on all its LANs; a chosen interface pins
       // both membership and NOTIFY egress.
       const membershipInterfaces = bindIp ? [bindIp] : detectLocalIPv4s();
-      this.ssdp = new RokuSsdpResponder({
+      this.ssdp = this.makeSsdpResponder({
         devices: adverts,
         bindIp,
         advertiseIp,

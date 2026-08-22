@@ -15,9 +15,22 @@ describe("parseEcpCommand", () => {
     expect(parseEcpCommand("POST", "/launch/12")).toEqual({ type: "launch", appId: "12" });
     expect(parseEcpCommand("POST", "/install/13")).toEqual({ type: "install", appId: "13" });
   });
+
+  it("rejects a launch without an app id", () => {
+    // Without the argument check this becomes { type: "launch", appId: undefined },
+    // which the adapter writes to `command` as the bare string "launch:".
+    expect(parseEcpCommand("POST", "/launch")).toBeNull();
+    expect(parseEcpCommand("POST", "/install")).toBeNull();
+  });
   it("parses input/search and keeps the query text", () => {
     expect(parseEcpCommand("POST", "/search?keyword=news")).toEqual({ type: "search", text: "keyword=news" });
     expect(parseEcpCommand("POST", "/input?a=1")).toEqual({ type: "input", text: "a=1" });
+  });
+  it("accepts input/search without a query as empty text", () => {
+    // Roku's own remote sends a bare /search when the field is cleared. Returning
+    // undefined here would put the literal "undefined" into the command state.
+    expect(parseEcpCommand("POST", "/search")).toEqual({ type: "search", text: "" });
+    expect(parseEcpCommand("POST", "/input")).toEqual({ type: "input", text: "" });
   });
   it("rejects a GET (that is a query, not a command)", () => {
     expect(parseEcpCommand("GET", "/query/device-info")).toBeNull();

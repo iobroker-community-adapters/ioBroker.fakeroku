@@ -33,6 +33,17 @@ describe("pickPrimaryIPv4", () => {
 });
 
 describe("listNonInternalIPv4s", () => {
+  it("skips an interface the OS reports without addresses", () => {
+    // os.networkInterfaces() types every entry as possibly undefined and does hand
+    // one out for a down interface — iterating it directly throws at start-up.
+    expect(
+      listNonInternalIPv4s({
+        down0: undefined,
+        en0: [{ address: "192.168.1.5", family: "IPv4", internal: false }],
+      } as never),
+    ).toEqual(["192.168.1.5"]);
+  });
+
   it("returns every non-internal IPv4 across interfaces, in enumeration order", () => {
     expect(
       listNonInternalIPv4s({
@@ -56,8 +67,8 @@ describe("listNonInternalIPv4s", () => {
   });
 
   it("returns an empty list when nothing is routable", () => {
-    expect(
-      listNonInternalIPv4s({ lo: [{ address: "127.0.0.1", family: "IPv4", internal: true }] } as never),
-    ).toEqual([]);
+    expect(listNonInternalIPv4s({ lo: [{ address: "127.0.0.1", family: "IPv4", internal: true }] } as never)).toEqual(
+      [],
+    );
   });
 });

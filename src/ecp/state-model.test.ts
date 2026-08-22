@@ -43,10 +43,24 @@ describe("commandToStateWrite", () => {
     expect(w.command).toBe("Lit_a");
   });
   it("records launch and search in the command string, no key pulse", () => {
-    expect(commandToStateWrite({ type: "launch", appId: "12" })).toMatchObject({ command: "launch:12", pulseKey: null });
+    expect(commandToStateWrite({ type: "launch", appId: "12" })).toMatchObject({
+      command: "launch:12",
+      pulseKey: null,
+    });
     expect(commandToStateWrite({ type: "search", text: "news" })).toMatchObject({
       command: "search:news",
       pulseKey: null,
     });
+  });
+});
+
+describe("commandToStateWrite with a missing argument", () => {
+  it("never puts the word undefined into the command state", () => {
+    // commandToStateWrite is called with whatever the ECP layer produced. A verb
+    // without its argument must degrade to an empty value, not to "undefined" —
+    // that string ends up visible in the user's object tree.
+    expect(commandToStateWrite({ type: "keypress" }).command).toBe("");
+    expect(commandToStateWrite({ type: "launch" }).command).toBe("launch:");
+    expect(commandToStateWrite({ type: "search" }).command).toBe("search:");
   });
 });
