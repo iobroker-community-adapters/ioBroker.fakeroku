@@ -5,7 +5,11 @@ name: Test and Release
 on:
   push:
     branches:
+      # `developing` carries the work, the release branch carries the releases —
+      # both need testing. Without it a change first meets a Windows runner when
+      # the release tag already exists (yamaha v1.1.0 was tagged that way).
       - "master"
+      - "developing"
     tags:
       # normal versions
       - "v[0-9]+.[0-9]+.[0-9]+"
