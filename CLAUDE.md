@@ -21,6 +21,8 @@ Roku-Emulator im LAN: ein ECP/SSDP-Controller (Logitech Harmony, Sofabaton) find
 - **Port ist für die Funktion egal** — die Fernbedienung liest ihn aus der SSDP-Ankündigung. Default 8060 (echter Roku-Port, risikofrei). **Manuelles Feld** — Auto-Vergabe verworfen (krobi 2026-07-30).
 - **Mehrere Rokus pro Instanz** (geteilter Port 1900), `singletonHost`.
 
+- **Zweige:** Arbeit auf `developing`, Release auf `master` — die CI prüft seit 2026-08-23 BEIDE (`push.branches`). Vorher lief sie nur auf dem Release-Zweig, wodurch ein nur unter Windows roter Test erst am Release-Tag auffiel (yamaha v1.1.0 verbrannt). `deploy` hängt am Tag, aus einem Push auf `developing` wird also nie ein Release.
+
 ## Tests
 - vitest, `src/**/*.test.ts` — Unit + Boot-Integrationstest (startet den Adapter real).
 
