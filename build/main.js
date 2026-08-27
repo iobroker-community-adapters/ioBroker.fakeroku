@@ -314,13 +314,17 @@ class Fakeroku extends utils.Adapter {
    * Teardown: drop the timers and sockets synchronously, then report done only
    * once the last write has landed.
    *
-   * `info.connection` is the only status this adapter carries, so losing that
-   * final write leaves the instance showing "connected" while the adapter is
-   * off. A fire-and-forget write followed by an immediate callback IS lost —
-   * measured across the fleet. Waiting is safe: the manifest deliberately
-   * carries no `common.supportedMessages.stopInstance` (with it the host kills
-   * the process outright and never runs this method), so the host grants the
-   * full `common.stopTimeout` — a second — for the write to complete.
+   * `info.connection` is the only status this adapter carries, and nothing else
+   * resets it: the host means to, but writes its reset to the namespace root
+   * instead of the datapoint (js-controller#3472). So if the final write is
+   * lost, the instance shows "connected" while the adapter is off.
+   *
+   * A fire-and-forget write plus an immediate callback is a race, not a
+   * guaranteed loss — measured on 1.1.0, it still arrived, because without
+   * `common.supportedMessages.stopInstance` the process ends in an orderly way
+   * and flushes what is pending. Waiting closes the race for the slow or busy
+   * case, and it is safe for the same reason: no `stopInstance` means the host
+   * grants the full `common.stopTimeout` instead of killing the process.
    *
    * @param callback function to invoke once teardown is complete
    */
