@@ -42,6 +42,7 @@ class EcpHttpServer {
   constructor(config) {
     this.config = config;
   }
+  config;
   server;
   /** Bind the HTTP server to the interface + port. Rejects on bind error. */
   async start() {

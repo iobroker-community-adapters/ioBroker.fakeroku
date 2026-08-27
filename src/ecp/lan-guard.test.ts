@@ -6,6 +6,13 @@ describe("isLanClient", () => {
       expect(isLanClient(ip)).toBe(true);
     }
   });
+  it("accepts a link-local address (a remote that got no DHCP lease)", () => {
+    // 169.254/16 is what a controller self-assigns when the DHCP server is slow or
+    // gone. It is still on the wire in the same LAN — rejecting it locks the user's
+    // remote out exactly in the situation they are already troubleshooting.
+    expect(isLanClient("169.254.10.5")).toBe(true);
+  });
+
   it("accepts IPv6-mapped private IPv4", () => {
     expect(isLanClient("::ffff:10.47.88.5")).toBe(true);
   });
@@ -13,5 +20,13 @@ describe("isLanClient", () => {
     expect(isLanClient("8.8.8.8")).toBe(false);
     expect(isLanClient("172.32.0.1")).toBe(false);
     expect(isLanClient(undefined)).toBe(false);
+  });
+
+  it("rejects addresses that merely start with the same digits", () => {
+    // 100.64/10 is carrier-grade NAT — public-side address space, not a LAN.
+    // A prefix match on "10" instead of "10." would hand the whole range access.
+    expect(isLanClient("100.64.0.1")).toBe(false);
+    expect(isLanClient("109.1.2.3")).toBe(false);
+    expect(isLanClient("1.2.3.4")).toBe(false);
   });
 });

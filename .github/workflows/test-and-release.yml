@@ -15,6 +15,12 @@ on:
       - "v[0-9]+.[0-9]+.[0-9]+"
       # pre-releases
       - "v[0-9]+.[0-9]+.[0-9]+-**"
+    # Reine Doku-Pushes lösen keinen Lauf aus: an einer Textzeile kann kein
+    # Test fallen. Laut GitHub-Doku gilt "Path filters are not evaluated for
+    # pushes of tags" — der Release-Lauf am Tag bleibt also unberührt. Bewusst
+    # NUR unter `push`, nicht unter `pull_request`.
+    paths-ignore:
+      - "**.md"
   pull_request: {}
 
 # Cancel previous PR/branch runs when a new commit is pushed

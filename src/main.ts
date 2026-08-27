@@ -42,6 +42,15 @@ export class Fakeroku extends utils.Adapter {
   /** Device-manager backend: the emulated Rokus as cards with add/edit/delete. */
   private readonly deviceManagement: FakerokuDeviceManagement;
 
+  // Construction seams for the two network-facing collaborators. Production uses
+  // the real classes; the orchestration tests swap them for fakes so onReady's
+  // wiring (per-device isolation, SSDP degradation, timers) is testable without
+  // binding a port. Behaviour is unchanged — same constructors, same arguments.
+  private makeEcpServer: (options: ConstructorParameters<typeof EcpHttpServer>[0]) => EcpHttpServer = options =>
+    new EcpHttpServer(options);
+  private makeSsdpResponder: (options: ConstructorParameters<typeof RokuSsdpResponder>[0]) => RokuSsdpResponder =
+    options => new RokuSsdpResponder(options);
+
   /**
    * @param options adapter options passed through by js-controller
    */
@@ -101,7 +110,7 @@ export class Fakeroku extends utils.Adapter {
         const advert: RokuAdvert = { uuid: d.uuid || deriveUuid(d.name), port: Number(d.port) || DEFAULT_ECP_PORT };
         try {
           await this.createDeviceStates(deviceId, d.name, keys);
-          const server = new EcpHttpServer({
+          const server = this.makeEcpServer({
             device: advert,
             friendlyName: d.name,
             apps: DEFAULT_APPS,
@@ -138,7 +147,7 @@ export class Fakeroku extends utils.Adapter {
       // a multi-homed host is discoverable on all its LANs; a chosen interface pins
       // both membership and NOTIFY egress.
       const membershipInterfaces = bindIp ? [bindIp] : detectLocalIPv4s();
-      this.ssdp = new RokuSsdpResponder({
+      this.ssdp = this.makeSsdpResponder({
         devices: adverts,
         bindIp,
         advertiseIp,
@@ -157,10 +166,23 @@ export class Fakeroku extends utils.Adapter {
         this.ssdp = undefined;
       }
 
-      await this.setState("info.connection", { val: true, ack: true });
-      this.log.info(
-        `Emulating ${adverts.length} Roku device(s), advertising on ${advertiseIp}${this.ssdp ? "" : " (discovery off)"}`,
-      );
+      // "Connected" means EVERY configured Roku is listening, not just some of
+      // them. A device whose port is taken (or whose name collides) is skipped
+      // above with a warning naming it; reporting "connected" anyway would hide
+      // a broken configuration behind the devices that did come up, and the user
+      // would only find out when the remote stops working. Config rows without a
+      // usable name are filtered out before this point and deliberately do not
+      // count — every device in `configured` that fails has said so in the log.
+      const allStarted = adverts.length === configured.length;
+      await this.setState("info.connection", { val: allStarted, ack: true });
+      const where = `advertising on ${advertiseIp}${this.ssdp ? "" : " (discovery off)"}`;
+      if (allStarted) {
+        this.log.info(`Emulating ${adverts.length} Roku device(s), ${where}`);
+      } else {
+        this.log.error(
+          `Only ${adverts.length} of ${configured.length} configured Roku device(s) could be started, ${where} — fix the cause reported above; the instance stays disconnected until every device runs.`,
+        );
+      }
     } catch (e) {
       this.log.error(`onReady failed: ${e instanceof Error ? e.message : String(e)}`);
     }
@@ -320,7 +342,16 @@ export class Fakeroku extends utils.Adapter {
   }
 
   /**
-   * Synchronous teardown — no await, call the callback immediately (SIGKILL otherwise).
+   * Teardown: drop the timers and sockets synchronously, then report done only
+   * once the last write has landed.
+   *
+   * `info.connection` is the only status this adapter carries, so losing that
+   * final write leaves the instance showing "connected" while the adapter is
+   * off. A fire-and-forget write followed by an immediate callback IS lost —
+   * measured across the fleet. Waiting is safe: the manifest deliberately
+   * carries no `common.supportedMessages.stopInstance` (with it the host kills
+   * the process outright and never runs this method), so the host grants the
+   * full `common.stopTimeout` — a second — for the write to complete.
    *
    * @param callback function to invoke once teardown is complete
    */
@@ -342,8 +373,15 @@ export class Fakeroku extends utils.Adapter {
       for (const s of this.ecpServers) {
         s.stop();
       }
-      void this.setState("info.connection", { val: false, ack: true });
-      callback();
+      void this.setState("info.connection", { val: false, ack: true })
+        // A rejected write must not become an unhandled rejection — that is a
+        // crash (exit code 6) instead of an orderly stop. The trace stays at
+        // debug: it explains a stale "connected" afterwards, and nobody can act
+        // on it while the adapter is already going down.
+        .catch((e: unknown) => {
+          this.log.debug(`Final connection write failed: ${e instanceof Error ? e.message : String(e)}`);
+        })
+        .finally(() => callback());
     } catch {
       callback();
     }

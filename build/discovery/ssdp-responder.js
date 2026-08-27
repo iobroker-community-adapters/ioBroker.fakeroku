@@ -42,6 +42,7 @@ class RokuSsdpResponder {
   constructor(config) {
     this.config = config;
   }
+  config;
   socket;
   fatalReported = false;
   /** Bind on 1900, join multicast on the selected interface(s), start answering. Rejects on bind error. */
