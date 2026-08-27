@@ -95,7 +95,7 @@ becomes `true`, or watch `.command` for the last button as text.
 -->
 ### 1.2.0 (2026-08-27)
 - (krobipd) Changed: the instance now reports "not connected" while a configured Roku is missing — a device whose port is taken no longer hides behind the ones that did start.
-- (krobipd) Fixed: stopping the adapter now clears its connection state instead of leaving the instance showing "connected" while nothing is running.
+- (krobipd) Improved: shutdown now waits for its last write to land before reporting done, so the connection state cannot be lost on a slow or busy system.
 - (krobipd) New: optional error reporting via Sentry — only active if you enabled diagnostics in ioBroker, and it transmits no personal data.
 
 ### 1.1.0 (2026-08-10) — stable

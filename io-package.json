@@ -4,17 +4,17 @@
     "version": "1.2.0",
     "news": {
       "1.2.0": {
-        "en": "Honest status: the instance reports connected only while every configured Roku runs, and clears it when stopped. Plus optional error reporting via Sentry.",
-        "de": "Ehrlicher Status: Die Instanz meldet nur dann verbunden, wenn jeder konfigurierte Roku läuft, und setzt ihn beim Stoppen zurück. Dazu optionale Fehlerberichte über Sentry.",
-        "ru": "Честный статус: экземпляр сообщает о подключении, только когда работают все настроенные Roku, и сбрасывает его при остановке. Плюс необязательная отправка ошибок через Sentry.",
-        "pt": "Estado honesto: a instância só indica ligado enquanto todos os Roku configurados estiverem a funcionar e limpa-o ao parar. Além disso, relatórios de erro opcionais via Sentry.",
-        "nl": "Eerlijke status: de instantie meldt alleen verbonden zolang elke geconfigureerde Roku draait en wist dit bij het stoppen. Plus optionele foutrapportage via Sentry.",
-        "fr": "Statut honnête : l'instance n'indique connecté que si chaque Roku configuré fonctionne, et l'efface à l'arrêt. Plus des rapports d'erreurs facultatifs via Sentry.",
-        "it": "Stato onesto: l'istanza segnala connesso solo finché ogni Roku configurato è in funzione e lo azzera all'arresto. Inoltre segnalazione errori opzionale tramite Sentry.",
-        "es": "Estado honesto: la instancia solo indica conectado mientras cada Roku configurado esté funcionando y lo borra al detenerse. Además, informes de errores opcionales mediante Sentry.",
-        "pl": "Uczciwy status: instancja zgłasza połączenie tylko wtedy, gdy działa każdy skonfigurowany Roku, i czyści go przy zatrzymaniu. Dodatkowo opcjonalne raportowanie błędów przez Sentry.",
-        "uk": "Чесний статус: екземпляр повідомляє про з'єднання, лише поки працює кожен налаштований Roku, і скидає його під час зупинки. Крім того, необов'язкові звіти про помилки через Sentry.",
-        "zh-cn": "诚实的状态：仅当每个已配置的 Roku 都在运行时，实例才报告已连接，停止时会清除该状态。此外还提供可选的 Sentry 错误报告。"
+        "en": "Honest status: the instance reports connected only while every configured Roku runs. Shutdown waits for its last write. Plus optional error reporting via Sentry.",
+        "de": "Ehrlicher Status: Die Instanz meldet nur dann verbunden, wenn jeder konfigurierte Roku läuft. Das Beenden wartet auf den letzten Schreibvorgang. Dazu optionale Fehlerberichte über Sentry.",
+        "ru": "Честный статус: экземпляр сообщает о подключении, только когда работают все настроенные Roku. Остановка дожидается последней записи. Плюс необязательная отправка ошибок через Sentry.",
+        "pt": "Estado honesto: a instância só indica ligado enquanto todos os Roku configurados estiverem a funcionar. A paragem aguarda a última escrita. Além disso, relatórios de erro opcionais via Sentry.",
+        "nl": "Eerlijke status: de instantie meldt alleen verbonden zolang elke geconfigureerde Roku draait. Het stoppen wacht op de laatste schrijfactie. Plus optionele foutrapportage via Sentry.",
+        "fr": "Statut honnête : l'instance n'indique connecté que si chaque Roku configuré fonctionne. L'arrêt attend sa dernière écriture. Plus des rapports d'erreurs facultatifs via Sentry.",
+        "it": "Stato onesto: l'istanza segnala connesso solo finché ogni Roku configurato è in funzione. L'arresto attende l'ultima scrittura. Inoltre segnalazione errori opzionale tramite Sentry.",
+        "es": "Estado honesto: la instancia solo indica conectado mientras cada Roku configurado esté funcionando. La parada espera a su última escritura. Además, informes de errores opcionales mediante Sentry.",
+        "pl": "Uczciwy status: instancja zgłasza połączenie tylko wtedy, gdy działa każdy skonfigurowany Roku. Zatrzymanie czeka na ostatni zapis. Dodatkowo opcjonalne raportowanie błędów przez Sentry.",
+        "uk": "Чесний статус: екземпляр повідомляє про з'єднання, лише поки працює кожен налаштований Roku. Зупинка чекає на останній запис. Крім того, необов'язкові звіти про помилки через Sentry.",
+        "zh-cn": "诚实的状态：仅当每个已配置的 Roku 都在运行时，实例才报告已连接。停止时会等待最后一次写入完成。此外还提供可选的 Sentry 错误报告。"
       },
       "1.1.0": {
         "en": "More robust: a busy port on one Roku no longer stops the others, and discovery now reaches every network interface even on hosts with several.",
