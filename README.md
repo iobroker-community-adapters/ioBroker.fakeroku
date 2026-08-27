@@ -93,7 +93,7 @@ becomes `true`, or watch `.command` for the last button as text.
 	Placeholder for the next version (at the beginning of the line):
 	### **WORK IN PROGRESS**
 -->
-### **WORK IN PROGRESS**
+### 1.2.0 (2026-08-27)
 - (krobipd) Changed: the instance now reports "not connected" while a configured Roku is missing — a device whose port is taken no longer hides behind the ones that did start.
 - (krobipd) Fixed: stopping the adapter now clears its connection state instead of leaving the instance showing "connected" while nothing is running.
 - (krobipd) New: optional error reporting via Sentry — only active if you enabled diagnostics in ioBroker, and it transmits no personal data.
@@ -118,11 +118,6 @@ becomes `true`, or watch `.command` for the last button as text.
 ### 0.5.1 (2026-08-05)
 - (mcm1957) Adapter requires Node.js >= 22 now
 - (mcm1957) Dependencies have been updated
-
-### 0.5.0 (2026-07-30)
-- Complete rewrite with the full Roku control surface, including `device-info` with a current Roku version — the part modern remotes check at pairing, beyond what a classic Harmony hub needs
-- New clean data model: a `command` datapoint plus fixed `keys.<Key>` states, all created up front instead of appearing only after the first keypress
-- Discovery binds to the chosen network interface, command handling is restricted to the local network
 
 [Older changelogs can be found there](CHANGELOG_OLD.md)
 

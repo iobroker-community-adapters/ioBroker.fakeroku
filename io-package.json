@@ -1,9 +1,9 @@
 {
   "common": {
     "name": "fakeroku",
-    "version": "1.1.0",
+    "version": "1.2.0",
     "news": {
-      "NEXT": {
+      "1.2.0": {
         "en": "Honest status: the instance reports connected only while every configured Roku runs, and clears it when stopped. Plus optional error reporting via Sentry.",
         "de": "Ehrlicher Status: Die Instanz meldet nur dann verbunden, wenn jeder konfigurierte Roku läuft, und setzt ihn beim Stoppen zurück. Dazu optionale Fehlerberichte über Sentry.",
         "ru": "Честный статус: экземпляр сообщает о подключении, только когда работают все настроенные Roku, и сбрасывает его при остановке. Плюс необязательная отправка ошибок через Sentry.",
