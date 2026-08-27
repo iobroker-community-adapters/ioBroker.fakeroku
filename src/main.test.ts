@@ -206,9 +206,40 @@ describe("Fakeroku onReady — device wiring", () => {
     await ctx.i.onReady();
 
     expect(ctx.i.log.warn).toHaveBeenCalledWith(expect.stringContaining("could not start on port 8060"));
-    // The second device is up, so the adapter is usable and says so.
-    expect(ctx.i.states.get("info.connection")).toEqual({ val: true, ack: true });
+    // The surviving device keeps working and gets announced …
     expect(ctx.ssdps[0].options.devices as unknown[]).toHaveLength(1);
+  });
+
+  it("reports disconnected while any configured device is missing", async () => {
+    const ctx = setup(
+      {
+        devices: [
+          { name: "Wohnzimmer", port: 8060, type: "player" },
+          { name: "Schlafzimmer", port: 8061, type: "player" },
+        ],
+      },
+      { failEcpPort: 8060 },
+    );
+    await ctx.i.onReady();
+
+    // … but "connected" must not paper over the dead one: a taken port is a
+    // configuration the user has to fix, and the only other trace is a log line.
+    expect(ctx.i.states.get("info.connection")).toEqual({ val: false, ack: true });
+    expect(ctx.i.log.error).toHaveBeenCalledWith(expect.stringContaining("Only 1 of 2 configured"));
+  });
+
+  it("reports connected once every configured device is up", async () => {
+    const ctx = setup({
+      devices: [
+        { name: "Wohnzimmer", port: 8060, type: "player" },
+        { name: "Schlafzimmer", port: 8061, type: "player" },
+      ],
+    });
+    await ctx.i.onReady();
+
+    expect(ctx.i.states.get("info.connection")).toEqual({ val: true, ack: true });
+    expect(ctx.i.log.error).not.toHaveBeenCalled();
+    expect(ctx.i.log.info).toHaveBeenCalledWith(expect.stringContaining("Emulating 2 Roku device(s)"));
   });
 
   it("stops with an error when no device could be started", async () => {
@@ -233,6 +264,9 @@ describe("Fakeroku onReady — device wiring", () => {
     // over one object tree, and the second one's keys overwriting the first's.
     expect(ctx.ecp).toHaveLength(1);
     expect(ctx.i.log.warn).toHaveBeenCalledWith(expect.stringContaining("already in use"));
+    // A hand-edited duplicate is a broken configuration like a taken port — one
+    // of the two configured devices never runs, so the instance says so.
+    expect(ctx.i.states.get("info.connection")).toEqual({ val: false, ack: true });
   });
 
   it("keeps a device's persisted identity instead of re-deriving it", async () => {
@@ -257,6 +291,10 @@ describe("Fakeroku onReady — device wiring", () => {
     await ctx.i.onReady();
     expect(ctx.ecp).toHaveLength(1);
     expect(ctx.i.objects.get("Echt")?.type).toBe("device");
+    // The unusable rows are dropped BEFORE the completeness check — they carry no
+    // name to report, so counting them would turn the instance red with nothing
+    // in the log to act on.
+    expect(ctx.i.states.get("info.connection")).toEqual({ val: true, ack: true });
   });
 });
 
@@ -480,7 +518,7 @@ describe("Fakeroku onUnload", () => {
     ctx.i.clearInterval.mockClear();
 
     const callback = vi.fn();
-    ctx.i.onUnload(callback);
+    await new Promise<void>(resolve => ctx.i.onUnload(() => (callback(), resolve())));
 
     expect(callback).toHaveBeenCalledTimes(1);
     expect(ctx.ssdps[0].stop).toHaveBeenCalledTimes(1);
@@ -488,6 +526,52 @@ describe("Fakeroku onUnload", () => {
     expect(ctx.i.clearInterval).toHaveBeenCalledTimes(1); // the NOTIFY repeat
     expect(ctx.i.clearTimeout.mock.calls.length).toBeGreaterThanOrEqual(2); // pulse + watchdog
     expect(ctx.i.states.get("info.connection")).toEqual({ val: false, ack: true });
+  });
+
+  it("reports done only after the last write has landed", async () => {
+    const ctx = setup();
+    await ctx.i.onReady();
+
+    // The write has to settle a turn LATER than the call, or this test would pass
+    // with the callback fired first — a write that resolves synchronously proves
+    // nothing about ordering.
+    const order: string[] = [];
+    const store = ctx.i.states;
+    (ctx.i as unknown as { setState: unknown }).setState = vi.fn(
+      async (id: string, state: { val?: unknown; ack?: boolean }) =>
+        new Promise<void>(resolve =>
+          globalThis.setTimeout(() => {
+            order.push(`write:${id}`);
+            store.set(id, { val: state?.val, ack: state?.ack === true });
+            resolve();
+          }, 0),
+        ),
+    );
+
+    await new Promise<void>(resolve => ctx.i.onUnload(() => (order.push("callback"), resolve())));
+
+    // Fire-and-forget plus an immediate callback loses the write: the process is
+    // gone before it reaches the database, and the instance keeps showing
+    // "connected" while the adapter is off.
+    expect(order).toEqual(["write:info.connection", "callback"]);
+    expect(ctx.i.states.get("info.connection")).toEqual({ val: false, ack: true });
+  });
+
+  it("still reports done when the last write is rejected", async () => {
+    const ctx = setup();
+    await ctx.i.onReady();
+    (ctx.i as unknown as { setState: unknown }).setState = vi.fn(async () => {
+      throw new Error("database gone");
+    });
+
+    // A teardown that never calls back is killed by js-controller — a failing
+    // write must not cost the callback. And the rejection has to be HANDLED:
+    // an unhandled one turns an orderly stop into a crash, so the debug trace is
+    // the proof that something caught it.
+    const callback = vi.fn();
+    await new Promise<void>(resolve => ctx.i.onUnload(() => (callback(), resolve())));
+    expect(callback).toHaveBeenCalledTimes(1);
+    expect(ctx.i.log.debug).toHaveBeenCalledWith(expect.stringContaining("Final connection write failed"));
   });
 
   it("still calls back when a teardown step throws", async () => {
@@ -498,7 +582,7 @@ describe("Fakeroku onUnload", () => {
     });
 
     const callback = vi.fn();
-    // A throwing teardown that skips the callback is a SIGKILL by js-controller.
+    // A throwing teardown that skips the callback is a hard kill by js-controller.
     expect(() => ctx.i.onUnload(callback)).not.toThrow();
     expect(callback).toHaveBeenCalledTimes(1);
   });
@@ -627,7 +711,7 @@ describe("Fakeroku start-up robustness", () => {
     await ctx.i.onReady();
     ctx.i.clearInterval.mockClear();
     const cb = vi.fn();
-    ctx.i.onUnload(cb);
+    await new Promise<void>(resolve => ctx.i.onUnload(() => (cb(), resolve())));
     expect(ctx.i.clearInterval).not.toHaveBeenCalled();
     expect(cb).toHaveBeenCalledTimes(1);
   });

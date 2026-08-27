@@ -59,6 +59,12 @@ class Fakeroku extends utils.Adapter {
   deviceKeys = /* @__PURE__ */ new Map();
   /** Device-manager backend: the emulated Rokus as cards with add/edit/delete. */
   deviceManagement;
+  // Construction seams for the two network-facing collaborators. Production uses
+  // the real classes; the orchestration tests swap them for fakes so onReady's
+  // wiring (per-device isolation, SSDP degradation, timers) is testable without
+  // binding a port. Behaviour is unchanged — same constructors, same arguments.
+  makeEcpServer = (options) => new import_ecp_http_server.EcpHttpServer(options);
+  makeSsdpResponder = (options) => new import_ssdp_responder.RokuSsdpResponder(options);
   /**
    * @param options adapter options passed through by js-controller
    */
@@ -102,7 +108,7 @@ class Fakeroku extends utils.Adapter {
         const advert = { uuid: d.uuid || (0, import_device_identity.deriveUuid)(d.name), port: Number(d.port) || import_constants.DEFAULT_ECP_PORT };
         try {
           await this.createDeviceStates(deviceId, d.name, keys);
-          const server = new import_ecp_http_server.EcpHttpServer({
+          const server = this.makeEcpServer({
             device: advert,
             friendlyName: d.name,
             apps: import_device_info.DEFAULT_APPS,
@@ -128,7 +134,7 @@ class Fakeroku extends utils.Adapter {
         return;
       }
       const membershipInterfaces = bindIp ? [bindIp] : (0, import_detect_ip.detectLocalIPv4s)();
-      this.ssdp = new import_ssdp_responder.RokuSsdpResponder({
+      this.ssdp = this.makeSsdpResponder({
         devices: adverts,
         bindIp,
         advertiseIp,
@@ -149,10 +155,16 @@ class Fakeroku extends utils.Adapter {
         );
         this.ssdp = void 0;
       }
-      await this.setState("info.connection", { val: true, ack: true });
-      this.log.info(
-        `Emulating ${adverts.length} Roku device(s), advertising on ${advertiseIp}${this.ssdp ? "" : " (discovery off)"}`
-      );
+      const allStarted = adverts.length === configured.length;
+      await this.setState("info.connection", { val: allStarted, ack: true });
+      const where = `advertising on ${advertiseIp}${this.ssdp ? "" : " (discovery off)"}`;
+      if (allStarted) {
+        this.log.info(`Emulating ${adverts.length} Roku device(s), ${where}`);
+      } else {
+        this.log.error(
+          `Only ${adverts.length} of ${configured.length} configured Roku device(s) could be started, ${where} \u2014 fix the cause reported above; the instance stays disconnected until every device runs.`
+        );
+      }
     } catch (e) {
       this.log.error(`onReady failed: ${e instanceof Error ? e.message : String(e)}`);
     }
@@ -299,7 +311,16 @@ class Fakeroku extends utils.Adapter {
     });
   }
   /**
-   * Synchronous teardown — no await, call the callback immediately (SIGKILL otherwise).
+   * Teardown: drop the timers and sockets synchronously, then report done only
+   * once the last write has landed.
+   *
+   * `info.connection` is the only status this adapter carries, so losing that
+   * final write leaves the instance showing "connected" while the adapter is
+   * off. A fire-and-forget write followed by an immediate callback IS lost —
+   * measured across the fleet. Waiting is safe: the manifest deliberately
+   * carries no `common.supportedMessages.stopInstance` (with it the host kills
+   * the process outright and never runs this method), so the host grants the
+   * full `common.stopTimeout` — a second — for the write to complete.
    *
    * @param callback function to invoke once teardown is complete
    */
@@ -322,8 +343,9 @@ class Fakeroku extends utils.Adapter {
       for (const s of this.ecpServers) {
         s.stop();
       }
-      void this.setState("info.connection", { val: false, ack: true });
-      callback();
+      void this.setState("info.connection", { val: false, ack: true }).catch((e) => {
+        this.log.debug(`Final connection write failed: ${e instanceof Error ? e.message : String(e)}`);
+      }).finally(() => callback());
     } catch {
       callback();
     }
