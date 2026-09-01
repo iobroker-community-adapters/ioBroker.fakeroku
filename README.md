@@ -92,7 +92,7 @@ becomes `true` — or watch `.command` for the last button as text.
 	Placeholder for the next version (at the beginning of the line):
 	### **WORK IN PROGRESS**
 -->
-### **WORK IN PROGRESS**
+### 1.3.0 (2026-09-01)
 - (krobipd) Fixed: a malformed keyboard keypress from a remote (a bad %-escape in the URL) could crash the adapter.
 - (krobipd) Fixed: remotes on an IPv6-only local network were refused; link-local and unique-local IPv6 addresses now count as LAN.
 - (krobipd) Fixed: the adapter icon in the admin is now the same one shown on GitHub.
@@ -122,10 +122,6 @@ becomes `true` — or watch `.command` for the last button as text.
 - (krobipd) Works out of the box: it detects the network address to advertise on its own, no manual interface picking.
 - (krobipd) Manage multiple emulated Rokus from the admin UI, each as a Player or a TV.
 - (krobipd) Cleaner object tree — one datapoint per remote button with the correct types, plus a last-command datapoint; leftover objects from older versions are removed on start.
-
-### 0.5.1 (2026-08-05)
-- (mcm1957) Adapter requires Node.js >= 22 now
-- (mcm1957) Dependencies have been updated
 
 [Older changelogs can be found there](CHANGELOG_OLD.md)
 

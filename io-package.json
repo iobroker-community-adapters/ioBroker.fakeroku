@@ -1,9 +1,9 @@
 {
   "common": {
     "name": "fakeroku",
-    "version": "1.2.0",
+    "version": "1.3.0",
     "news": {
-      "NEXT": {
+      "1.3.0": {
         "en": "Fixes a crash on a malformed keypress, accepts IPv6 remotes, caps each Roku at 25 commands/s, shows the correct icon, reports Roku OS 15.0, requires admin >= 8.0.11.",
         "de": "Behebt einen Absturz bei fehlerhaftem Tastendruck, akzeptiert IPv6-Fernbedienungen, begrenzt jeden Roku auf 25 Befehle/s, zeigt das richtige Symbol, meldet Roku OS 15.0, benötigt admin >= 8.0.11.",
         "ru": "Исправлен сбой при некорректном нажатии, принимаются IPv6-пульты, лимит 25 команд/с на Roku, правильный значок, сообщается Roku OS 15.0, требуется admin >= 8.0.11.",
@@ -121,7 +121,14 @@
       "uk": "Емулює пристрої Roku, щоб пульти ECP/SSDP (Harmony, Sofabaton) запускали події в ioBroker",
       "zh-cn": "模拟 Roku 设备，使 ECP/SSDP 遥控器（Harmony、Sofabaton）在 ioBroker 中触发事件"
     },
-    "keywords": ["fakeroku", "roku", "harmony", "sofabaton", "emulator", "remote control"],
+    "keywords": [
+      "fakeroku",
+      "roku",
+      "harmony",
+      "sofabaton",
+      "emulator",
+      "remote control"
+    ],
     "licenseInformation": {
       "license": "MIT",
       "type": "free"
@@ -165,7 +172,10 @@
       {
         "condition": {
           "operand": "and",
-          "rules": ["oldVersion<1.0.0", "newVersion>=1.0.0"]
+          "rules": [
+            "oldVersion<1.0.0",
+            "newVersion>=1.0.0"
+          ]
         },
         "title": {
           "en": "Major change: new data types",
@@ -194,7 +204,10 @@
           "zh-cn": "fakeroku 已完全重建。数据点现在使用真实类型而非文本（例如按键为 boolean）。请检查读取它们的脚本和可视化。"
         },
         "level": "warn",
-        "buttons": ["agree", "cancel"]
+        "buttons": [
+          "agree",
+          "cancel"
+        ]
       }
     ],
     "plugins": {
