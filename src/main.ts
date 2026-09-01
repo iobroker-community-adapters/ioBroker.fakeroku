@@ -14,6 +14,7 @@ import { detectLocalIPv4s, detectPrimaryIPv4 } from "./lib/detect-ip";
 import { errText } from "./lib/errors";
 import { planObjectCleanup } from "./lib/object-cleanup";
 import { sanitizeId } from "./lib/pure-helpers";
+import { RateGate } from "./lib/rate-gate";
 
 /** Managed timeout for a stuck SSDP start (a busy port 1900 must not hang onReady). */
 const SSDP_START_TIMEOUT_MS = 5000;
@@ -23,6 +24,10 @@ const SSDP_NOTIFY_INTERVAL_MS = 300_000;
 const KEY_PULSE_MS = 50;
 /** Safety cap for a held key: a keydown with no matching keyup resets after this. */
 const HOLD_MAX_MS = 30_000;
+/** Commands accepted per second and emulated Roku; the excess is dropped (see lib/rate-gate.ts). */
+const MAX_COMMANDS_PER_SECOND = 25;
+/** How often at most the dropped-commands warning repeats per device. */
+const RATE_WARN_INTERVAL_MS = 60_000;
 /** The only shapes a device id ever had: the md5 hex the adapters derive, or a dashed uuid. */
 const UUID_SHAPE = /^[A-Za-z0-9-]{1,64}$/;
 
@@ -42,6 +47,10 @@ export class Fakeroku extends utils.Adapter {
   private readonly holdTimers = new Map<string, ioBroker.Timeout>();
   /** Per device, the key names it exposes — so a keypress only writes keys this device carries. */
   private readonly deviceKeys = new Map<string, ReadonlySet<string>>();
+  /** Per device, its command rate gate — the write-flood protection for the states database. */
+  private readonly commandGates = new Map<string, RateGate>();
+  /** Per device, when the dropped-commands warning was last written. */
+  private readonly rateWarnedAt = new Map<string, number>();
   /** Device-manager backend: the emulated Rokus as cards with add/edit/delete. */
   private readonly deviceManagement: FakerokuDeviceManagement;
 
@@ -281,6 +290,9 @@ export class Fakeroku extends utils.Adapter {
    * @param cmd the parsed ECP command
    */
   private applyCommand(deviceId: string, cmd: CommandEvent): void {
+    if (!this.admitCommand(deviceId)) {
+      return;
+    }
     const write = commandToStateWrite(cmd);
     this.writeState(`${deviceId}.command`, write.command);
     this.writeState(`${deviceId}.commandType`, write.commandType);
@@ -320,6 +332,34 @@ export class Fakeroku extends utils.Adapter {
         }
       }
     }
+  }
+
+  /**
+   * The rate gate in front of every state write: MAX_COMMANDS_PER_SECOND per device,
+   * the excess is dropped and reported once per RATE_WARN_INTERVAL_MS. Every accepted
+   * command costs the states database three writes plus one more when the pulse
+   * ends — a flooding device in the LAN would otherwise slow the whole host.
+   *
+   * @param deviceId the id-safe device path segment
+   * @returns true if the command may be applied
+   */
+  private admitCommand(deviceId: string): boolean {
+    const now = Date.now();
+    let gate = this.commandGates.get(deviceId);
+    if (!gate) {
+      gate = new RateGate(MAX_COMMANDS_PER_SECOND, now);
+      this.commandGates.set(deviceId, gate);
+    }
+    if (gate.allow(now)) {
+      return true;
+    }
+    if (now - (this.rateWarnedAt.get(deviceId) ?? 0) >= RATE_WARN_INTERVAL_MS) {
+      this.rateWarnedAt.set(deviceId, now);
+      this.log.warn(
+        `Emulated Roku "${deviceId}" receives more than ${MAX_COMMANDS_PER_SECOND} commands per second — dropping the excess (a misbehaving controller?)`,
+      );
+    }
+    return false;
   }
 
   /**

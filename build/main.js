@@ -46,10 +46,13 @@ var import_detect_ip = require("./lib/detect-ip");
 var import_errors = require("./lib/errors");
 var import_object_cleanup = require("./lib/object-cleanup");
 var import_pure_helpers = require("./lib/pure-helpers");
+var import_rate_gate = require("./lib/rate-gate");
 const SSDP_START_TIMEOUT_MS = 5e3;
 const SSDP_NOTIFY_INTERVAL_MS = 3e5;
 const KEY_PULSE_MS = 50;
 const HOLD_MAX_MS = 3e4;
+const MAX_COMMANDS_PER_SECOND = 25;
+const RATE_WARN_INTERVAL_MS = 6e4;
 const UUID_SHAPE = /^[A-Za-z0-9-]{1,64}$/;
 class Fakeroku extends utils.Adapter {
   ssdp;
@@ -60,6 +63,10 @@ class Fakeroku extends utils.Adapter {
   holdTimers = /* @__PURE__ */ new Map();
   /** Per device, the key names it exposes — so a keypress only writes keys this device carries. */
   deviceKeys = /* @__PURE__ */ new Map();
+  /** Per device, its command rate gate — the write-flood protection for the states database. */
+  commandGates = /* @__PURE__ */ new Map();
+  /** Per device, when the dropped-commands warning was last written. */
+  rateWarnedAt = /* @__PURE__ */ new Map();
   /** Device-manager backend: the emulated Rokus as cards with add/edit/delete. */
   deviceManagement;
   // Construction seams for the two network-facing collaborators. Production uses
@@ -253,6 +260,9 @@ class Fakeroku extends utils.Adapter {
    * @param cmd the parsed ECP command
    */
   applyCommand(deviceId, cmd) {
+    if (!this.admitCommand(deviceId)) {
+      return;
+    }
     const write = (0, import_state_model.commandToStateWrite)(cmd);
     this.writeState(`${deviceId}.command`, write.command);
     this.writeState(`${deviceId}.commandType`, write.commandType);
@@ -287,6 +297,34 @@ class Fakeroku extends utils.Adapter {
         }
       }
     }
+  }
+  /**
+   * The rate gate in front of every state write: MAX_COMMANDS_PER_SECOND per device,
+   * the excess is dropped and reported once per RATE_WARN_INTERVAL_MS. Every accepted
+   * command costs the states database three writes plus one more when the pulse
+   * ends — a flooding device in the LAN would otherwise slow the whole host.
+   *
+   * @param deviceId the id-safe device path segment
+   * @returns true if the command may be applied
+   */
+  admitCommand(deviceId) {
+    var _a;
+    const now = Date.now();
+    let gate = this.commandGates.get(deviceId);
+    if (!gate) {
+      gate = new import_rate_gate.RateGate(MAX_COMMANDS_PER_SECOND, now);
+      this.commandGates.set(deviceId, gate);
+    }
+    if (gate.allow(now)) {
+      return true;
+    }
+    if (now - ((_a = this.rateWarnedAt.get(deviceId)) != null ? _a : 0) >= RATE_WARN_INTERVAL_MS) {
+      this.rateWarnedAt.set(deviceId, now);
+      this.log.warn(
+        `Emulated Roku "${deviceId}" receives more than ${MAX_COMMANDS_PER_SECOND} commands per second \u2014 dropping the excess (a misbehaving controller?)`
+      );
+    }
+    return false;
   }
   /**
    * Fire-and-forget state write for the command hot path. The states exist (created

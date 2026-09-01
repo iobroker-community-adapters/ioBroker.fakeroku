@@ -25,7 +25,7 @@ classic Harmony hub.
 - Emulates one or more Roku devices on the LAN — the Roku control protocol (ECP) over HTTP plus SSDP discovery on port 1900.
 - Full Roku control surface including `/query/device-info` with a current Roku version, beyond what a classic Harmony hub needs.
 - Clean data model per device: a `command` datapoint plus fixed `keys.<Key>` states, all created up front.
-- Several emulated Rokus from a single instance; discovery bound to the chosen network interface; command handling restricted to the LAN.
+- Several emulated Rokus from a single instance; discovery bound to the chosen network interface; command handling restricted to the LAN and capped at 25 commands per second per emulated Roku, so a misbehaving device cannot flood ioBroker.
 
 ## Sentry / Error reporting
 
@@ -99,6 +99,7 @@ becomes `true` — or watch `.command` for the last button as text.
 - (krobipd) Changed: requires admin >= 8.0.11.
 - (krobipd) Improved: discovery answers only searches from your own network, and the device dialog in the admin keeps working after the device list was edited by hand.
 - (krobipd) Improved: the emulated Roku reports Roku OS 15.0 (was 14.1), and the command-type datapoint lists its possible values so the admin shows them as labels.
+- (krobipd) New: a misbehaving device on your network can no longer flood ioBroker — more than 25 commands per second per emulated Roku are dropped and reported in the log.
 
 ### 1.2.0 (2026-08-27)
 - (krobipd) Changed: the instance now reports "not connected" while a configured Roku is missing — a device whose port is taken no longer hides behind the ones that did start.

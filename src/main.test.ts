@@ -95,6 +95,7 @@ function internalOf(adapter: Fakeroku): {
   deviceKeys: Map<string, ReadonlySet<string>>;
   pulseTimers: Set<unknown>;
   holdTimers: Map<string, unknown>;
+  setState: ReturnType<typeof vi.fn>;
   makeEcpServer: unknown;
   makeSsdpResponder: unknown;
 } {
@@ -483,6 +484,60 @@ describe("Fakeroku applyCommand", () => {
     const release = ctx.i.setTimeout.mock.calls.at(-1)!;
     (release[0] as () => void)();
     expect(ctx.i.states.get("Wohnzimmer.keys.Home")).toEqual({ val: false, ack: true });
+  });
+
+  it("drops a flood: past 25 commands in a second the rest are ignored, with one warning a minute", async () => {
+    const ctx = await ready();
+    const clock = vi.spyOn(Date, "now").mockReturnValue(1_000_000);
+    try {
+      ctx.i.setState.mockClear();
+      const commandWrites = (): number => ctx.i.setState.mock.calls.filter(c => c[0] === "Wohnzimmer.command").length;
+      for (let i = 0; i < 40; i++) {
+        ctx.i.applyCommand("Wohnzimmer", { type: "keypress", key: "Home" });
+      }
+      // Every accepted press is three writes plus one; a device sending a thousand a
+      // second would turn the adapter into a write flood against the whole host.
+      expect(commandWrites()).toBe(25);
+      expect(ctx.i.log.warn).toHaveBeenCalledTimes(1);
+      expect(ctx.i.log.warn).toHaveBeenCalledWith(expect.stringContaining("more than 25 commands per second"));
+
+      // Still flooding 30 s later: the budget has refilled, the warning has not repeated.
+      clock.mockReturnValue(1_030_000);
+      for (let i = 0; i < 40; i++) {
+        ctx.i.applyCommand("Wohnzimmer", { type: "keypress", key: "Home" });
+      }
+      expect(commandWrites()).toBe(50);
+      expect(ctx.i.log.warn).toHaveBeenCalledTimes(1);
+
+      // A minute after the first warning the log may say it again.
+      clock.mockReturnValue(1_061_000);
+      for (let i = 0; i < 40; i++) {
+        ctx.i.applyCommand("Wohnzimmer", { type: "keypress", key: "Home" });
+      }
+      expect(ctx.i.log.warn).toHaveBeenCalledTimes(2);
+    } finally {
+      clock.mockRestore();
+    }
+  });
+
+  it("rates each emulated Roku on its own — one flooding remote does not mute the other device", async () => {
+    const ctx = setup({
+      devices: [
+        { name: "Wohnzimmer", port: 8060, type: "player" },
+        { name: "Kueche", port: 8061, type: "player" },
+      ],
+    });
+    await ctx.i.onReady();
+    const clock = vi.spyOn(Date, "now").mockReturnValue(2_000_000);
+    try {
+      for (let i = 0; i < 40; i++) {
+        ctx.i.applyCommand("Wohnzimmer", { type: "keypress", key: "Home" });
+      }
+      ctx.i.applyCommand("Kueche", { type: "keypress", key: "Home" });
+      expect(ctx.i.states.get("Kueche.command")).toEqual({ val: "Home", ack: true });
+    } finally {
+      clock.mockRestore();
+    }
   });
 
   it("forgets a pulse timer once it has fired — the teardown list must not grow per keypress", async () => {

@@ -4,17 +4,17 @@
     "version": "1.2.0",
     "news": {
       "NEXT": {
-        "en": "Fixes a crash on a malformed keyboard keypress, accepts IPv6 remotes on the local network, shows the correct adapter icon, reports Roku OS 15.0 and requires admin >= 8.0.11.",
-        "de": "Behebt einen Absturz bei fehlerhaftem Tastatur-Tastendruck, akzeptiert IPv6-Fernbedienungen im LAN, zeigt das richtige Adapter-Symbol, meldet Roku OS 15.0 und benötigt admin >= 8.0.11.",
-        "ru": "Исправлен сбой при некорректном нажатии клавиши, принимаются IPv6-пульты в локальной сети, показан правильный значок адаптера, сообщается Roku OS 15.0, требуется admin >= 8.0.11.",
-        "pt": "Corrige uma falha num toque de teclado malformado, aceita comandos IPv6 na rede local, mostra o ícone correto do adaptador, reporta Roku OS 15.0 e requer admin >= 8.0.11.",
-        "nl": "Verhelpt een crash bij een ongeldige toetsenbordtoets, accepteert IPv6-afstandsbedieningen in het LAN, toont het juiste adapterpictogram, meldt Roku OS 15.0 en vereist admin >= 8.0.11.",
-        "fr": "Corrige un plantage sur une touche clavier malformée, accepte les télécommandes IPv6 du réseau local, affiche la bonne icône, annonce Roku OS 15.0 et requiert admin >= 8.0.11.",
-        "it": "Corregge un arresto su un tasto malformato, accetta telecomandi IPv6 nella rete locale, mostra l'icona corretta dell'adattatore, segnala Roku OS 15.0 e richiede admin >= 8.0.11.",
-        "es": "Corrige un fallo con una tecla malformada, acepta mandos IPv6 en la red local, muestra el icono correcto del adaptador, informa Roku OS 15.0 y requiere admin >= 8.0.11.",
-        "pl": "Naprawia awarię przy nieprawidłowym klawiszu, akceptuje piloty IPv6 w sieci lokalnej, pokazuje właściwą ikonę adaptera, zgłasza Roku OS 15.0 i wymaga admin >= 8.0.11.",
-        "uk": "Виправлено збій при некоректному натисканні клавіші, приймаються IPv6-пульти в локальній мережі, показано правильну іконку адаптера, повідомляється Roku OS 15.0, потрібен admin >= 8.0.11.",
-        "zh-cn": "修复格式错误的键盘按键导致的崩溃，接受本地网络中的 IPv6 遥控器，显示正确的适配器图标，报告 Roku OS 15.0，并需要 admin >= 8.0.11。"
+        "en": "Fixes a crash on a malformed keypress, accepts IPv6 remotes, caps each Roku at 25 commands/s, shows the correct icon, reports Roku OS 15.0, requires admin >= 8.0.11.",
+        "de": "Behebt einen Absturz bei fehlerhaftem Tastendruck, akzeptiert IPv6-Fernbedienungen, begrenzt jeden Roku auf 25 Befehle/s, zeigt das richtige Symbol, meldet Roku OS 15.0, benötigt admin >= 8.0.11.",
+        "ru": "Исправлен сбой при некорректном нажатии, принимаются IPv6-пульты, лимит 25 команд/с на Roku, правильный значок, сообщается Roku OS 15.0, требуется admin >= 8.0.11.",
+        "pt": "Corrige uma falha num toque malformado, aceita comandos IPv6, limita cada Roku a 25 comandos/s, mostra o ícone correto, reporta Roku OS 15.0, requer admin >= 8.0.11.",
+        "nl": "Verhelpt een crash bij een ongeldige toets, accepteert IPv6-afstandsbedieningen, begrenst elke Roku op 25 opdrachten/s, toont het juiste pictogram, meldt Roku OS 15.0, vereist admin >= 8.0.11.",
+        "fr": "Corrige un plantage sur une touche malformée, accepte les télécommandes IPv6, limite chaque Roku à 25 commandes/s, affiche la bonne icône, annonce Roku OS 15.0, requiert admin >= 8.0.11.",
+        "it": "Corregge un arresto su un tasto malformato, accetta telecomandi IPv6, limita ogni Roku a 25 comandi/s, mostra l'icona corretta, segnala Roku OS 15.0, richiede admin >= 8.0.11.",
+        "es": "Corrige un fallo con una tecla malformada, acepta mandos IPv6, limita cada Roku a 25 órdenes/s, muestra el icono correcto, informa Roku OS 15.0, requiere admin >= 8.0.11.",
+        "pl": "Naprawia awarię przy nieprawidłowym klawiszu, akceptuje piloty IPv6, ogranicza każdy Roku do 25 poleceń/s, pokazuje właściwą ikonę, zgłasza Roku OS 15.0, wymaga admin >= 8.0.11.",
+        "uk": "Виправлено збій при некоректному натисканні, приймаються IPv6-пульти, ліміт 25 команд/с на Roku, правильна іконка, повідомляється Roku OS 15.0, потрібен admin >= 8.0.11.",
+        "zh-cn": "修复格式错误按键导致的崩溃，接受 IPv6 遥控器，每个 Roku 限制为每秒 25 条命令，显示正确图标，报告 Roku OS 15.0，需要 admin >= 8.0.11。"
       },
       "1.2.0": {
         "en": "Honest status: the instance reports connected only while every configured Roku runs. Shutdown waits for its last write. Plus optional error reporting via Sentry.",
