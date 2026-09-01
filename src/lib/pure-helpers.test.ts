@@ -16,6 +16,10 @@ describe("normalizeKey", () => {
   it("decodes URL-encoded Lit_ characters", () => {
     expect(normalizeKey("Lit_%C3%A4")).toBe("Lit_ä");
   });
+  it("keeps a malformed or truncated escape raw", () => {
+    expect(normalizeKey("Lit_%ZZ")).toBe("Lit_%ZZ");
+    expect(normalizeKey("Lit_%E0%A4")).toBe("Lit_%E0%A4");
+  });
   it("leaves a plain key unchanged", () => {
     expect(normalizeKey("Home")).toBe("Home");
   });

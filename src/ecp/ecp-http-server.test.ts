@@ -69,6 +69,12 @@ describe("EcpHttpServer", () => {
     expect(r.status).toBe(200);
     expect(commands).toEqual([{ type: "keypress", key: "Home" }]);
   });
+  it("answers a malformed keyboard keypress instead of crashing on it", async () => {
+    commands.length = 0;
+    const r = await request("POST", "/keypress/Lit_%ZZ");
+    expect(r.status).toBe(200);
+    expect(commands).toEqual([{ type: "keypress", key: "Lit_%ZZ" }]);
+  });
   it("404s an unknown POST verb", async () => {
     const r = await request("POST", "/frobnicate/x");
     expect(r.status).toBe(404);
@@ -150,6 +156,16 @@ describe("EcpHttpServer", () => {
     expect(debugLogs.some(m => m.includes("ECP search keyword=news from"))).toBe(true);
   });
 
+  it("keeps a decoded control character out of the log line", async () => {
+    debugLogs.length = 0;
+    await request("POST", "/keypress/Lit_%0Ainjected");
+    // A newline in the key would end the log entry early and start a fake second one.
+    const line = debugLogs.find(m => m.startsWith("ECP keypress"));
+    expect(line).toBeDefined();
+    expect(line).not.toContain("\n");
+    expect(line).toContain("Lit_?injected");
+  });
+
   it("logs a command that carries no argument without a trailing space", async () => {
     debugLogs.length = 0;
     await request("POST", "/search");
@@ -170,6 +186,27 @@ describe("EcpHttpServer", () => {
     // threw on a busy port — a throw there costs the callback and means SIGKILL.
     expect(() => idle.stop()).not.toThrow();
     expect(() => idle.stop()).not.toThrow();
+  });
+
+  it("stop is safe after a start that failed on a busy port", async () => {
+    const blocker = http.createServer();
+    await new Promise<void>(resolve => blocker.listen(PORT + 1, "127.0.0.1", resolve));
+    const busy = new EcpHttpServer({
+      device: { uuid: "busy", port: PORT + 1 },
+      friendlyName: "busy",
+      apps: [],
+      deviceType: "player",
+      bindIp: "127.0.0.1",
+      logger: noopLog,
+      onCommand: () => {},
+    });
+    try {
+      await expect(busy.start()).rejects.toThrow(/EADDRINUSE/);
+      // main.ts closes the failed server; a throw here would abort the device loop.
+      expect(() => busy.stop()).not.toThrow();
+    } finally {
+      blocker.close();
+    }
   });
 
   it("serves the advertised app list", async () => {

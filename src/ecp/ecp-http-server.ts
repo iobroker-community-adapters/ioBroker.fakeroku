@@ -1,9 +1,10 @@
 import * as http from "node:http";
 import type { RokuAdvert } from "../discovery/ssdp-messages";
+import { errText } from "../lib/errors";
+import { isLanClient } from "../lib/lan-guard";
 import type { AdapterLogger } from "../lib/logger";
 import { type CommandEvent, parseEcpCommand } from "./ecp-command";
 import { type AppEntry, buildAppsXml, buildDescXml, buildDeviceInfoXml } from "./device-info";
-import { isLanClient } from "./lan-guard";
 import type { DeviceType } from "./state-model";
 
 /** Configuration for one emulated Roku's ECP HTTP server. */
@@ -97,12 +98,13 @@ export class EcpHttpServer {
       }
       // The received command — without this a keypress leaves no trace at all, so a
       // "I press a button and nothing happens" report has nothing to go on.
-      const detail = cmd.key ?? cmd.appId ?? cmd.text ?? "";
+      // Control characters (a decoded `Lit_%0A`) are replaced so one request stays one log line.
+      const detail = (cmd.key ?? cmd.appId ?? cmd.text ?? "").replace(/\p{Cc}/gu, "?");
       this.config.logger.debug(`ECP ${cmd.type}${detail ? ` ${detail}` : ""} from ${peer}`);
       try {
         this.config.onCommand(cmd);
       } catch (e) {
-        this.config.logger.warn(`onCommand failed: ${e instanceof Error ? e.message : String(e)}`);
+        this.config.logger.warn(`onCommand failed: ${errText(e)}`);
       }
       res.statusCode = 200;
       res.end();

@@ -3,7 +3,7 @@
   "networkInterface": "Netwerkinterface (binden + aankondigen)",
   "networkInterfaceTooltip": "De netwerkkaart waaraan de geëmuleerde Roku's zich binden en aankondigen. Laat het op 'alle interfaces' staan — het routeerbare IP wordt automatisch gedetecteerd, dus het werkt meteen. Kies alleen een specifiek adres op een host met meerdere netwerkkaarten.",
   "headerDevices": "Geëmuleerde Roku-apparaten",
-  "devicesHelp": "Elke kaart is één geëmuleerde Roku. Voeg er een toe en voeg daarna in je Harmony- of Sofabaton-app een **Roku**-apparaat toe dat naar deze ioBroker-host wijst — elke toetsdruk komt in de objecten van het apparaat.",
+  "devicesHelp": "Elke kaart is één geëmuleerde Roku. Voeg er een toe en voeg daarna in je Harmony- of Sofabaton-app een <b>Roku</b>-apparaat toe dat naar deze ioBroker-host wijst — elke toetsdruk komt in de objecten van het apparaat.",
   "deviceName": "Naam",
   "devicePort": "ECP-poort",
   "portLabel": "Poort",

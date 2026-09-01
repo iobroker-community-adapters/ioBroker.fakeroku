@@ -32,9 +32,10 @@ __export(ecp_http_server_exports, {
 });
 module.exports = __toCommonJS(ecp_http_server_exports);
 var http = __toESM(require("node:http"));
+var import_errors = require("../lib/errors");
+var import_lan_guard = require("../lib/lan-guard");
 var import_ecp_command = require("./ecp-command");
 var import_device_info = require("./device-info");
-var import_lan_guard = require("./lan-guard");
 class EcpHttpServer {
   /**
    * @param config server configuration
@@ -96,12 +97,12 @@ class EcpHttpServer {
         res.end();
         return;
       }
-      const detail = (_f = (_e = (_d = cmd.key) != null ? _d : cmd.appId) != null ? _e : cmd.text) != null ? _f : "";
+      const detail = ((_f = (_e = (_d = cmd.key) != null ? _d : cmd.appId) != null ? _e : cmd.text) != null ? _f : "").replace(new RegExp("\\p{Cc}", "gu"), "?");
       this.config.logger.debug(`ECP ${cmd.type}${detail ? ` ${detail}` : ""} from ${peer}`);
       try {
         this.config.onCommand(cmd);
       } catch (e) {
-        this.config.logger.warn(`onCommand failed: ${e instanceof Error ? e.message : String(e)}`);
+        this.config.logger.warn(`onCommand failed: ${(0, import_errors.errText)(e)}`);
       }
       res.statusCode = 200;
       res.end();

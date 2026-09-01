@@ -3,7 +3,7 @@
   "networkInterface": "Interfejs sieciowy (bind + rozgłaszanie)",
   "networkInterfaceTooltip": "Karta sieciowa, do której podłączają się i rozgłaszają emulowane Roku. Zostaw na 'wszystkich interfejsach' — routowalny adres IP jest wykrywany automatycznie, więc działa bez konfiguracji. Wybierz konkretny adres tylko na hoście z kilkoma kartami sieciowymi.",
   "headerDevices": "Emulowane urządzenia Roku",
-  "devicesHelp": "Każda karta to jeden emulowany Roku. Dodaj urządzenie, a następnie w aplikacji Harmony lub Sofabaton dodaj urządzenie **Roku** wskazujące na tego hosta ioBroker — każde naciśnięcie trafia do obiektów urządzenia.",
+  "devicesHelp": "Każda karta to jeden emulowany Roku. Dodaj urządzenie, a następnie w aplikacji Harmony lub Sofabaton dodaj urządzenie <b>Roku</b> wskazujące na tego hosta ioBroker — każde naciśnięcie trafia do obiektów urządzenia.",
   "deviceName": "Nazwa",
   "devicePort": "Port ECP",
   "portLabel": "Port",

@@ -3,6 +3,19 @@
     "name": "fakeroku",
     "version": "1.2.0",
     "news": {
+      "NEXT": {
+        "en": "Fixes a crash on a malformed keyboard keypress, accepts IPv6 remotes on the local network, shows the correct adapter icon in the admin, and requires admin >= 8.0.11.",
+        "de": "Behebt einen Absturz bei einem fehlerhaften Tastatur-Tastendruck, akzeptiert IPv6-Fernbedienungen im lokalen Netz, zeigt im Admin das richtige Adapter-Symbol und benötigt admin >= 8.0.11.",
+        "ru": "Исправлен сбой при некорректном нажатии клавиши клавиатуры, принимаются IPv6-пульты в локальной сети, в админке отображается правильный значок адаптера, требуется admin >= 8.0.11.",
+        "pt": "Corrige uma falha num toque de teclado malformado, aceita comandos IPv6 na rede local, mostra o ícone correto do adaptador no admin e requer admin >= 8.0.11.",
+        "nl": "Verhelpt een crash bij een ongeldige toetsenbordtoets, accepteert IPv6-afstandsbedieningen in het lokale netwerk, toont het juiste adapterpictogram in de admin en vereist admin >= 8.0.11.",
+        "fr": "Corrige un plantage sur une touche clavier malformée, accepte les télécommandes IPv6 du réseau local, affiche la bonne icône d'adaptateur dans l'admin et requiert admin >= 8.0.11.",
+        "it": "Corregge un arresto su un tasto della tastiera malformato, accetta telecomandi IPv6 nella rete locale, mostra l'icona corretta dell'adattatore nell'admin e richiede admin >= 8.0.11.",
+        "es": "Corrige un fallo con una tecla de teclado malformada, acepta mandos IPv6 en la red local, muestra el icono correcto del adaptador en el admin y requiere admin >= 8.0.11.",
+        "pl": "Naprawia awarię przy nieprawidłowym naciśnięciu klawisza, akceptuje piloty IPv6 w sieci lokalnej, pokazuje właściwą ikonę adaptera w panelu admin i wymaga admin >= 8.0.11.",
+        "uk": "Виправлено збій при некоректному натисканні клавіші, приймаються IPv6-пульти в локальній мережі, в адмінці показується правильна іконка адаптера, потрібен admin >= 8.0.11.",
+        "zh-cn": "修复格式错误的键盘按键导致的崩溃，接受本地网络中的 IPv6 遥控器，在管理界面显示正确的适配器图标，并需要 admin >= 8.0.11。"
+      },
       "1.2.0": {
         "en": "Honest status: the instance reports connected only while every configured Roku runs. Shutdown waits for its last write. Plus optional error reporting via Sentry.",
         "de": "Ehrlicher Status: Die Instanz meldet nur dann verbunden, wenn jeder konfigurierte Roku läuft. Das Beenden wartet auf den letzten Schreibvorgang. Dazu optionale Fehlerberichte über Sentry.",
@@ -80,19 +93,6 @@
         "pl": "Adapter wymaga node.js > = 20 teraz.\nAdapter wymaga admin > = 7.7.22\nAdapter wymaga sterownika js- > = 6.0.11\nZaktualizowano zależności",
         "uk": "Адаптер вимагає node.js >= 20 тепер.\nАдаптер вимагає адмін >= 7.7.22 тепер\nАдаптер вимагає js-controller >=6.0.11 тепер\nЗалежність було оновлено",
         "zh-cn": "适配器需要节点.js >= 20 现在.\n适任者需要管理员 \\ 7.7.22 现在\n适配器需要js控制器 现在6.0.11\n依赖关系已更新"
-      },
-      "0.3.0": {
-        "en": "Adapter requires node.js >= 18 and js-controller >= 5 now\nDependencies have been updated",
-        "de": "Adapter benötigt node.js >= 18 und js-controller >= 5 jetzt\nAbhängigkeiten wurden aktualisiert",
-        "ru": "Адаптер требует node.js >= 18 и js-контроллер >= 5 сейчас\nЗависимость обновлена",
-        "pt": "Adapter requer node.js >= 18 e js-controller >= 5 agora\nAs dependências foram atualizadas",
-        "nl": "Voor adaptor zijn node.js < 18 en js-controller > Nu 5\nAfhankelijkheden zijn bijgewerkt",
-        "fr": "L'adaptateur nécessite node.js >= 18 et js-controller >= 5 maintenant\nLes dépendances ont été actualisées",
-        "it": "Adattatore richiede node.js >= 18 e js-controller >= 5 ora\nLe dipendenze sono state aggiornate",
-        "es": "Adaptador requiere node.js √≥= 18 y js-controller 5 ahora\nSe han actualizado las dependencias",
-        "pl": "Adapter wymaga node.js > = 18 i kontroler js- > = 5 teraz\nZaktualizowano zależności",
-        "uk": "Адаптер вимагає node.js >= 18 і js-controller >= 5 тепер\nЗалежність було оновлено",
-        "zh-cn": "适配器需要节点.js QQ18和js控制器 QQ 现在5号\n依赖关系已更新"
       }
     },
     "titleLang": {
@@ -121,18 +121,15 @@
       "uk": "Емулює пристрої Roku, щоб пульти ECP/SSDP (Harmony, Sofabaton) запускали події в ioBroker",
       "zh-cn": "模拟 Roku 设备，使 ECP/SSDP 遥控器（Harmony、Sofabaton）在 ioBroker 中触发事件"
     },
-    "keywords": [
-      "fakeroku",
-      "Harmony Hub"
-    ],
+    "keywords": ["fakeroku", "roku", "harmony", "sofabaton", "emulator", "remote control"],
     "licenseInformation": {
       "license": "MIT",
       "type": "free"
     },
     "platform": "Javascript/Node.js",
     "mode": "daemon",
-    "icon": "fakeroku.png",
-    "extIcon": "https://raw.githubusercontent.com/iobroker-community-adapters/ioBroker.fakeroku/master/admin/fakeroku.png",
+    "icon": "fakeroku.svg",
+    "extIcon": "https://raw.githubusercontent.com/iobroker-community-adapters/ioBroker.fakeroku/master/admin/fakeroku.svg",
     "readme": "https://github.com/iobroker-community-adapters/ioBroker.fakeroku/blob/master/README.md",
     "loglevel": "info",
     "tier": 2,
@@ -155,7 +152,7 @@
     ],
     "globalDependencies": [
       {
-        "admin": ">=7.8.23"
+        "admin": ">=8.0.11"
       }
     ],
     "adminUI": {
@@ -168,10 +165,7 @@
       {
         "condition": {
           "operand": "and",
-          "rules": [
-            "oldVersion<1.0.0",
-            "newVersion>=1.0.0"
-          ]
+          "rules": ["oldVersion<1.0.0", "newVersion>=1.0.0"]
         },
         "title": {
           "en": "Major change: new data types",
@@ -200,10 +194,7 @@
           "zh-cn": "fakeroku 已完全重建。数据点现在使用真实类型而非文本（例如按键为 boolean）。请检查读取它们的脚本和可视化。"
         },
         "level": "warn",
-        "buttons": [
-          "agree",
-          "cancel"
-        ]
+        "buttons": ["agree", "cancel"]
       }
     ],
     "plugins": {

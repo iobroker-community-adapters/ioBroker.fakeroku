@@ -26,8 +26,7 @@ __export(detect_ip_exports, {
 module.exports = __toCommonJS(detect_ip_exports);
 var import_node_os = require("node:os");
 function isRoutableIPv4(addr) {
-  const isV4 = addr.family === "IPv4" || addr.family === 4;
-  return isV4 && !addr.internal;
+  return addr.family === "IPv4" && !addr.internal;
 }
 function listNonInternalIPv4s(interfaces) {
   const out = [];

@@ -14,14 +14,12 @@ import type { DeviceType } from "./ecp/state-model";
 /** Object-id segments the adapter reserves for its own tree — a device may not take them. */
 const RESERVED_IDS = new Set(["info"]);
 
-/** One emulated Roku as stored in the adapter's native.devices. */
-interface RokuDeviceConfig {
-  name: string;
-  port: number;
-  type: DeviceType;
-  /** Stable SSDP identity — carried through edits so the controller pairing survives. */
-  uuid?: string;
-}
+/**
+ * One emulated Roku as stored in the adapter's native.devices — the manifest's own
+ * element type, so the manager and the runtime (main.ts) read the same shape.
+ * `uuid` is the stable SSDP identity, carried through edits so the pairing survives.
+ */
+type RokuDeviceConfig = ioBroker.AdapterConfig["devices"][number];
 
 /** Manager directive: reload the whole view. */
 type InstanceResult = { refresh: boolean };
@@ -168,12 +166,23 @@ export class FakerokuDeviceManagement extends DeviceManagement {
   /**
    * Read the device list from the live config object.
    *
-   * @returns the configured devices, or an empty list
+   * @returns the configured devices (normalised), or an empty list
    */
   private async readDevices(): Promise<RokuDeviceConfig[]> {
     const obj = await this.adapter.getForeignObjectAsync(this.objId);
     const devices = (obj?.native as { devices?: unknown } | undefined)?.devices;
-    return Array.isArray(devices) ? (devices as RokuDeviceConfig[]) : [];
+    if (!Array.isArray(devices)) {
+      return [];
+    }
+    // native.devices is user-editable (expert mode, CLI). Normalise every row the
+    // same way the dialog does, so a hand-edited entry (numeric name, missing port)
+    // shows up as a card the user can fix instead of throwing inside add/edit.
+    return devices
+      .filter((d): d is Record<string, unknown> => typeof d === "object" && d !== null)
+      .map(d => {
+        const clean = cleanDevice(d);
+        return typeof d.uuid === "string" && d.uuid ? { ...clean, uuid: d.uuid } : clean;
+      });
   }
 
   /**

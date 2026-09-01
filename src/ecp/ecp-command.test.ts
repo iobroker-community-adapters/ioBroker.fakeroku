@@ -7,6 +7,11 @@ describe("parseEcpCommand", () => {
   it("normalizes a Lit_ key (URL-decode + every dot)", () => {
     expect(parseEcpCommand("POST", "/keypress/Lit_%C3%A4")).toEqual({ type: "keypress", key: "Lit_ä" });
   });
+  it("keeps a malformed percent-escape raw instead of throwing", () => {
+    // decodeURIComponent throws on "%ZZ"; inside the request handler that is an
+    // uncaught exception — the adapter dies on one bad request from the LAN.
+    expect(parseEcpCommand("POST", "/keypress/Lit_%ZZ")).toEqual({ type: "keypress", key: "Lit_%ZZ" });
+  });
   it("parses keydown and keyup (hold / release)", () => {
     expect(parseEcpCommand("POST", "/keydown/Select")).toEqual({ type: "keydown", key: "Select" });
     expect(parseEcpCommand("POST", "/keyup/Select")).toEqual({ type: "keyup", key: "Select" });

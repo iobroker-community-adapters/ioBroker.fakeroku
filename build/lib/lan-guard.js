@@ -16,29 +16,39 @@ var __copyProps = (to, from, except, desc) => {
   return to;
 };
 var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
-var pure_helpers_exports = {};
-__export(pure_helpers_exports, {
-  normalizeKey: () => normalizeKey,
-  sanitizeId: () => sanitizeId
+var lan_guard_exports = {};
+__export(lan_guard_exports, {
+  isLanClient: () => isLanClient
 });
-module.exports = __toCommonJS(pure_helpers_exports);
-function sanitizeId(raw) {
-  return raw.replace(/[^A-Za-z0-9\-_]/g, "_");
-}
-function normalizeKey(raw) {
-  const decoded = raw.startsWith("Lit_") ? `Lit_${decodePercentEscapes(raw.slice(4))}` : raw;
-  return decoded.replace(/\./g, "_");
-}
-function decodePercentEscapes(s) {
-  try {
-    return decodeURIComponent(s);
-  } catch {
-    return s;
+module.exports = __toCommonJS(lan_guard_exports);
+function isLanClient(remoteAddress) {
+  if (!remoteAddress) {
+    return false;
   }
+  const ip = remoteAddress.replace(/^::ffff:/, "");
+  if (ip === "127.0.0.1" || ip === "::1") {
+    return true;
+  }
+  if (/^10\./.test(ip)) {
+    return true;
+  }
+  if (/^192\.168\./.test(ip)) {
+    return true;
+  }
+  if (/^172\.(1[6-9]|2\d|3[01])\./.test(ip)) {
+    return true;
+  }
+  if (/^169\.254\./.test(ip)) {
+    return true;
+  }
+  const v6 = ip.toLowerCase();
+  if (/^fe[89ab][0-9a-f]:/.test(v6) || /^f[cd][0-9a-f]{2}:/.test(v6)) {
+    return true;
+  }
+  return false;
 }
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
-  normalizeKey,
-  sanitizeId
+  isLanClient
 });
-//# sourceMappingURL=pure-helpers.js.map
+//# sourceMappingURL=lan-guard.js.map

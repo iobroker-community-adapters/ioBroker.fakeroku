@@ -22,6 +22,17 @@ describe("isLanClient", () => {
     expect(isLanClient(undefined)).toBe(false);
   });
 
+  it("accepts IPv6 link-local and unique-local clients (an IPv6-only LAN segment)", () => {
+    for (const ip of ["fe80::1", "fe80::a1b2:c3d4%en0", "FE80::1", "fd12:3456:789a::1", "fc00::1"]) {
+      expect(isLanClient(ip), ip).toBe(true);
+    }
+  });
+  it("rejects global IPv6 and the ranges next to the local ones", () => {
+    for (const ip of ["2001:db8::1", "fe00::1", "fec0::1", "ff02::1"]) {
+      expect(isLanClient(ip), ip).toBe(false);
+    }
+  });
+
   it("rejects addresses that merely start with the same digits", () => {
     // 100.64/10 is carrier-grade NAT — public-side address space, not a LAN.
     // A prefix match on "10" instead of "10." would hand the whole range access.

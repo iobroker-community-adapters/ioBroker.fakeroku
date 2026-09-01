@@ -3,7 +3,7 @@
   "networkInterface": "Netzwerkschnittstelle (Binden + Ankündigen)",
   "networkInterfaceTooltip": "Die Netzwerkkarte, an die sich die emulierten Rokus binden und über die sie sich ankündigen. Auf 'alle Schnittstellen' lassen — die passende IP wird automatisch erkannt, es läuft also ohne Einstellung. Nur bei mehreren Netzwerkkarten eine feste Adresse wählen.",
   "headerDevices": "Emulierte Roku-Geräte",
-  "devicesHelp": "Jede Karte ist ein emulierter Roku. Lege einen an, dann füge in deiner Harmony- oder Sofabaton-App ein **Roku**-Gerät hinzu, das auf diesen ioBroker-Host zeigt — jeder Tastendruck landet in den Objekten des Geräts.",
+  "devicesHelp": "Jede Karte ist ein emulierter Roku. Lege einen an, dann füge in deiner Harmony- oder Sofabaton-App ein <b>Roku</b>-Gerät hinzu, das auf diesen ioBroker-Host zeigt — jeder Tastendruck landet in den Objekten des Geräts.",
   "deviceName": "Name",
   "devicePort": "ECP-Port",
   "portLabel": "Port",

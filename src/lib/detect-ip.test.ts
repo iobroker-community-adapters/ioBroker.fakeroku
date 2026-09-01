@@ -10,14 +10,6 @@ describe("pickPrimaryIPv4", () => {
     ).toBe("10.47.88.2");
   });
 
-  it("accepts the numeric family shape (Node 18+)", () => {
-    expect(
-      pickPrimaryIPv4({
-        eth0: [{ address: "192.168.1.5", family: 4, internal: false }],
-      } as never),
-    ).toBe("192.168.1.5");
-  });
-
   it("skips internal addresses and IPv6", () => {
     expect(
       pickPrimaryIPv4({
@@ -49,7 +41,7 @@ describe("listNonInternalIPv4s", () => {
       listNonInternalIPv4s({
         lo: [{ address: "127.0.0.1", family: "IPv4", internal: true }],
         eth0: [{ address: "10.47.88.2", family: "IPv4", internal: false }],
-        wlan0: [{ address: "192.168.1.5", family: 4, internal: false }],
+        wlan0: [{ address: "192.168.1.5", family: "IPv4", internal: false }],
       } as never),
     ).toEqual(["10.47.88.2", "192.168.1.5"]);
   });

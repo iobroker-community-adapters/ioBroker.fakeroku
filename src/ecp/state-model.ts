@@ -1,5 +1,13 @@
 import type { CommandEvent } from "./ecp-command";
 
+/**
+ * Longest `command` value written. The text comes straight from the request URL,
+ * which a LAN client controls up to Node's header limit (16 KiB) — bounding it
+ * keeps a flood of oversized values out of the states database. Real commands
+ * (a key name, `launch:<id>`, a search keyword) stay far below this.
+ */
+export const MAX_COMMAND_LENGTH = 500;
+
 /** The emulated Roku device type — decides which keys the device exposes. */
 export type DeviceType = "player" | "tv";
 
@@ -103,7 +111,7 @@ function describeCommand(cmd: CommandEvent): string {
  */
 export function commandToStateWrite(cmd: CommandEvent): StateWrite {
   const write: StateWrite = {
-    command: describeCommand(cmd),
+    command: describeCommand(cmd).slice(0, MAX_COMMAND_LENGTH),
     commandType: cmd.type,
     pulseKey: null,
     holdKey: null,

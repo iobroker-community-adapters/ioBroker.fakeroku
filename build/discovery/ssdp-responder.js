@@ -32,6 +32,8 @@ __export(ssdp_responder_exports, {
 });
 module.exports = __toCommonJS(ssdp_responder_exports);
 var dgram = __toESM(require("node:dgram"));
+var import_errors = require("../lib/errors");
+var import_lan_guard = require("../lib/lan-guard");
 var import_ssdp_messages = require("./ssdp-messages");
 const SSDP_PORT = 1900;
 const MULTICAST_ADDR = "239.255.255.250";
@@ -60,7 +62,7 @@ class RokuSsdpResponder {
             socket.setMulticastInterface(this.config.bindIp);
           } catch (e) {
             this.config.logger.warn(
-              `SSDP: could not pin multicast egress to ${this.config.bindIp}: ${errMsg(e)} \u2014 NOTIFY may use the default interface`
+              `SSDP: could not pin multicast egress to ${this.config.bindIp}: ${(0, import_errors.errText)(e)} \u2014 NOTIFY may use the default interface`
             );
           }
         }
@@ -102,7 +104,7 @@ class RokuSsdpResponder {
       socket.addMembership(MULTICAST_ADDR, iface);
     } catch (e) {
       this.config.logger.warn(
-        `SSDP multicast join failed on ${iface != null ? iface : "default interface"}: ${errMsg(e)} \u2014 discovery may be incomplete`
+        `SSDP multicast join failed on ${iface != null ? iface : "default interface"}: ${(0, import_errors.errText)(e)} \u2014 discovery may be incomplete`
       );
     }
   }
@@ -124,6 +126,10 @@ class RokuSsdpResponder {
   onMessage(text, address, port) {
     var _a;
     if (!(0, import_ssdp_messages.matchesRokuSearch)(text)) {
+      return;
+    }
+    if (!(0, import_lan_guard.isLanClient)(address)) {
+      this.config.logger.debug(`SSDP search from non-LAN ${address} ignored`);
       return;
     }
     for (const device of this.config.devices) {
@@ -159,9 +165,6 @@ class RokuSsdpResponder {
       this.socket = void 0;
     }
   }
-}
-function errMsg(e) {
-  return e instanceof Error ? e.message : String(e);
 }
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {

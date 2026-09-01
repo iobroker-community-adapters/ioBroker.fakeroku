@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": ["../../src/lib/errors.ts"],
+  "sourcesContent": ["/**\n * Message of an unknown thrown value: `Error.message`, or the string form of a\n * non-Error (node bindings can reject with a bare string). One helper for every\n * log line that reports a caught value, so the idiom is not repeated per call site.\n *\n * @param e the caught value\n * @returns its message or a string form\n */\nexport function errText(e: unknown): string {\n  return e instanceof Error ? e.message : String(e);\n}\n"],
+  "mappings": ";;;;;;;;;;;;;;;;;;AAAA;AAAA;AAAA;AAAA;AAAA;AAQO,SAAS,QAAQ,GAAoB;AAC1C,SAAO,aAAa,QAAQ,EAAE,UAAU,OAAO,CAAC;AAClD;",
+  "names": []
+}

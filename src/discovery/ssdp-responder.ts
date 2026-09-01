@@ -1,4 +1,6 @@
 import * as dgram from "node:dgram";
+import { errText } from "../lib/errors";
+import { isLanClient } from "../lib/lan-guard";
 import type { AdapterLogger } from "../lib/logger";
 import { buildAliveNotify, buildSearchResponse, matchesRokuSearch, type RokuAdvert } from "./ssdp-messages";
 
@@ -80,7 +82,7 @@ export class RokuSsdpResponder {
             socket.setMulticastInterface(this.config.bindIp);
           } catch (e) {
             this.config.logger.warn(
-              `SSDP: could not pin multicast egress to ${this.config.bindIp}: ${errMsg(e)} — NOTIFY may use the default interface`,
+              `SSDP: could not pin multicast egress to ${this.config.bindIp}: ${errText(e)} — NOTIFY may use the default interface`,
             );
           }
         }
@@ -129,7 +131,7 @@ export class RokuSsdpResponder {
       // ECP port by the advertised IP, and NOTIFY may still leave via the default
       // route. Warn so the "no discovery" symptom is findable.
       this.config.logger.warn(
-        `SSDP multicast join failed on ${iface ?? "default interface"}: ${errMsg(e)} — discovery may be incomplete`,
+        `SSDP multicast join failed on ${iface ?? "default interface"}: ${errText(e)} — discovery may be incomplete`,
       );
     }
   }
@@ -152,6 +154,13 @@ export class RokuSsdpResponder {
 
   private onMessage(text: string, address: string, port: number): void {
     if (!matchesRokuSearch(text)) {
+      return;
+    }
+    // Port 1900 is bound on every interface. A search from outside the LAN gets no
+    // answer: the ECP server would refuse that client anyway, and replying to a
+    // spoofed source would make the emulator a small reflection amplifier.
+    if (!isLanClient(address)) {
+      this.config.logger.debug(`SSDP search from non-LAN ${address} ignored`);
       return;
     }
     for (const device of this.config.devices) {
@@ -190,14 +199,4 @@ export class RokuSsdpResponder {
       this.socket = undefined;
     }
   }
-}
-
-/**
- * Message of an unknown thrown value.
- *
- * @param e the caught value
- * @returns its message or a string form
- */
-function errMsg(e: unknown): string {
-  return e instanceof Error ? e.message : String(e);
 }

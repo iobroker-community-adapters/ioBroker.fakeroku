@@ -64,13 +64,13 @@ export const DEFAULT_APPS: AppEntry[] = [
 ];
 
 /**
- * Escape XML text content.
+ * Escape XML text content and attribute values.
  *
  * @param s the raw text
  * @returns the escaped text
  */
 function xmlEscape(s: string): string {
-  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
 /**

@@ -5,7 +5,7 @@
     "_headerNetwork": {
       "type": "header",
       "text": "headerNetwork",
-      "size": 3
+      "size": 4
     },
     "networkInterface": {
       "type": "ip",
@@ -24,7 +24,7 @@
       "newLine": true,
       "type": "header",
       "text": "headerDevices",
-      "size": 3
+      "size": 4
     },
     "_devicesHelp": {
       "type": "staticText",

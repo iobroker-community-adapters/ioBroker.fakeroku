@@ -116,13 +116,19 @@ class FakerokuDeviceManagement extends import_dm_utils.DeviceManagement {
   /**
    * Read the device list from the live config object.
    *
-   * @returns the configured devices, or an empty list
+   * @returns the configured devices (normalised), or an empty list
    */
   async readDevices() {
     var _a;
     const obj = await this.adapter.getForeignObjectAsync(this.objId);
     const devices = (_a = obj == null ? void 0 : obj.native) == null ? void 0 : _a.devices;
-    return Array.isArray(devices) ? devices : [];
+    if (!Array.isArray(devices)) {
+      return [];
+    }
+    return devices.filter((d) => typeof d === "object" && d !== null).map((d) => {
+      const clean = cleanDevice(d);
+      return typeof d.uuid === "string" && d.uuid ? { ...clean, uuid: d.uuid } : clean;
+    });
   }
   /**
    * Persist the device list. Writing `native.*` restarts the adapter, which

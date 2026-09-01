@@ -16,35 +16,16 @@ var __copyProps = (to, from, except, desc) => {
   return to;
 };
 var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
-var lan_guard_exports = {};
-__export(lan_guard_exports, {
-  isLanClient: () => isLanClient
+var errors_exports = {};
+__export(errors_exports, {
+  errText: () => errText
 });
-module.exports = __toCommonJS(lan_guard_exports);
-function isLanClient(remoteAddress) {
-  if (!remoteAddress) {
-    return false;
-  }
-  const ip = remoteAddress.replace(/^::ffff:/, "");
-  if (ip === "127.0.0.1" || ip === "::1") {
-    return true;
-  }
-  if (/^10\./.test(ip)) {
-    return true;
-  }
-  if (/^192\.168\./.test(ip)) {
-    return true;
-  }
-  if (/^172\.(1[6-9]|2\d|3[01])\./.test(ip)) {
-    return true;
-  }
-  if (/^169\.254\./.test(ip)) {
-    return true;
-  }
-  return false;
+module.exports = __toCommonJS(errors_exports);
+function errText(e) {
+  return e instanceof Error ? e.message : String(e);
 }
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
-  isLanClient
+  errText
 });
-//# sourceMappingURL=lan-guard.js.map
+//# sourceMappingURL=errors.js.map

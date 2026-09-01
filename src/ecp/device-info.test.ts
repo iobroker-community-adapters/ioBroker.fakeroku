@@ -41,6 +41,9 @@ describe("buildDescXml", () => {
 });
 
 describe("buildAppsXml", () => {
+  it("escapes a quote in an app id, which sits in an attribute", () => {
+    expect(buildAppsXml([{ id: 'a"b', name: "X" }])).toContain('id="a&quot;b"');
+  });
   it("renders configured apps and no dead 2015 services", () => {
     const apps = buildAppsXml(DEFAULT_APPS);
     expect(apps).toContain('<app id="12">Netflix</app>');

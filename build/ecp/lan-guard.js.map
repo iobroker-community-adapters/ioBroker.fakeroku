@@ -1,7 +1,0 @@
-{
-  "version": 3,
-  "sources": ["../../src/ecp/lan-guard.ts"],
-  "sourcesContent": ["/**\n * LAN restriction for the ECP HTTP server: only accept commands from private /\n * local networks. The old adapter accepted key presses from any reachable IP.\n *\n * @param remoteAddress the client IP from the request socket\n * @returns true if the client is on a private/local network\n */\nexport function isLanClient(remoteAddress: string | undefined): boolean {\n  if (!remoteAddress) {\n    return false;\n  }\n  const ip = remoteAddress.replace(/^::ffff:/, \"\");\n  if (ip === \"127.0.0.1\" || ip === \"::1\") {\n    return true;\n  }\n  if (/^10\\./.test(ip)) {\n    return true;\n  }\n  if (/^192\\.168\\./.test(ip)) {\n    return true;\n  }\n  if (/^172\\.(1[6-9]|2\\d|3[01])\\./.test(ip)) {\n    return true;\n  }\n  if (/^169\\.254\\./.test(ip)) {\n    return true;\n  }\n  return false;\n}\n"],
-  "mappings": ";;;;;;;;;;;;;;;;;;AAAA;AAAA;AAAA;AAAA;AAAA;AAOO,SAAS,YAAY,eAA4C;AACtE,MAAI,CAAC,eAAe;AAClB,WAAO;AAAA,EACT;AACA,QAAM,KAAK,cAAc,QAAQ,YAAY,EAAE;AAC/C,MAAI,OAAO,eAAe,OAAO,OAAO;AACtC,WAAO;AAAA,EACT;AACA,MAAI,QAAQ,KAAK,EAAE,GAAG;AACpB,WAAO;AAAA,EACT;AACA,MAAI,cAAc,KAAK,EAAE,GAAG;AAC1B,WAAO;AAAA,EACT;AACA,MAAI,6BAA6B,KAAK,EAAE,GAAG;AACzC,WAAO;AAAA,EACT;AACA,MAAI,cAAc,KAAK,EAAE,GAAG;AAC1B,WAAO;AAAA,EACT;AACA,SAAO;AACT;",
-  "names": []
-}

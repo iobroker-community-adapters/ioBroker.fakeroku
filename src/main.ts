@@ -11,6 +11,7 @@ import { commandToStateWrite, type DeviceType, keysForType } from "./ecp/state-m
 import { DEFAULT_ECP_PORT } from "./lib/constants";
 import { deriveUuid } from "./lib/device-identity";
 import { detectLocalIPv4s, detectPrimaryIPv4 } from "./lib/detect-ip";
+import { errText } from "./lib/errors";
 import { planObjectCleanup } from "./lib/object-cleanup";
 import { sanitizeId } from "./lib/pure-helpers";
 
@@ -22,6 +23,8 @@ const SSDP_NOTIFY_INTERVAL_MS = 300_000;
 const KEY_PULSE_MS = 50;
 /** Safety cap for a held key: a keydown with no matching keyup resets after this. */
 const HOLD_MAX_MS = 30_000;
+/** The only shapes a device id ever had: the md5 hex the adapters derive, or a dashed uuid. */
+const UUID_SHAPE = /^[A-Za-z0-9-]{1,64}$/;
 
 /**
  * ioBroker.fakeroku — Roku emulator (input side).
@@ -106,11 +109,18 @@ export class Fakeroku extends utils.Adapter {
         const keys = keysForType(deviceType);
         // Adopt the device's persisted uuid (old adapter or an earlier run) so the SSDP
         // identity — and thus the controller pairing — survives an update; derive a stable
-        // one from the name only for a device that never had one.
-        const advert: RokuAdvert = { uuid: d.uuid || deriveUuid(d.name), port: Number(d.port) || DEFAULT_ECP_PORT };
+        // one from the name only for a device that never had one. The value goes verbatim
+        // into SSDP headers and XML, so only the shape the adapters ever wrote (hex, or a
+        // dashed uuid) is accepted — a hand-edited stray value is replaced, not emitted.
+        const uuid = typeof d.uuid === "string" && UUID_SHAPE.test(d.uuid) ? d.uuid : deriveUuid(d.name);
+        if (d.uuid && uuid !== d.uuid) {
+          this.log.warn(`Emulated Roku "${d.name}" has an unusable device id in its config — using a derived one.`);
+        }
+        const advert: RokuAdvert = { uuid, port: Number(d.port) || DEFAULT_ECP_PORT };
+        let server: EcpHttpServer | undefined;
         try {
           await this.createDeviceStates(deviceId, d.name, keys);
-          const server = this.makeEcpServer({
+          server = this.makeEcpServer({
             device: advert,
             friendlyName: d.name,
             apps: DEFAULT_APPS,
@@ -126,8 +136,10 @@ export class Fakeroku extends utils.Adapter {
           adverts.push(advert);
         } catch (e) {
           // One device's failure (a busy ECP port) must not take the others down.
+          // Close whatever the failed start left behind, so nothing outlives this turn.
+          server?.stop();
           this.log.warn(
-            `Emulated Roku "${d.name}" could not start on port ${advert.port}: ${e instanceof Error ? e.message : String(e)} — skipping it.`,
+            `Emulated Roku "${d.name}" could not start on port ${advert.port}: ${errText(e)} — skipping it.`,
           );
         }
       }
@@ -147,7 +159,7 @@ export class Fakeroku extends utils.Adapter {
       // a multi-homed host is discoverable on all its LANs; a chosen interface pins
       // both membership and NOTIFY egress.
       const membershipInterfaces = bindIp ? [bindIp] : detectLocalIPv4s();
-      this.ssdp = this.makeSsdpResponder({
+      const ssdp = this.makeSsdpResponder({
         devices: adverts,
         bindIp,
         advertiseIp,
@@ -155,14 +167,18 @@ export class Fakeroku extends utils.Adapter {
         logger: this.log,
         onFatalError: () => this.onSsdpFatal(),
       });
+      this.ssdp = ssdp;
       try {
-        await this.startWithTimeout(this.ssdp.start(), SSDP_START_TIMEOUT_MS);
-        this.ssdp.announce();
+        await this.startWithTimeout(ssdp.start(), SSDP_START_TIMEOUT_MS);
+        ssdp.announce();
         this.notifyTimer = this.setInterval(() => this.ssdp?.announce(), SSDP_NOTIFY_INTERVAL_MS);
       } catch (e) {
         this.log.warn(
-          `SSDP discovery unavailable: ${e instanceof Error ? e.message : String(e)} — already-paired remotes still work; set the network interface if devices are not found.`,
+          `SSDP discovery unavailable: ${errText(e)} — already-paired remotes still work; set the network interface if devices are not found.`,
         );
+        // A start that only timed out can still bind later. Close it, or the socket
+        // outlives the reference dropped here and keeps answering with nobody to stop it.
+        ssdp.stop();
         this.ssdp = undefined;
       }
 
@@ -184,7 +200,7 @@ export class Fakeroku extends utils.Adapter {
         );
       }
     } catch (e) {
-      this.log.error(`onReady failed: ${e instanceof Error ? e.message : String(e)}`);
+      this.log.error(`onReady failed: ${errText(e)}`);
     }
   }
 
@@ -209,7 +225,7 @@ export class Fakeroku extends utils.Adapter {
       common: { name: "Last command type", type: "string", role: "text", read: true, write: false, def: "" },
       native: {},
     });
-    await this.extendObject(`${deviceId}.keys`, { type: "channel", common: { name: "keys" }, native: {} });
+    await this.extendObject(`${deviceId}.keys`, { type: "channel", common: { name: "Remote keys" }, native: {} });
     for (const key of keys) {
       await this.extendObject(`${deviceId}.keys.${key}`, {
         type: "state",
@@ -239,11 +255,11 @@ export class Fakeroku extends utils.Adapter {
     const toDelete = planObjectCleanup(existingIds, configuredDeviceIds, this.deviceKeys);
     for (const id of toDelete) {
       await this.delObjectAsync(id, { recursive: true }).catch((e: unknown) => {
-        this.log.debug(`cleanup: could not delete ${id}: ${e instanceof Error ? e.message : String(e)}`);
+        this.log.debug(`cleanup: could not delete ${id}: ${errText(e)}`);
       });
     }
     if (toDelete.length > 0) {
-      this.log.info(`Removed ${toDelete.length} orphaned object(s) from an earlier version or config.`);
+      this.log.debug(`Removed ${toDelete.length} orphaned object(s) from an earlier version or config.`);
     }
   }
 
@@ -256,26 +272,26 @@ export class Fakeroku extends utils.Adapter {
    */
   private applyCommand(deviceId: string, cmd: CommandEvent): void {
     const write = commandToStateWrite(cmd);
-    void this.setState(`${deviceId}.command`, { val: write.command, ack: true });
-    void this.setState(`${deviceId}.commandType`, { val: write.commandType, ack: true });
+    this.writeState(`${deviceId}.command`, write.command);
+    this.writeState(`${deviceId}.commandType`, write.commandType);
     // Only write keys.<Key> if THIS device's type carries the key — a player has no
     // TV key objects, so a stray TV keypress lands in `command` only, never a missing state.
     const keys = this.deviceKeys.get(deviceId);
     if (write.pulseKey && keys?.has(write.pulseKey)) {
       const id = `${deviceId}.keys.${write.pulseKey}`;
-      void this.setState(id, { val: true, ack: true });
+      this.writeState(id, true);
       const timer = this.setTimeout(() => {
         if (timer) {
           this.pulseTimers.delete(timer);
         }
-        void this.setState(id, { val: false, ack: true });
+        this.writeState(id, false);
       }, KEY_PULSE_MS);
       if (timer) {
         this.pulseTimers.add(timer);
       }
     } else if (write.holdKey && keys?.has(write.holdKey.key)) {
       const id = `${deviceId}.keys.${write.holdKey.key}`;
-      void this.setState(id, { val: write.holdKey.value, ack: true });
+      this.writeState(id, write.holdKey.value);
       // A keydown holds the key true until its keyup. Arm a watchdog so a lost keyup
       // (controller disconnects mid-press) cannot pin the key true forever; a keyup
       // clears it, and a repeated keydown re-arms it.
@@ -287,13 +303,28 @@ export class Fakeroku extends utils.Adapter {
       if (write.holdKey.value) {
         const timer = this.setTimeout(() => {
           this.holdTimers.delete(id);
-          void this.setState(id, { val: false, ack: true });
+          this.writeState(id, false);
         }, HOLD_MAX_MS);
         if (timer) {
           this.holdTimers.set(id, timer);
         }
       }
     }
+  }
+
+  /**
+   * Fire-and-forget state write for the command hot path. The states exist (created
+   * up front in createDeviceStates), so there is no read-before-write; a rejection —
+   * the states database already closed while a remote still sends — is traced at
+   * debug, because an unhandled one would crash the adapter over one lost keypress.
+   *
+   * @param id the state id relative to the namespace
+   * @param val the value to write
+   */
+  private writeState(id: string, val: string | boolean): void {
+    this.setState(id, { val, ack: true }).catch((e: unknown) => {
+      this.log.debug(`State write ${id} failed: ${errText(e)}`);
+    });
   }
 
   /**
@@ -383,7 +414,7 @@ export class Fakeroku extends utils.Adapter {
         // debug: it explains a stale "connected" afterwards, and nobody can act
         // on it while the adapter is already going down.
         .catch((e: unknown) => {
-          this.log.debug(`Final connection write failed: ${e instanceof Error ? e.message : String(e)}`);
+          this.log.debug(`Final connection write failed: ${errText(e)}`);
         })
         .finally(() => callback());
     } catch {

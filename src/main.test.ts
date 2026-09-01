@@ -184,6 +184,18 @@ describe("Fakeroku onReady — device wiring", () => {
     expect(ctx.i.states.get("info.connection")).toEqual({ val: true, ack: true });
   });
 
+  it("closes an ECP server whose start failed, so nothing of it outlives the device loop", async () => {
+    const ctx = setup({}, { failEcpPort: 8060 });
+    await ctx.i.onReady();
+    expect(ctx.ecp[0].stop).toHaveBeenCalledTimes(1);
+  });
+
+  it("names the keys channel like the other objects", async () => {
+    const ctx = setup();
+    await ctx.i.onReady();
+    expect(ctx.i.objects.get("Wohnzimmer.keys")).toMatchObject({ common: { name: "Remote keys" } });
+  });
+
   it("keys are read-only booleans with the gate-conformant role", async () => {
     const ctx = setup();
     await ctx.i.onReady();
@@ -276,6 +288,25 @@ describe("Fakeroku onReady — device wiring", () => {
     expect((ctx.ecp[0].options.device as { uuid: string }).uuid).toBe("kept-uuid-1234");
   });
 
+  it("replaces a persisted device id that is not in a shape the adapters ever wrote", async () => {
+    const ctx = setup({ devices: [{ name: "Wohnzimmer", port: 8060, type: "player", uuid: "x\r\nUSN: evil" }] });
+    await ctx.i.onReady();
+    // The id goes verbatim into SSDP headers and the description XML — a hand-edited
+    // value with line breaks would inject headers. Only hex / dashed-uuid shapes pass.
+    const uuid = (ctx.ecp[0].options.device as { uuid: string }).uuid;
+    expect(uuid).toMatch(/^[0-9a-f]{32}$/);
+    expect(ctx.i.log.warn).toHaveBeenCalledWith(expect.stringContaining("unusable device id"));
+  });
+
+  it("keeps a dashed uuid from an older configuration", async () => {
+    const ctx = setup({
+      devices: [{ name: "Wohnzimmer", port: 8060, type: "player", uuid: "123e4567-e89b-12d3-a456-426614174000" }],
+    });
+    await ctx.i.onReady();
+    expect((ctx.ecp[0].options.device as { uuid: string }).uuid).toBe("123e4567-e89b-12d3-a456-426614174000");
+    expect(ctx.i.log.warn).not.toHaveBeenCalled();
+  });
+
   it("warns and stops when no device is configured", async () => {
     const ctx = setup({ devices: [] });
     await ctx.i.onReady();
@@ -352,6 +383,14 @@ describe("Fakeroku onReady — discovery is an aid, not a precondition", () => {
     expect(ctx.i.states.get("info.connection")).toEqual({ val: true, ack: true });
     expect(ctx.ssdps[0].announce).not.toHaveBeenCalled();
     expect(ctx.i.ssdp).toBeUndefined();
+  });
+
+  it("closes a responder whose start failed, so a late bind cannot outlive the dropped reference", async () => {
+    const ctx = setup({}, { ssdpStartFails: true });
+    await ctx.i.onReady();
+    // A bind that only timed out can still complete later; without stop() that
+    // socket keeps answering searches and onUnload has no handle left to close it.
+    expect(ctx.ssdps[0].stop).toHaveBeenCalledTimes(1);
   });
 
   it("a successful start announces immediately and arms the repeat", async () => {
@@ -451,6 +490,17 @@ describe("Fakeroku applyCommand", () => {
     expect(ctx.i.setTimeout).not.toHaveBeenCalled();
   });
 
+  it("a rejected state write is traced, not thrown — a remote can still press keys while the database closes", async () => {
+    const ctx = await ready();
+    (ctx.i as unknown as { setState: unknown }).setState = vi.fn(async () => {
+      throw new Error("States database not connected");
+    });
+    expect(() => ctx.i.applyCommand("Wohnzimmer", { type: "keypress", key: "Home" })).not.toThrow();
+    // Let the rejections settle — an unhandled one fails the run (and kills the adapter).
+    await new Promise(resolve => setImmediate(resolve));
+    expect(ctx.i.log.debug).toHaveBeenCalledWith(expect.stringContaining("State write Wohnzimmer.command failed"));
+  });
+
   it("keyboard input and app launches never create per-character objects", async () => {
     const ctx = await ready();
     ctx.i.applyCommand("Wohnzimmer", { type: "keypress", key: "Lit_a" });
@@ -473,7 +523,9 @@ describe("Fakeroku cleanup of stale objects", () => {
     expect(ctx.i.objects.has("altgeraet")).toBe(false);
     expect(ctx.i.objects.has("altgeraet.keys.Home")).toBe(false);
     expect(ctx.i.objects.get("Wohnzimmer")).toBeDefined();
-    expect(ctx.i.log.info).toHaveBeenCalledWith(expect.stringContaining("orphaned object"));
+    // Routine housekeeping after an update or a config change — debug, like the
+    // other adapters' cleanups; the log keeps info for events the user acts on.
+    expect(ctx.i.log.debug).toHaveBeenCalledWith(expect.stringContaining("orphaned object"));
   });
 
   it("keeps the info channel and says nothing when there is nothing to remove", async () => {
@@ -484,7 +536,7 @@ describe("Fakeroku cleanup of stale objects", () => {
     await ctx.i.onReady();
 
     expect(ctx.i.objects.has("info.connection")).toBe(true);
-    expect(ctx.i.log.info).not.toHaveBeenCalledWith(expect.stringContaining("orphaned object"));
+    expect(ctx.i.log.debug).not.toHaveBeenCalledWith(expect.stringContaining("orphaned object"));
   });
 });
 

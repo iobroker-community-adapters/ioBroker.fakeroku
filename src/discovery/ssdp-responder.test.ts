@@ -215,6 +215,17 @@ describe("RokuSsdpResponder", () => {
     expect(s.sent[0].text).toContain("http://10.0.0.9:8060/");
   });
 
+  it("ignores a Roku search from outside the LAN — no reflection towards a spoofed source", async () => {
+    const r = new RokuSsdpResponder({ ...baseCfg, bindIp: undefined, membershipInterfaces: [] });
+    await r.start();
+    const s = dgramMock.sockets[0];
+    s.emit("message", Buffer.from(MSEARCH), { address: "8.8.8.8", port: 1900 });
+    // The socket listens on every interface; on a host with a public one an answer
+    // would go to whatever address the datagram claims to come from.
+    expect(s.sent).toEqual([]);
+    expect(noopLog.debug).toHaveBeenCalledWith(expect.stringContaining("non-LAN 8.8.8.8"));
+  });
+
   it("stays silent on traffic that is not a Roku search", async () => {
     const r = new RokuSsdpResponder({ ...baseCfg, bindIp: undefined, membershipInterfaces: [] });
     await r.start();

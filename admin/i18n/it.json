@@ -3,7 +3,7 @@
   "networkInterface": "Interfaccia di rete (bind + annuncio)",
   "networkInterfaceTooltip": "La scheda di rete a cui i Roku emulati si collegano e si annunciano. Lasciala su 'tutte le interfacce': l'IP instradabile viene rilevato automaticamente e funziona senza configurazione. Scegli un indirizzo specifico solo su un host con più schede di rete.",
   "headerDevices": "Dispositivi Roku emulati",
-  "devicesHelp": "Ogni scheda è un Roku emulato. Aggiungine uno, poi aggiungi un dispositivo **Roku** nell'app Harmony o Sofabaton che punta a questo host ioBroker — ogni pressione finisce negli oggetti del dispositivo.",
+  "devicesHelp": "Ogni scheda è un Roku emulato. Aggiungine uno, poi aggiungi un dispositivo <b>Roku</b> nell'app Harmony o Sofabaton che punta a questo host ioBroker — ogni pressione finisce negli oggetti del dispositivo.",
   "deviceName": "Nome",
   "devicePort": "Porta ECP",
   "portLabel": "Porta",

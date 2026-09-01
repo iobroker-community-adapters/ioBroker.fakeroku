@@ -1,4 +1,4 @@
-import { BASE_KEYS, commandToStateWrite, keysForType, TV_KEYS } from "./state-model";
+import { BASE_KEYS, commandToStateWrite, keysForType, MAX_COMMAND_LENGTH, TV_KEYS } from "./state-model";
 
 describe("keysForType", () => {
   it("a player exposes the base keys and no TV keys", () => {
@@ -51,6 +51,16 @@ describe("commandToStateWrite", () => {
       command: "search:news",
       pulseKey: null,
     });
+  });
+});
+
+describe("commandToStateWrite bounds the command text", () => {
+  it("cuts an oversized search text to the cap — the URL is client-controlled up to the header limit", () => {
+    const text = "x".repeat(MAX_COMMAND_LENGTH * 3);
+    expect(commandToStateWrite({ type: "search", text }).command).toHaveLength(MAX_COMMAND_LENGTH);
+  });
+  it("leaves a normal command untouched", () => {
+    expect(commandToStateWrite({ type: "launch", appId: "291097" }).command).toBe("launch:291097");
   });
 });
 

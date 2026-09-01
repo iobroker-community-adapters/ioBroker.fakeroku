@@ -163,6 +163,20 @@ describe("FakerokuDeviceManagement", () => {
     await expect(make(undefined).readDevices()).resolves.toEqual([]);
   });
 
+  it("normalises hand-edited rows so the dialogs keep working", async () => {
+    // Expert mode / CLI can leave anything in native.devices: a numeric name, a
+    // garbage port, a null row. The clash check's .trim() used to throw on the
+    // numeric name, and with it every add/edit dialog failed.
+    const i = make([{ name: 42, port: "abc" }, null, { name: "Ok", port: 8061, type: "tv", uuid: "u1" }]);
+    await expect(i.readDevices()).resolves.toEqual([
+      { name: "", port: 8060, type: "player" },
+      { name: "Ok", port: 8061, type: "tv", uuid: "u1" },
+    ]);
+    const ctx = mockContext({ form: { name: "New", port: 8070, type: "player" } });
+    await expect(i.addDevice(ctx)).resolves.toEqual({ refresh: true });
+    expect(adapter._stored()).toHaveLength(3);
+  });
+
   it("shows one card per device, keyed by list position", async () => {
     const out = await cards([living, kitchen]);
     expect(out.map(c => c.id)).toEqual(["0", "1"]);

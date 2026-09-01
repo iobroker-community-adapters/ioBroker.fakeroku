@@ -1,16 +1,13 @@
 import { networkInterfaces, type NetworkInterfaceInfo } from "node:os";
 
 /**
- * Is this a routable (non-internal) IPv4 address? Node typed `family` as the
- * string "IPv4" historically and as the number 4 since v18 — accept both so
- * detection works across runtimes.
+ * Is this a routable (non-internal) IPv4 address?
  *
  * @param addr one entry from an os.networkInterfaces() list
  * @returns true for a non-internal IPv4 address
  */
 function isRoutableIPv4(addr: NetworkInterfaceInfo): boolean {
-  const isV4 = addr.family === "IPv4" || (addr.family as unknown as number) === 4;
-  return isV4 && !addr.internal;
+  return addr.family === "IPv4" && !addr.internal;
 }
 
 /**

@@ -6,7 +6,7 @@
 
 **Support:** [![Ko-fi](https://img.shields.io/badge/Ko--fi-Support-ff5e5b?logo=ko-fi)](https://ko-fi.com/krobipd) [![PayPal](https://img.shields.io/badge/Donate-PayPal-blue.svg)](https://paypal.me/krobipd)
 
-Emulates one or more **Roku devices** on your LAN so that ECP/SSDP remotes — a
+Emulates one or more **[Roku](https://www.roku.com/) devices** on your LAN so that ECP/SSDP remotes — a
 Logitech Harmony Hub or a Sofabaton X1/X2 — can trigger events in
 ioBroker. It is the **input** counterpart to the Logitech Harmony adapter: a button
 on the remote becomes a datapoint in ioBroker.
@@ -37,11 +37,12 @@ For details and how to disable it, see the [Sentry plugin documentation](https:/
 
 - Node.js >= 22
 - js-controller >= 7.2.2
-- admin >= 7.8.23
+- admin >= 8.0.11
 
-## Installation
+## Ports
 
-Install the adapter from the ioBroker admin.
+- **TCP 8060 (listening, one per emulated Roku, configurable)** — the Roku control protocol (ECP): the remote sends its key presses here and reads the actual port from the discovery announcement.
+- **UDP 1900 (multicast, listening and outgoing)** — SSDP discovery, so a Harmony hub or Sofabaton finds the emulated Rokus; fixed by the UPnP standard.
 
 ## Configuration
 
@@ -60,7 +61,7 @@ Install the adapter from the ioBroker admin.
 To add the emulated Roku to a Harmony hub, add a "Roku" device in the Harmony app
 and point it at the ioBroker host.
 
-## Objects
+## State Tree
 
 At instance level:
 
@@ -83,16 +84,21 @@ not get their own objects.
 > play and pause cannot be told apart here — that is a protocol limitation, not an
 > adapter one.
 
-## Usage
-
 In a script or Blockly rule, react to a key — e.g. when `fakeroku.0.<name>.keys.Play`
-becomes `true`, or watch `.command` for the last button as text.
+becomes `true` — or watch `.command` for the last button as text.
 
 ## Changelog
 <!--
 	Placeholder for the next version (at the beginning of the line):
 	### **WORK IN PROGRESS**
 -->
+### **WORK IN PROGRESS**
+- (krobipd) Fixed: a malformed keyboard keypress from a remote (a bad %-escape in the URL) could crash the adapter.
+- (krobipd) Fixed: remotes on an IPv6-only local network were refused; link-local and unique-local IPv6 addresses now count as LAN.
+- (krobipd) Fixed: the adapter icon in the admin is now the same one shown on GitHub.
+- (krobipd) Changed: requires admin >= 8.0.11.
+- (krobipd) Improved: discovery answers only searches from your own network, and the device dialog in the admin keeps working after the device list was edited by hand.
+
 ### 1.2.0 (2026-08-27)
 - (krobipd) Changed: the instance now reports "not connected" while a configured Roku is missing — a device whose port is taken no longer hides behind the ones that did start.
 - (krobipd) Improved: shutdown now waits for its last write to land before reporting done, so the connection state cannot be lost on a slow or busy system.
@@ -136,6 +142,17 @@ users it is simply a new version of the same adapter:
   from 2023 to 2026, releasing versions up to 0.5.1.
 - From **0.6.0** on, [krobi](https://github.com/krobipd) rewrote the adapter from the
   ground up in TypeScript and added the full ECP surface including `device-info`.
+
+## Support
+
+- [ioBroker Forum](https://forum.iobroker.net/)
+- [GitHub Issues](https://github.com/iobroker-community-adapters/ioBroker.fakeroku/issues)
+
+### Support Development
+
+This adapter is free and open source. If you find it useful, consider buying me a coffee:
+
+[![Ko-fi](https://img.shields.io/badge/Ko--fi-Support%20me-ff5e5b?logo=ko-fi)](https://ko-fi.com/krobipd) [![PayPal](https://img.shields.io/badge/Donate-PayPal-blue.svg)](https://paypal.me/krobipd)
 
 ## License
 

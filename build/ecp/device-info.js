@@ -51,7 +51,7 @@ const DEFAULT_APPS = [
   { id: "291097", name: "Disney Plus" }
 ];
 function xmlEscape(s) {
-  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 function buildDescXml(device, friendlyName, type) {
   const p = PROFILES[type];

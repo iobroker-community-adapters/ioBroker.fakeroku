@@ -42,12 +42,14 @@ var import_state_model = require("./ecp/state-model");
 var import_constants = require("./lib/constants");
 var import_device_identity = require("./lib/device-identity");
 var import_detect_ip = require("./lib/detect-ip");
+var import_errors = require("./lib/errors");
 var import_object_cleanup = require("./lib/object-cleanup");
 var import_pure_helpers = require("./lib/pure-helpers");
 const SSDP_START_TIMEOUT_MS = 5e3;
 const SSDP_NOTIFY_INTERVAL_MS = 3e5;
 const KEY_PULSE_MS = 50;
 const HOLD_MAX_MS = 3e4;
+const UUID_SHAPE = /^[A-Za-z0-9-]{1,64}$/;
 class Fakeroku extends utils.Adapter {
   ssdp;
   notifyTimer;
@@ -105,10 +107,15 @@ class Fakeroku extends utils.Adapter {
         }
         const deviceType = d.type === "tv" ? "tv" : "player";
         const keys = (0, import_state_model.keysForType)(deviceType);
-        const advert = { uuid: d.uuid || (0, import_device_identity.deriveUuid)(d.name), port: Number(d.port) || import_constants.DEFAULT_ECP_PORT };
+        const uuid = typeof d.uuid === "string" && UUID_SHAPE.test(d.uuid) ? d.uuid : (0, import_device_identity.deriveUuid)(d.name);
+        if (d.uuid && uuid !== d.uuid) {
+          this.log.warn(`Emulated Roku "${d.name}" has an unusable device id in its config \u2014 using a derived one.`);
+        }
+        const advert = { uuid, port: Number(d.port) || import_constants.DEFAULT_ECP_PORT };
+        let server;
         try {
           await this.createDeviceStates(deviceId, d.name, keys);
-          const server = this.makeEcpServer({
+          server = this.makeEcpServer({
             device: advert,
             friendlyName: d.name,
             apps: import_device_info.DEFAULT_APPS,
@@ -123,8 +130,9 @@ class Fakeroku extends utils.Adapter {
           seenIds.add(deviceId);
           adverts.push(advert);
         } catch (e) {
+          server == null ? void 0 : server.stop();
           this.log.warn(
-            `Emulated Roku "${d.name}" could not start on port ${advert.port}: ${e instanceof Error ? e.message : String(e)} \u2014 skipping it.`
+            `Emulated Roku "${d.name}" could not start on port ${advert.port}: ${(0, import_errors.errText)(e)} \u2014 skipping it.`
           );
         }
       }
@@ -134,7 +142,7 @@ class Fakeroku extends utils.Adapter {
         return;
       }
       const membershipInterfaces = bindIp ? [bindIp] : (0, import_detect_ip.detectLocalIPv4s)();
-      this.ssdp = this.makeSsdpResponder({
+      const ssdp = this.makeSsdpResponder({
         devices: adverts,
         bindIp,
         advertiseIp,
@@ -142,17 +150,19 @@ class Fakeroku extends utils.Adapter {
         logger: this.log,
         onFatalError: () => this.onSsdpFatal()
       });
+      this.ssdp = ssdp;
       try {
-        await this.startWithTimeout(this.ssdp.start(), SSDP_START_TIMEOUT_MS);
-        this.ssdp.announce();
+        await this.startWithTimeout(ssdp.start(), SSDP_START_TIMEOUT_MS);
+        ssdp.announce();
         this.notifyTimer = this.setInterval(() => {
           var _a2;
           return (_a2 = this.ssdp) == null ? void 0 : _a2.announce();
         }, SSDP_NOTIFY_INTERVAL_MS);
       } catch (e) {
         this.log.warn(
-          `SSDP discovery unavailable: ${e instanceof Error ? e.message : String(e)} \u2014 already-paired remotes still work; set the network interface if devices are not found.`
+          `SSDP discovery unavailable: ${(0, import_errors.errText)(e)} \u2014 already-paired remotes still work; set the network interface if devices are not found.`
         );
+        ssdp.stop();
         this.ssdp = void 0;
       }
       const allStarted = adverts.length === configured.length;
@@ -166,7 +176,7 @@ class Fakeroku extends utils.Adapter {
         );
       }
     } catch (e) {
-      this.log.error(`onReady failed: ${e instanceof Error ? e.message : String(e)}`);
+      this.log.error(`onReady failed: ${(0, import_errors.errText)(e)}`);
     }
   }
   /**
@@ -190,7 +200,7 @@ class Fakeroku extends utils.Adapter {
       common: { name: "Last command type", type: "string", role: "text", read: true, write: false, def: "" },
       native: {}
     });
-    await this.extendObject(`${deviceId}.keys`, { type: "channel", common: { name: "keys" }, native: {} });
+    await this.extendObject(`${deviceId}.keys`, { type: "channel", common: { name: "Remote keys" }, native: {} });
     for (const key of keys) {
       await this.extendObject(`${deviceId}.keys.${key}`, {
         type: "state",
@@ -217,11 +227,11 @@ class Fakeroku extends utils.Adapter {
     const toDelete = (0, import_object_cleanup.planObjectCleanup)(existingIds, configuredDeviceIds, this.deviceKeys);
     for (const id of toDelete) {
       await this.delObjectAsync(id, { recursive: true }).catch((e) => {
-        this.log.debug(`cleanup: could not delete ${id}: ${e instanceof Error ? e.message : String(e)}`);
+        this.log.debug(`cleanup: could not delete ${id}: ${(0, import_errors.errText)(e)}`);
       });
     }
     if (toDelete.length > 0) {
-      this.log.info(`Removed ${toDelete.length} orphaned object(s) from an earlier version or config.`);
+      this.log.debug(`Removed ${toDelete.length} orphaned object(s) from an earlier version or config.`);
     }
   }
   /**
@@ -233,24 +243,24 @@ class Fakeroku extends utils.Adapter {
    */
   applyCommand(deviceId, cmd) {
     const write = (0, import_state_model.commandToStateWrite)(cmd);
-    void this.setState(`${deviceId}.command`, { val: write.command, ack: true });
-    void this.setState(`${deviceId}.commandType`, { val: write.commandType, ack: true });
+    this.writeState(`${deviceId}.command`, write.command);
+    this.writeState(`${deviceId}.commandType`, write.commandType);
     const keys = this.deviceKeys.get(deviceId);
     if (write.pulseKey && (keys == null ? void 0 : keys.has(write.pulseKey))) {
       const id = `${deviceId}.keys.${write.pulseKey}`;
-      void this.setState(id, { val: true, ack: true });
+      this.writeState(id, true);
       const timer = this.setTimeout(() => {
         if (timer) {
           this.pulseTimers.delete(timer);
         }
-        void this.setState(id, { val: false, ack: true });
+        this.writeState(id, false);
       }, KEY_PULSE_MS);
       if (timer) {
         this.pulseTimers.add(timer);
       }
     } else if (write.holdKey && (keys == null ? void 0 : keys.has(write.holdKey.key))) {
       const id = `${deviceId}.keys.${write.holdKey.key}`;
-      void this.setState(id, { val: write.holdKey.value, ack: true });
+      this.writeState(id, write.holdKey.value);
       const pending = this.holdTimers.get(id);
       if (pending) {
         this.clearTimeout(pending);
@@ -259,13 +269,27 @@ class Fakeroku extends utils.Adapter {
       if (write.holdKey.value) {
         const timer = this.setTimeout(() => {
           this.holdTimers.delete(id);
-          void this.setState(id, { val: false, ack: true });
+          this.writeState(id, false);
         }, HOLD_MAX_MS);
         if (timer) {
           this.holdTimers.set(id, timer);
         }
       }
     }
+  }
+  /**
+   * Fire-and-forget state write for the command hot path. The states exist (created
+   * up front in createDeviceStates), so there is no read-before-write; a rejection —
+   * the states database already closed while a remote still sends — is traced at
+   * debug, because an unhandled one would crash the adapter over one lost keypress.
+   *
+   * @param id the state id relative to the namespace
+   * @param val the value to write
+   */
+  writeState(id, val) {
+    this.setState(id, { val, ack: true }).catch((e) => {
+      this.log.debug(`State write ${id} failed: ${(0, import_errors.errText)(e)}`);
+    });
   }
   /**
    * The SSDP responder died at runtime (a socket error after a good start). Stop
@@ -348,7 +372,7 @@ class Fakeroku extends utils.Adapter {
         s.stop();
       }
       void this.setState("info.connection", { val: false, ack: true }).catch((e) => {
-        this.log.debug(`Final connection write failed: ${e instanceof Error ? e.message : String(e)}`);
+        this.log.debug(`Final connection write failed: ${(0, import_errors.errText)(e)}`);
       }).finally(() => callback());
     } catch {
       callback();

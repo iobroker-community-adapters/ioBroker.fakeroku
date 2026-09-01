@@ -3,7 +3,7 @@
   "networkInterface": "Interfaz de red (enlace + anuncio)",
   "networkInterfaceTooltip": "La tarjeta de red a la que se enlazan y anuncian los Roku emulados. Déjala en 'todas las interfaces': la IP enrutable se detecta automáticamente y funciona sin configurar. Elige una dirección concreta solo en un host con varias tarjetas de red.",
   "headerDevices": "Dispositivos Roku emulados",
-  "devicesHelp": "Cada tarjeta es un Roku emulado. Añade uno y luego añade un dispositivo **Roku** en tu app Harmony o Sofabaton apuntando a este host de ioBroker — cada pulsación llega a los objetos del dispositivo.",
+  "devicesHelp": "Cada tarjeta es un Roku emulado. Añade uno y luego añade un dispositivo <b>Roku</b> en tu app Harmony o Sofabaton apuntando a este host de ioBroker — cada pulsación llega a los objetos del dispositivo.",
   "deviceName": "Nombre",
   "devicePort": "Puerto ECP",
   "portLabel": "Puerto",

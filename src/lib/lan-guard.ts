@@ -1,6 +1,8 @@
 /**
- * LAN restriction for the ECP HTTP server: only accept commands from private /
- * local networks. The old adapter accepted key presses from any reachable IP.
+ * LAN restriction for both network services (ECP HTTP + SSDP): only accept
+ * requests from private / local networks — the IPv4 private and link-local ranges, loopback, and the IPv6
+ * link-local / unique-local ranges. The old adapter accepted key presses from any
+ * reachable IP.
  *
  * @param remoteAddress the client IP from the request socket
  * @returns true if the client is on a private/local network
@@ -23,6 +25,12 @@ export function isLanClient(remoteAddress: string | undefined): boolean {
     return true;
   }
   if (/^169\.254\./.test(ip)) {
+    return true;
+  }
+  // IPv6 in the LAN: link-local (fe80::/10, possibly with a `%zone` suffix) and
+  // unique-local (fc00::/7). A remote on an IPv6-only segment is still local.
+  const v6 = ip.toLowerCase();
+  if (/^fe[89ab][0-9a-f]:/.test(v6) || /^f[cd][0-9a-f]{2}:/.test(v6)) {
     return true;
   }
   return false;

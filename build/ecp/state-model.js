@@ -19,11 +19,13 @@ var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: tru
 var state_model_exports = {};
 __export(state_model_exports, {
   BASE_KEYS: () => BASE_KEYS,
+  MAX_COMMAND_LENGTH: () => MAX_COMMAND_LENGTH,
   TV_KEYS: () => TV_KEYS,
   commandToStateWrite: () => commandToStateWrite,
   keysForType: () => keysForType
 });
 module.exports = __toCommonJS(state_model_exports);
+const MAX_COMMAND_LENGTH = 500;
 const BASE_KEYS = [
   "Home",
   "Rev",
@@ -76,7 +78,7 @@ function describeCommand(cmd) {
 }
 function commandToStateWrite(cmd) {
   const write = {
-    command: describeCommand(cmd),
+    command: describeCommand(cmd).slice(0, MAX_COMMAND_LENGTH),
     commandType: cmd.type,
     pulseKey: null,
     holdKey: null
@@ -95,6 +97,7 @@ function commandToStateWrite(cmd) {
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
   BASE_KEYS,
+  MAX_COMMAND_LENGTH,
   TV_KEYS,
   commandToStateWrite,
   keysForType
