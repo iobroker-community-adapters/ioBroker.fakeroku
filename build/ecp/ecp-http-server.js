@@ -90,7 +90,6 @@ class EcpHttpServer {
       return;
     }
     if (method === "POST") {
-      req.resume();
       const cmd = (0, import_ecp_command.parseEcpCommand)("POST", url);
       if (!cmd) {
         res.statusCode = 404;

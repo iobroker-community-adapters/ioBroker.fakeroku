@@ -226,6 +226,20 @@ describe("Fakeroku onReady — device wiring", () => {
     expect(ctx.i.objects.get("Wohnzimmer.keys")).toMatchObject({ common: { name: "Remote keys" } });
   });
 
+  it("commandType carries the fixed verb list as plain-string labels", async () => {
+    const ctx = setup();
+    await ctx.i.onReady();
+    const states = (ctx.i.objects.get("Wohnzimmer.commandType") as { common: { states: Record<string, unknown> } })
+      .common.states;
+    expect(Object.keys(states).sort()).toEqual(
+      ["input", "install", "keydown", "keypress", "keyup", "launch", "search"].sort(),
+    );
+    // A translation object as a value is React error #31 in the admin's object view.
+    for (const v of Object.values(states)) {
+      expect(typeof v).toBe("string");
+    }
+  });
+
   it("keys are read-only booleans with the gate-conformant role", async () => {
     const ctx = setup();
     await ctx.i.onReady();

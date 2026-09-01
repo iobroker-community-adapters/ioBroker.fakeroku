@@ -37,6 +37,7 @@ var import_node_path = require("node:path");
 var import_device_management = require("./device-management");
 var import_ssdp_responder = require("./discovery/ssdp-responder");
 var import_device_info = require("./ecp/device-info");
+var import_ecp_command = require("./ecp/ecp-command");
 var import_ecp_http_server = require("./ecp/ecp-http-server");
 var import_state_model = require("./ecp/state-model");
 var import_constants = require("./lib/constants");
@@ -197,7 +198,17 @@ class Fakeroku extends utils.Adapter {
     });
     await this.extendObject(`${deviceId}.commandType`, {
       type: "state",
-      common: { name: "Last command type", type: "string", role: "text", read: true, write: false, def: "" },
+      common: {
+        name: "Last command type",
+        type: "string",
+        role: "text",
+        read: true,
+        write: false,
+        def: "",
+        // The fixed verb list, so the admin shows the value as a label. Plain strings
+        // only — a translation object here crashes the admin's object view.
+        states: Object.fromEntries(import_ecp_command.COMMAND_TYPES.map((verb) => [verb, verb]))
+      },
       native: {}
     });
     await this.extendObject(`${deviceId}.keys`, { type: "channel", common: { name: "Remote keys" }, native: {} });

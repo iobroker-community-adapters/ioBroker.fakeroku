@@ -3,7 +3,19 @@ import * as net from "node:net";
 import type { CommandEvent } from "./ecp-command";
 import { EcpHttpServer } from "./ecp-http-server";
 
-const PORT = 18099;
+/** A port the OS just had free — fixed numbers collide with whatever else runs on the machine. */
+async function freePort(): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const probe = net.createServer();
+    probe.once("error", reject);
+    probe.listen(0, "127.0.0.1", () => {
+      const { port } = probe.address() as net.AddressInfo;
+      probe.close(() => resolve(port));
+    });
+  });
+}
+
+let PORT = 0;
 const debugLogs: string[] = [];
 const warnLogs: string[] = [];
 const noopLog = {
@@ -40,6 +52,7 @@ describe("EcpHttpServer", () => {
   let server: EcpHttpServer;
 
   beforeAll(async () => {
+    PORT = await freePort();
     server = new EcpHttpServer({
       device: { uuid: "abc123", port: PORT },
       friendlyName: "Test Roku",
@@ -200,10 +213,11 @@ describe("EcpHttpServer", () => {
   });
 
   it("stop is safe after a start that failed on a busy port", async () => {
+    const busyPort = await freePort();
     const blocker = http.createServer();
-    await new Promise<void>(resolve => blocker.listen(PORT + 1, "127.0.0.1", resolve));
+    await new Promise<void>(resolve => blocker.listen(busyPort, "127.0.0.1", resolve));
     const busy = new EcpHttpServer({
-      device: { uuid: "busy", port: PORT + 1 },
+      device: { uuid: "busy", port: busyPort },
       friendlyName: "busy",
       apps: [],
       deviceType: "player",
@@ -224,7 +238,7 @@ describe("EcpHttpServer", () => {
     // A controller can hold a half-sent request open. close() alone waits for it
     // (headersTimeout, 60 s) and the synchronous onUnload runs into the host's 1 s
     // kill; closeAllConnections() ends it now.
-    const heldPort = PORT + 3;
+    const heldPort = await freePort();
     const held = new EcpHttpServer({
       device: { uuid: "held", port: heldPort },
       friendlyName: "held",
@@ -250,6 +264,29 @@ describe("EcpHttpServer", () => {
     ]);
     socket.destroy();
     expect(outcome).toBe("closed");
+  });
+
+  it("a POST body the adapter never reads leaves the keep-alive connection usable", async () => {
+    // Controllers reuse one connection. If an unread body stayed in the socket, the
+    // next request on it would hang or be parsed as garbage.
+    const agent = new http.Agent({ keepAlive: true, maxSockets: 1 });
+    const send = (method: string, path: string, body?: Buffer): Promise<{ status: number; port: number }> =>
+      new Promise((resolve, reject) => {
+        const req = http.request({ host: "127.0.0.1", port: PORT, method, path, agent }, res => {
+          res.resume();
+          res.on("end", () => resolve({ status: res.statusCode ?? 0, port: res.socket?.remotePort ?? 0 }));
+        });
+        req.on("error", reject);
+        req.end(body);
+      });
+    try {
+      const first = await send("POST", "/keypress/Home", Buffer.alloc(64 * 1024, 0x41));
+      const second = await send("GET", "/query/device-info");
+      expect(first.status).toBe(200);
+      expect(second.status).toBe(200);
+    } finally {
+      agent.destroy();
+    }
   });
 
   it("serves the advertised app list", async () => {

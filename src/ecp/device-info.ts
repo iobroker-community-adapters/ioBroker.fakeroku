@@ -5,12 +5,16 @@ import type { DeviceType } from "./state-model";
  * A fake but CURRENT Roku OS version. This is the pairing lever: a modern remote
  * like a Sofabaton reads /query/device-info at pairing and rejects a too-old
  * version (HA forum #501046) — emulated_roku hardcodes 7.5.0 / "Roku 4" (2016) and
- * fails there, the old fakeroku had no device-info at all. The exact "new enough"
- * value is not documented; verify against real hardware (a Sofabaton) and bump if
- * needed. (The official Roku app is a different case: it uses ECP-2 and never reads
- * device-info — see the README note.)
+ * fails there, the old fakeroku had no device-info at all.
+ *
+ * Kept at the newest Roku OS major (checked 2026-09-01: Roku OS 15.0, released
+ * 2025-10-15 — support.roku.com release notes + Wikipedia "Roku OS"). The exact
+ * threshold Sofabaton applies is documented nowhere (thread, Sofabaton docs and
+ * their 2024-12 Roku notice name none); staying current is the only lever we have.
+ * The build number is cosmetic — no controller is known to read it. (The official
+ * Roku app is a different case: it uses ECP-2 and never reads device-info.)
  */
-const SOFTWARE_VERSION = "14.1.4";
+const SOFTWARE_VERSION = "15.0.0";
 const SOFTWARE_BUILD = "4200";
 
 /** Per-device-type identity + capability flags advertised in device-info. */

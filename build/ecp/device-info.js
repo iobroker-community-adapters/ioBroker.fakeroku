@@ -24,7 +24,7 @@ __export(device_info_exports, {
   buildDeviceInfoXml: () => buildDeviceInfoXml
 });
 module.exports = __toCommonJS(device_info_exports);
-const SOFTWARE_VERSION = "14.1.4";
+const SOFTWARE_VERSION = "15.0.0";
 const SOFTWARE_BUILD = "4200";
 const PROFILES = {
   player: {

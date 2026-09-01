@@ -89,7 +89,8 @@ export class EcpHttpServer {
     }
 
     if (method === "POST") {
-      req.resume(); // drain any body
+      // The body is never read: Node discards an unconsumed body when the response
+      // finishes, so the keep-alive connection stays usable (guarded by a test).
       const cmd = parseEcpCommand("POST", url);
       if (!cmd) {
         res.statusCode = 404;

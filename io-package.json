@@ -4,17 +4,17 @@
     "version": "1.2.0",
     "news": {
       "NEXT": {
-        "en": "Fixes a crash on a malformed keyboard keypress, accepts IPv6 remotes on the local network, shows the correct adapter icon in the admin, and requires admin >= 8.0.11.",
-        "de": "Behebt einen Absturz bei einem fehlerhaften Tastatur-Tastendruck, akzeptiert IPv6-Fernbedienungen im lokalen Netz, zeigt im Admin das richtige Adapter-Symbol und benötigt admin >= 8.0.11.",
-        "ru": "Исправлен сбой при некорректном нажатии клавиши клавиатуры, принимаются IPv6-пульты в локальной сети, в админке отображается правильный значок адаптера, требуется admin >= 8.0.11.",
-        "pt": "Corrige uma falha num toque de teclado malformado, aceita comandos IPv6 na rede local, mostra o ícone correto do adaptador no admin e requer admin >= 8.0.11.",
-        "nl": "Verhelpt een crash bij een ongeldige toetsenbordtoets, accepteert IPv6-afstandsbedieningen in het lokale netwerk, toont het juiste adapterpictogram in de admin en vereist admin >= 8.0.11.",
-        "fr": "Corrige un plantage sur une touche clavier malformée, accepte les télécommandes IPv6 du réseau local, affiche la bonne icône d'adaptateur dans l'admin et requiert admin >= 8.0.11.",
-        "it": "Corregge un arresto su un tasto della tastiera malformato, accetta telecomandi IPv6 nella rete locale, mostra l'icona corretta dell'adattatore nell'admin e richiede admin >= 8.0.11.",
-        "es": "Corrige un fallo con una tecla de teclado malformada, acepta mandos IPv6 en la red local, muestra el icono correcto del adaptador en el admin y requiere admin >= 8.0.11.",
-        "pl": "Naprawia awarię przy nieprawidłowym naciśnięciu klawisza, akceptuje piloty IPv6 w sieci lokalnej, pokazuje właściwą ikonę adaptera w panelu admin i wymaga admin >= 8.0.11.",
-        "uk": "Виправлено збій при некоректному натисканні клавіші, приймаються IPv6-пульти в локальній мережі, в адмінці показується правильна іконка адаптера, потрібен admin >= 8.0.11.",
-        "zh-cn": "修复格式错误的键盘按键导致的崩溃，接受本地网络中的 IPv6 遥控器，在管理界面显示正确的适配器图标，并需要 admin >= 8.0.11。"
+        "en": "Fixes a crash on a malformed keyboard keypress, accepts IPv6 remotes on the local network, shows the correct adapter icon, reports Roku OS 15.0 and requires admin >= 8.0.11.",
+        "de": "Behebt einen Absturz bei fehlerhaftem Tastatur-Tastendruck, akzeptiert IPv6-Fernbedienungen im LAN, zeigt das richtige Adapter-Symbol, meldet Roku OS 15.0 und benötigt admin >= 8.0.11.",
+        "ru": "Исправлен сбой при некорректном нажатии клавиши, принимаются IPv6-пульты в локальной сети, показан правильный значок адаптера, сообщается Roku OS 15.0, требуется admin >= 8.0.11.",
+        "pt": "Corrige uma falha num toque de teclado malformado, aceita comandos IPv6 na rede local, mostra o ícone correto do adaptador, reporta Roku OS 15.0 e requer admin >= 8.0.11.",
+        "nl": "Verhelpt een crash bij een ongeldige toetsenbordtoets, accepteert IPv6-afstandsbedieningen in het LAN, toont het juiste adapterpictogram, meldt Roku OS 15.0 en vereist admin >= 8.0.11.",
+        "fr": "Corrige un plantage sur une touche clavier malformée, accepte les télécommandes IPv6 du réseau local, affiche la bonne icône, annonce Roku OS 15.0 et requiert admin >= 8.0.11.",
+        "it": "Corregge un arresto su un tasto malformato, accetta telecomandi IPv6 nella rete locale, mostra l'icona corretta dell'adattatore, segnala Roku OS 15.0 e richiede admin >= 8.0.11.",
+        "es": "Corrige un fallo con una tecla malformada, acepta mandos IPv6 en la red local, muestra el icono correcto del adaptador, informa Roku OS 15.0 y requiere admin >= 8.0.11.",
+        "pl": "Naprawia awarię przy nieprawidłowym klawiszu, akceptuje piloty IPv6 w sieci lokalnej, pokazuje właściwą ikonę adaptera, zgłasza Roku OS 15.0 i wymaga admin >= 8.0.11.",
+        "uk": "Виправлено збій при некоректному натисканні клавіші, приймаються IPv6-пульти в локальній мережі, показано правильну іконку адаптера, повідомляється Roku OS 15.0, потрібен admin >= 8.0.11.",
+        "zh-cn": "修复格式错误的键盘按键导致的崩溃，接受本地网络中的 IPv6 遥控器，显示正确的适配器图标，报告 Roku OS 15.0，并需要 admin >= 8.0.11。"
       },
       "1.2.0": {
         "en": "Honest status: the instance reports connected only while every configured Roku runs. Shutdown waits for its last write. Plus optional error reporting via Sentry.",

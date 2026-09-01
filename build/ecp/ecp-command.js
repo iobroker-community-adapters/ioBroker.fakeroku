@@ -18,10 +18,12 @@ var __copyProps = (to, from, except, desc) => {
 var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 var ecp_command_exports = {};
 __export(ecp_command_exports, {
+  COMMAND_TYPES: () => COMMAND_TYPES,
   parseEcpCommand: () => parseEcpCommand
 });
 module.exports = __toCommonJS(ecp_command_exports);
 var import_pure_helpers = require("../lib/pure-helpers");
+const COMMAND_TYPES = ["keypress", "keydown", "keyup", "launch", "install", "input", "search"];
 function parseEcpCommand(method, url) {
   if (method !== "POST") {
     return null;
@@ -50,6 +52,7 @@ function parseEcpCommand(method, url) {
 }
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
+  COMMAND_TYPES,
   parseEcpCommand
 });
 //# sourceMappingURL=ecp-command.js.map

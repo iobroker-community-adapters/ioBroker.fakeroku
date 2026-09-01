@@ -5,7 +5,7 @@ import { FakerokuDeviceManagement } from "./device-management";
 import type { RokuAdvert } from "./discovery/ssdp-messages";
 import { RokuSsdpResponder } from "./discovery/ssdp-responder";
 import { DEFAULT_APPS } from "./ecp/device-info";
-import type { CommandEvent } from "./ecp/ecp-command";
+import { COMMAND_TYPES, type CommandEvent } from "./ecp/ecp-command";
 import { EcpHttpServer } from "./ecp/ecp-http-server";
 import { commandToStateWrite, type DeviceType, keysForType } from "./ecp/state-model";
 import { DEFAULT_ECP_PORT } from "./lib/constants";
@@ -222,7 +222,17 @@ export class Fakeroku extends utils.Adapter {
     });
     await this.extendObject(`${deviceId}.commandType`, {
       type: "state",
-      common: { name: "Last command type", type: "string", role: "text", read: true, write: false, def: "" },
+      common: {
+        name: "Last command type",
+        type: "string",
+        role: "text",
+        read: true,
+        write: false,
+        def: "",
+        // The fixed verb list, so the admin shows the value as a label. Plain strings
+        // only — a translation object here crashes the admin's object view.
+        states: Object.fromEntries(COMMAND_TYPES.map(verb => [verb, verb])),
+      },
       native: {},
     });
     await this.extendObject(`${deviceId}.keys`, { type: "channel", common: { name: "Remote keys" }, native: {} });
