@@ -17,6 +17,9 @@ describe("matchesRokuSearch", () => {
   it("accepts ssdp:all", () => {
     expect(matchesRokuSearch(MSEARCH.replace("ST: roku:ecp", "ST: ssdp:all"))).toBe(true);
   });
+  it("accepts upnp:rootdevice (the generic UPnP sweep a controller may start with)", () => {
+    expect(matchesRokuSearch(MSEARCH.replace("ST: roku:ecp", "ST: upnp:rootdevice"))).toBe(true);
+  });
   it("rejects a foreign ST", () => {
     expect(matchesRokuSearch(MSEARCH.replace("ST: roku:ecp", "ST: urn:schemas-upnp-org:device:MediaRenderer:1"))).toBe(
       false,

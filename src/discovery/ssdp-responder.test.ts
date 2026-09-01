@@ -8,6 +8,7 @@ const dgramMock = vi.hoisted(() => {
     membership: Array<string | undefined>;
     mcastIf: string[];
     closed: boolean;
+    options: unknown;
     handlers: Record<string, Array<(...a: unknown[]) => void>>;
     once: (ev: string, cb: (...a: unknown[]) => void) => FakeSocket;
     on: (ev: string, cb: (...a: unknown[]) => void) => FakeSocket;
@@ -23,8 +24,9 @@ const dgramMock = vi.hoisted(() => {
   const sockets: FakeSocket[] = [];
   // Injectable failures — each is the real OS error the production code guards.
   const fail = { bind: false, join: false, mcastIf: false, send: false, close: false, throwString: false };
-  const make = (): FakeSocket => {
+  const make = (options?: unknown): FakeSocket => {
     const s: FakeSocket = {
+      options,
       membership: [],
       mcastIf: [],
       sent: [],
@@ -88,7 +90,7 @@ const dgramMock = vi.hoisted(() => {
   };
   return { sockets, make, fail };
 });
-vi.mock("node:dgram", () => ({ createSocket: () => dgramMock.make() }));
+vi.mock("node:dgram", () => ({ createSocket: (options: unknown) => dgramMock.make(options) }));
 
 /** A logger that records what the responder said, so warn-vs-silence is assertable. */
 function recordingLog() {
@@ -127,6 +129,14 @@ describe("RokuSsdpResponder", () => {
     const s = dgramMock.sockets[0];
     expect(s.membership).toEqual(["10.0.0.9"]);
     expect(s.mcastIf).toEqual(["10.0.0.9"]);
+  });
+
+  it("binds port 1900 shareable, so another SSDP service on the host can coexist", async () => {
+    // hueemu (and any UPnP stack) sits on the same port; without reuseAddr the second
+    // one to start fails its bind and one of the two emulators is undiscoverable.
+    const r = new RokuSsdpResponder({ ...baseCfg, bindIp: undefined, membershipInterfaces: [] });
+    await r.start();
+    expect(dgramMock.sockets[0].options).toEqual({ type: "udp4", reuseAddr: true });
   });
 
   it("with no interface known joins on the OS default", async () => {

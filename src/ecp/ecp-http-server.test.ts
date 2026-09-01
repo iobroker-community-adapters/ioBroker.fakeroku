@@ -1,4 +1,5 @@
 import * as http from "node:http";
+import * as net from "node:net";
 import type { CommandEvent } from "./ecp-command";
 import { EcpHttpServer } from "./ecp-http-server";
 
@@ -15,12 +16,15 @@ const noopLog = {
   error: (): void => {},
 };
 
-function request(method: string, path: string): Promise<{ status: number; body: string }> {
+function request(
+  method: string,
+  path: string,
+): Promise<{ status: number; body: string; headers: http.IncomingHttpHeaders }> {
   return new Promise((resolve, reject) => {
     const req = http.request({ host: "127.0.0.1", port: PORT, method, path }, res => {
       let body = "";
       res.on("data", c => (body += c));
-      res.on("end", () => resolve({ status: res.statusCode ?? 0, body }));
+      res.on("end", () => resolve({ status: res.statusCode ?? 0, body, headers: res.headers }));
     });
     req.on("error", reject);
     req.end();
@@ -49,10 +53,17 @@ describe("EcpHttpServer", () => {
   });
   afterAll(() => server.stop());
 
-  it("serves device-info with a current version", async () => {
+  it("serves device-info with a current version, as XML", async () => {
     const r = await request("GET", "/query/device-info");
     expect(r.status).toBe(200);
     expect(r.body).toMatch(/<software-version>1[4-9]\./);
+    // A real Roku answers text/xml; a controller's XML parser may refuse a body
+    // delivered without it.
+    expect(r.headers["content-type"]).toMatch(/^text\/xml/);
+  });
+  it("answers a query with a query string (a controller appending parameters)", async () => {
+    const r = await request("GET", "/query/device-info?ts=1");
+    expect(r.status).toBe(200);
   });
   it("serves the UPnP root description", async () => {
     const r = await request("GET", "/");
@@ -207,6 +218,38 @@ describe("EcpHttpServer", () => {
     } finally {
       blocker.close();
     }
+  });
+
+  it("stop tears down a connection that is still mid-request, not only idle ones", async () => {
+    // A controller can hold a half-sent request open. close() alone waits for it
+    // (headersTimeout, 60 s) and the synchronous onUnload runs into the host's 1 s
+    // kill; closeAllConnections() ends it now.
+    const heldPort = PORT + 3;
+    const held = new EcpHttpServer({
+      device: { uuid: "held", port: heldPort },
+      friendlyName: "held",
+      apps: [],
+      deviceType: "player",
+      bindIp: "127.0.0.1",
+      logger: noopLog,
+      onCommand: () => {},
+    });
+    await held.start();
+    const socket = net.connect(heldPort, "127.0.0.1");
+    await new Promise<void>((resolve, reject) => {
+      socket.once("connect", resolve);
+      socket.once("error", reject);
+    });
+    socket.write("POST /keypress/Home HTTP/1.1\r\nHost: 127.0.0.1\r\n"); // no blank line: never completes
+    await new Promise(resolve => setTimeout(resolve, 50));
+    const closed = new Promise<string>(resolve => socket.once("close", () => resolve("closed")));
+    held.stop();
+    const outcome = await Promise.race([
+      closed,
+      new Promise<string>(resolve => setTimeout(() => resolve("still open after 500 ms"), 500)),
+    ]);
+    socket.destroy();
+    expect(outcome).toBe("closed");
   });
 
   it("serves the advertised app list", async () => {

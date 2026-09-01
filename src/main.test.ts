@@ -57,6 +57,8 @@ vi.mock("node:os", async importOriginal => {
   return { ...actual, default: { ...actual, networkInterfaces }, networkInterfaces };
 });
 
+import { I18n } from "@iobroker/adapter-core";
+import { join } from "node:path";
 import { Fakeroku } from "./main";
 import type { CommandEvent } from "./ecp/ecp-command";
 import { EcpHttpServer } from "./ecp/ecp-http-server";
@@ -91,6 +93,8 @@ function internalOf(adapter: Fakeroku): {
   clearInterval: ReturnType<typeof vi.fn>;
   ssdp: FakeSsdp | undefined;
   deviceKeys: Map<string, ReadonlySet<string>>;
+  pulseTimers: Set<unknown>;
+  holdTimers: Map<string, unknown>;
   makeEcpServer: unknown;
   makeSsdpResponder: unknown;
 } {
@@ -182,6 +186,32 @@ describe("Fakeroku onReady — device wiring", () => {
     const tvKeys = [...ctx.i.objects.keys()].filter(k => k.startsWith("Schlafzimmer.keys.")).length;
     expect(tvKeys).toBeGreaterThan(playerKeys);
     expect(ctx.i.states.get("info.connection")).toEqual({ val: true, ack: true });
+  });
+
+  it("keeps the object tree of a device whose server could not start", async () => {
+    const ctx = setup(
+      {
+        devices: [
+          { name: "Wohnzimmer", port: 8060, type: "player" },
+          { name: "Kueche", port: 8061, type: "player" },
+        ],
+      },
+      { failEcpPort: 8060 },
+    );
+    await ctx.i.onReady();
+    // The device is still configured. Its states — and whatever the user attached to
+    // them, history for one — must survive until the port conflict is fixed, not be
+    // swept as orphans on every restart while the log says "fix the port".
+    expect(ctx.i.objects.get("Wohnzimmer.keys.Home")?.type).toBe("state");
+    expect(ctx.i.objects.get("Kueche.keys.Home")?.type).toBe("state");
+  });
+
+  it("loads the admin translations from the adapter's admin folder", async () => {
+    const ctx = setup();
+    await ctx.i.onReady();
+    // adapter-core looks for `<root>/i18n` — pointing at admin/i18n directly would
+    // throw at start-up and leave every device-manager label untranslated.
+    expect(I18n.init).toHaveBeenCalledWith(join("/tmp/fakeroku", "admin"), ctx.adapter);
   });
 
   it("closes an ECP server whose start failed, so nothing of it outlives the device loop", async () => {
@@ -439,6 +469,38 @@ describe("Fakeroku applyCommand", () => {
     const release = ctx.i.setTimeout.mock.calls.at(-1)!;
     (release[0] as () => void)();
     expect(ctx.i.states.get("Wohnzimmer.keys.Home")).toEqual({ val: false, ack: true });
+  });
+
+  it("forgets a pulse timer once it has fired — the teardown list must not grow per keypress", async () => {
+    const ctx = await ready();
+    ctx.i.setTimeout.mockClear();
+    ctx.i.applyCommand("Wohnzimmer", { type: "keypress", key: "Home" });
+    expect(ctx.i.pulseTimers.size).toBe(1);
+    (ctx.i.setTimeout.mock.calls.at(-1)![0] as () => void)();
+    // Every keypress adds one entry; without the removal a busy remote grows the
+    // set for the lifetime of the instance.
+    expect(ctx.i.pulseTimers.size).toBe(0);
+  });
+
+  it("forgets a watchdog once it has fired", async () => {
+    const ctx = await ready();
+    ctx.i.setTimeout.mockClear();
+    ctx.i.applyCommand("Wohnzimmer", { type: "keydown", key: "Select" });
+    expect(ctx.i.holdTimers.size).toBe(1);
+    (ctx.i.setTimeout.mock.calls.at(-1)![0] as () => void)();
+    expect(ctx.i.holdTimers.size).toBe(0);
+  });
+
+  it("a pulse is far shorter than the hold watchdog — a keypress must not look like a held key", async () => {
+    const ctx = await ready();
+    ctx.i.setTimeout.mockClear();
+    ctx.i.applyCommand("Wohnzimmer", { type: "keypress", key: "Home" });
+    const pulseMs = ctx.i.setTimeout.mock.calls.at(-1)![1] as number;
+    ctx.i.applyCommand("Wohnzimmer", { type: "keydown", key: "Select" });
+    const holdMs = ctx.i.setTimeout.mock.calls.at(-1)![1] as number;
+    // The two constants are easy to swap; a 30 s "pulse" would read as a stuck key.
+    expect(pulseMs).toBeLessThan(1000);
+    expect(holdMs).toBeGreaterThan(pulseMs * 10);
   });
 
   it("holds a key between keydown and keyup, and arms no watchdog on release", async () => {

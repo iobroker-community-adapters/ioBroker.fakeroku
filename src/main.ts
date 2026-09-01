@@ -366,6 +366,8 @@ export class Fakeroku extends utils.Adapter {
         },
         (e: unknown) => {
           clear();
+          // Lint (prefer-promise-reject-errors) wants an Error here; errText downstream
+          // would cope with anything, so this is the rule's shape, not a second safeguard.
           reject(e instanceof Error ? e : new Error(String(e)));
         },
       );

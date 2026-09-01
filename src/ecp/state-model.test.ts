@@ -1,4 +1,8 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { BASE_KEYS, commandToStateWrite, keysForType, MAX_COMMAND_LENGTH, TV_KEYS } from "./state-model";
+
+const root = join(__dirname, "..", "..");
 
 describe("keysForType", () => {
   it("a player exposes the base keys and no TV keys", () => {
@@ -14,10 +18,11 @@ describe("keysForType", () => {
       expect(keys).toContain(k);
     }
   });
-  it("base has 16 keys, TV adds 11 for 27 total", () => {
-    expect(BASE_KEYS.length).toBe(16);
-    expect(TV_KEYS.length).toBe(11);
-    expect(keysForType("tv").length).toBe(27);
+  it("the admin hint and the README name the real number of player keys", () => {
+    // The count itself is free to change; the texts a user reads must follow it.
+    const en = JSON.parse(readFileSync(join(root, "admin", "i18n", "en.json"), "utf8")) as Record<string, string>;
+    expect(en.deviceTypeHint).toContain(`the ${BASE_KEYS.length} standard`);
+    expect(readFileSync(join(root, "README.md"), "utf8")).toContain(`the ${BASE_KEYS.length} standard`);
   });
 });
 

@@ -35,6 +35,9 @@ describe("buildDescXml", () => {
     expect(desc).toContain("urn:roku-com:service:ecp:1");
     expect(desc).toContain("<UDN>uuid:roku:ecp:abc123</UDN>");
   });
+  it("escapes the friendly name — a user's name must not break the description a remote parses", () => {
+    expect(buildDescXml(device, "A & B <TV>", "player")).toContain("<friendlyName>A &amp; B &lt;TV&gt;</friendlyName>");
+  });
   it("a TV root description uses the tv device type", () => {
     expect(buildDescXml(device, "Living Room", "tv")).toContain("urn:roku-com:device:tv:1-0");
   });

@@ -415,6 +415,15 @@ describe("buildDeviceForm", () => {
     expect(form.items.name.validator).toContain('["living room"]');
   });
 
+  it("keeps the validator valid code when a name carries quotes or backslashes", () => {
+    const form = buildDeviceForm(['Say "hi"', "back\\slash"], []) as unknown as FormSchema;
+    const literal = form.items.name.validator!.match(/^!(\[.*\])\.includes\(/)?.[1];
+    expect(literal).toBeDefined();
+    // The admin evaluates this string as JavaScript. An unescaped quote ends the array
+    // early and every duplicate-name check in the dialog silently stops working.
+    expect(JSON.parse(literal!)).toEqual(['say "hi"', "back\\slash"]);
+  });
+
   it("compares ports as numbers, so a typed '8060' is caught", () => {
     const form = buildDeviceForm([], [8060]) as unknown as FormSchema;
     expect(form.items.port.validator).toBe("![8060].includes(Number(data.port))");
