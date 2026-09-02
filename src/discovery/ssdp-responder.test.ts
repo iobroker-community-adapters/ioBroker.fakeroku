@@ -1,3 +1,4 @@
+import type { Mock } from "vitest";
 import { RokuSsdpResponder } from "./ssdp-responder";
 
 // dgram is mocked so the interface handling in start() (per-interface addMembership +
@@ -51,7 +52,8 @@ const dgramMock = vi.hoisted(() => {
       },
       addMembership: (_addr, iface) => {
         if (fail.throwString) {
-          throw "EPERM-ish string";
+          // Deliberately not an Error: the responder must cope with a string throw.
+          throw "EPERM-ish string" as unknown;
         }
         if (fail.join) {
           throw new Error("ENODEV");
@@ -73,7 +75,9 @@ const dgramMock = vi.hoisted(() => {
             address: args[2] as string,
           });
         }
-        if (typeof cb === "function") (cb as (e?: Error) => void)(fail.send ? new Error("ENETUNREACH") : undefined);
+        if (typeof cb === "function") {
+          (cb as (e?: Error) => void)(fail.send ? new Error("ENETUNREACH") : undefined);
+        }
       },
       close: () => {
         if (fail.close) {
@@ -93,7 +97,7 @@ const dgramMock = vi.hoisted(() => {
 vi.mock("node:dgram", () => ({ createSocket: (options: unknown) => dgramMock.make(options) }));
 
 /** A logger that records what the responder said, so warn-vs-silence is assertable. */
-function recordingLog() {
+function recordingLog(): { debug: Mock; warn: Mock; error: Mock } {
   return { debug: vi.fn(), warn: vi.fn(), error: vi.fn() };
 }
 const noopLog = recordingLog();

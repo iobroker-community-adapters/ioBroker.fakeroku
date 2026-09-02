@@ -45,7 +45,11 @@ function request(
 
 describe("EcpHttpServer", () => {
   const commands: CommandEvent[] = [];
-  /** Swappable command sink, so one test can make the adapter's handler throw. */
+  /**
+   * Swappable command sink, so one test can make the adapter's handler throw.
+   *
+   * @param c Command event received from the HTTP layer
+   */
   let onCommandImpl: (c: CommandEvent) => void = c => {
     commands.push(c);
   };

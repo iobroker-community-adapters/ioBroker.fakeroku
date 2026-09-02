@@ -1,4 +1,5 @@
 import { vi } from "vitest";
+import type * as OsModule from "node:os";
 
 /**
  * Orchestration tests for the adapter lifecycle. `@iobroker/adapter-core` is
@@ -17,32 +18,35 @@ vi.mock("@iobroker/adapter-core", () => {
     public objects = new Map<string, Record<string, unknown>>();
     public states = new Map<string, { val: unknown; ack: boolean }>();
     public on = vi.fn();
-    public setState = vi.fn(async (id: string, state: unknown) => {
+    public setState = vi.fn((id: string, state: unknown) => {
       const s = state as { val?: unknown; ack?: boolean };
       this.states.set(id.replace(`${this.namespace}.`, ""), { val: s?.val, ack: s?.ack === true });
+      return Promise.resolve();
     });
-    public extendObject = vi.fn(async (id: string, obj: Record<string, unknown>) => {
+    public extendObject = vi.fn((id: string, obj: Record<string, unknown>) => {
       const key = id.replace(`${this.namespace}.`, "");
       this.objects.set(key, { ...(this.objects.get(key) ?? {}), ...obj });
+      return Promise.resolve();
     });
-    public getAdapterObjectsAsync = vi.fn(async () => {
+    public getAdapterObjectsAsync = vi.fn(() => {
       const out: Record<string, unknown> = {};
       for (const [k, v] of this.objects) {
         out[`${this.namespace}.${k}`] = v;
       }
-      return out;
+      return Promise.resolve(out);
     });
-    public delObjectAsync = vi.fn(async (id: string, opts?: { recursive?: boolean }) => {
+    public delObjectAsync = vi.fn((id: string, opts?: { recursive?: boolean }) => {
       const key = id.replace(`${this.namespace}.`, "");
       for (const k of [...this.objects.keys()]) {
         if (k === key || (opts?.recursive && k.startsWith(`${key}.`))) {
           this.objects.delete(k);
         }
       }
+      return Promise.resolve();
     });
-    public setInterval = vi.fn(() => ({ kind: "interval" }) as unknown);
+    public setInterval = vi.fn(() => ({ kind: "interval" }));
     public clearInterval = vi.fn();
-    public setTimeout = vi.fn((_cb: () => void, _ms: number) => ({ kind: "timeout" }) as unknown);
+    public setTimeout = vi.fn((_cb: () => void, _ms: number) => ({ kind: "timeout" }));
     public clearTimeout = vi.fn();
     constructor(_opts: unknown) {}
   }
@@ -52,7 +56,7 @@ vi.mock("@iobroker/adapter-core", () => {
 /** os.networkInterfaces is swapped so the advertise-IP paths are deterministic. */
 const osMock = vi.hoisted(() => ({ interfaces: null as Record<string, unknown[]> | null }));
 vi.mock("node:os", async importOriginal => {
-  const actual = await importOriginal<typeof import("node:os")>();
+  const actual = await importOriginal<typeof OsModule>();
   const networkInterfaces = (): unknown => osMock.interfaces ?? actual.networkInterfaces();
   return { ...actual, default: { ...actual, networkInterfaces }, networkInterfaces };
 });
@@ -76,7 +80,11 @@ interface FakeSsdp {
   options: Record<string, unknown>;
 }
 
-/** Typed access to the private members the orchestration tests drive. */
+/**
+ * Typed access to the private members the orchestration tests drive.
+ *
+ * @param adapter Adapter instance under test
+ */
 function internalOf(adapter: Fakeroku): {
   onReady(): Promise<void>;
   onUnload(cb: () => void): void;
@@ -114,6 +122,8 @@ interface Ctx {
  *
  * @param config native config fields for this run
  * @param opts   per-fake behaviour (which ECP port fails to start, SSDP failure)
+ * @param opts.failEcpPort ECP port whose fake server fails to start
+ * @param opts.ssdpStartFails Whether the fake SSDP responder fails to start
  */
 function setup(
   config: Record<string, unknown> = {},
@@ -134,10 +144,11 @@ function setup(
     const server: FakeEcp = {
       options,
       stop: vi.fn(),
-      start: vi.fn(async () => {
+      start: vi.fn(() => {
         if (opts.failEcpPort === port) {
-          throw new Error(`EADDRINUSE ${port}`);
+          return Promise.reject(new Error(`EADDRINUSE ${port}`));
         }
+        return Promise.resolve();
       }),
     };
     ecp.push(server);
@@ -148,10 +159,11 @@ function setup(
       options,
       stop: vi.fn(),
       announce: vi.fn(),
-      start: vi.fn(async () => {
+      start: vi.fn(() => {
         if (opts.ssdpStartFails) {
-          throw new Error("port 1900 busy");
+          return Promise.reject(new Error("port 1900 busy"));
         }
+        return Promise.resolve();
       }),
     };
     ssdps.push(responder);
@@ -623,8 +635,8 @@ describe("Fakeroku applyCommand", () => {
 
   it("a rejected state write is traced, not thrown — a remote can still press keys while the database closes", async () => {
     const ctx = await ready();
-    (ctx.i as unknown as { setState: unknown }).setState = vi.fn(async () => {
-      throw new Error("States database not connected");
+    (ctx.i as unknown as { setState: unknown }).setState = vi.fn(() => {
+      return Promise.reject(new Error("States database not connected"));
     });
     expect(() => ctx.i.applyCommand("Wohnzimmer", { type: "keypress", key: "Home" })).not.toThrow();
     // Let the rejections settle — an unhandled one fails the run (and kills the adapter).
@@ -743,8 +755,8 @@ describe("Fakeroku onUnload", () => {
   it("still reports done when the last write is rejected", async () => {
     const ctx = setup();
     await ctx.i.onReady();
-    (ctx.i as unknown as { setState: unknown }).setState = vi.fn(async () => {
-      throw new Error("database gone");
+    (ctx.i as unknown as { setState: unknown }).setState = vi.fn(() => {
+      return Promise.reject(new Error("database gone"));
     });
 
     // A teardown that never calls back is killed by js-controller — a failing

@@ -1,6 +1,10 @@
 import { planObjectCleanup } from "./object-cleanup";
 
-/** One configured device "ioBroker" exposing the given keys. */
+/**
+ * One configured device "ioBroker" exposing the given keys.
+ *
+ * @param keys Key names the device exposes
+ */
 const valid = (keys: string[]): ReadonlyMap<string, ReadonlySet<string>> => new Map([["ioBroker", new Set(keys)]]);
 const BASE = valid(["Home", "Play", "Select"]);
 

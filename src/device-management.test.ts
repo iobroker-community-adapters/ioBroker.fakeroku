@@ -1,3 +1,4 @@
+import type { Mock } from "vitest";
 // t() returns something identifiable instead of a translation object, so the
 // tests assert on the message CHOICE, not on wording; keys with arguments keep
 // the arguments visible.
@@ -73,17 +74,22 @@ describe("findClash", () => {
 // device list can be silently lost, so each rule gets its own test.
 // ---------------------------------------------------------------------------
 
-/** An in-memory `system.adapter.fakeroku.0` config object as the manager sees it. */
+/**
+ * An in-memory `system.adapter.fakeroku.0` config object as the manager sees it.
+ *
+ * @param devices Device list stored in native.devices
+ */
 function mockAdapter(devices: unknown = []): any {
   let stored: unknown = devices;
   return {
     namespace: "fakeroku.0",
     on: vi.fn(),
-    getForeignObjectAsync: vi.fn(async (id: string) =>
-      id === "system.adapter.fakeroku.0" ? { native: { devices: stored } } : null,
+    getForeignObjectAsync: vi.fn((id: string) =>
+      Promise.resolve(id === "system.adapter.fakeroku.0" ? { native: { devices: stored } } : null),
     ),
-    extendForeignObjectAsync: vi.fn(async (_id: string, patch: { native: { devices: unknown } }) => {
+    extendForeignObjectAsync: vi.fn((_id: string, patch: { native: { devices: unknown } }) => {
       stored = patch.native.devices;
+      return Promise.resolve();
     }),
     _stored: () => stored as RokuDeviceConfig[],
   };
@@ -93,12 +99,20 @@ function mockAdapter(devices: unknown = []): any {
  * A mock ActionContext with configurable form / confirmation answers. The
  * parameters are declared (not just ignored) so the tests can assert on the
  * schema and the pre-filled data the manager passes in.
+ *
+ * @param opts Canned answers for the dialogs
+ * @param opts.form What showForm resolves with
+ * @param opts.confirm What showConfirmation resolves with (default true)
  */
-function mockContext(opts: { form?: unknown; confirm?: boolean } = {}) {
+function mockContext(opts: { form?: unknown; confirm?: boolean } = {}): {
+  showForm: Mock;
+  showConfirmation: Mock;
+  showMessage: Mock;
+} {
   return {
-    showForm: vi.fn(async (_schema: unknown, _options: unknown) => opts.form),
-    showConfirmation: vi.fn(async (_text: unknown) => opts.confirm ?? true),
-    showMessage: vi.fn(async (_text: unknown) => undefined),
+    showForm: vi.fn((_schema: unknown, _options: unknown) => Promise.resolve(opts.form)),
+    showConfirmation: vi.fn((_text: unknown) => Promise.resolve(opts.confirm ?? true)),
+    showMessage: vi.fn((_text: unknown) => Promise.resolve(undefined)),
   };
 }
 
@@ -139,7 +153,11 @@ describe("FakerokuDeviceManagement", () => {
     return internalOf(dm);
   }
 
-  /** Collect the cards loadDevices() pushes into the manager view. */
+  /**
+   * Collect the cards loadDevices() pushes into the manager view.
+   *
+   * @param devices Device list the manager loads the cards from
+   */
   async function cards(devices: unknown): Promise<Card[]> {
     const i = make(devices);
     const out: Card[] = [];
@@ -252,7 +270,7 @@ describe("FakerokuDeviceManagement", () => {
       const i = make([living, kitchen]);
       const ctx = mockContext({ form: undefined });
       await i.addDevice(ctx);
-      const schema = ctx.showForm.mock.calls[0][0] as unknown as FormSchema;
+      const schema = ctx.showForm.mock.calls[0][0] as FormSchema;
       // The greyed-out OK button is the user's only in-dialog feedback; it works
       // off these literal lists, so an empty list means every clash gets through.
       expect(schema.items.name.validator).toContain('"living room"');
@@ -325,7 +343,7 @@ describe("FakerokuDeviceManagement", () => {
       const i = make([living, kitchen]);
       const ctx = mockContext({ form: undefined });
       await i.editDevice(1, ctx);
-      const schema = ctx.showForm.mock.calls[0][0] as unknown as FormSchema;
+      const schema = ctx.showForm.mock.calls[0][0] as FormSchema;
       // Otherwise opening a device and pressing OK without changing anything greys
       // the button out: it clashes with itself and the user cannot edit at all.
       expect(schema.items.name.validator).not.toContain('"kitchen"');
