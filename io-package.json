@@ -1,9 +1,9 @@
 {
   "common": {
     "name": "fakeroku",
-    "version": "1.3.0",
+    "version": "1.4.0",
     "news": {
-      "NEXT": {
+      "1.4.0": {
         "en": "Renaming a Roku keeps the remote paired, a stuck key is released at start-up, all datapoints get translated names, and IPv6 remotes from your network are accepted.",
         "de": "Umbenennen behält die Kopplung der Fernbedienung, eine hängende Taste wird beim Start freigegeben, alle Datenpunkte bekommen übersetzte Namen, IPv6-Fernbedienungen werden akzeptiert.",
         "ru": "Переименование сохраняет сопряжение пульта, зависшая кнопка сбрасывается при старте, все точки данных получают переведённые названия, IPv6-пульты принимаются.",

@@ -92,12 +92,12 @@ becomes `true` — or watch `.command` for the last button as text.
 	Placeholder for the next version (at the beginning of the line):
 	### **WORK IN PROGRESS**
 -->
-### **WORK IN PROGRESS**
-- (krobipd) Fixed: renaming an emulated Roku in the admin could change its identity on the network, so a paired Harmony or Sofabaton lost the device and had to be set up again. Affected every device that was never added through the "+ Add" dialog — including the one each new instance starts with.
-- (krobipd) Fixed: a remote key that was pressed or held when the adapter stopped stayed `true` for good. All key datapoints are now released when the adapter starts, so a rule waiting for the next press keeps working after a crash or a restart.
-- (krobipd) Fixed: a device named "info" entered by hand into the configuration replaced the instance's own status channel and left datapoints behind that were never cleaned up. Such a name is now refused, and leftovers from an earlier run are removed.
-- (krobipd) Changed: every datapoint now carries a translated name and, where there is something to explain, a short description — in all eleven admin languages. Existing installations are updated too, not just new ones.
-- (krobipd) Improved: a remote with a globally routable IPv6 address is accepted when it is in the same network as the ioBroker host. Before, only the reserved IPv6 ranges counted as local, which shut out remotes on a connection with native IPv6.
+### 1.4.0 (2026-09-03)
+- (krobipd) Fixed: renaming an emulated Roku could change its identity on the network, so a paired Harmony or Sofabaton lost the device and had to be set up again.
+- (krobipd) Fixed: a remote key that was pressed when the adapter stopped stayed on for good. All key datapoints are now released at start-up, so the next press works again.
+- (krobipd) Fixed: a device named "info" entered by hand into the configuration replaced the instance's own status channel. The name is refused now and leftovers are removed.
+- (krobipd) Changed: every datapoint now carries a translated name and, where useful, a short description — in all eleven languages, in existing installations as well.
+- (krobipd) Improved: a remote with a globally routable IPv6 address is accepted when it sits in the same network as the ioBroker host, not just on the reserved IPv6 ranges.
 - (krobipd) New: user documentation in English and German, shown in the ioBroker documentation portal.
 
 ### 1.3.0 (2026-09-01)
@@ -124,12 +124,6 @@ becomes `true` — or watch `.command` for the last button as text.
 ### 1.0.0 (2026-08-05)
 - (krobipd) First stable release — version 1.0.0 marks the complete rewrite as the mature, supported version of the adapter.
 - (krobipd) Upgrading from an older version now shows a one-time notice that the button data points changed from text to real boolean values, so scripts and visualizations can be checked.
-
-### 0.6.0 (2026-08-05)
-- (krobipd) Complete rewrite. The adapter now answers the full Roku control surface — including device-info with a current Roku version — so Logitech Harmony and Sofabaton remotes pair and work reliably.
-- (krobipd) Works out of the box: it detects the network address to advertise on its own, no manual interface picking.
-- (krobipd) Manage multiple emulated Rokus from the admin UI, each as a Player or a TV.
-- (krobipd) Cleaner object tree — one datapoint per remote button with the correct types, plus a last-command datapoint; leftover objects from older versions are removed on start.
 
 [Older changelogs can be found there](CHANGELOG_OLD.md)
 
