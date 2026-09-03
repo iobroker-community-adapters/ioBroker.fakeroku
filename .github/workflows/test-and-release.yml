@@ -15,13 +15,17 @@ on:
       - "v[0-9]+.[0-9]+.[0-9]+"
       # pre-releases
       - "v[0-9]+.[0-9]+.[0-9]+-**"
-    # Reine Doku-Pushes lösen keinen Lauf aus: an einer Textzeile kann kein
-    # Test fallen. Laut GitHub-Doku gilt "Path filters are not evaluated for
-    # pushes of tags" — der Release-Lauf am Tag bleibt also unberührt. Bewusst
-    # NUR unter `push`, nicht unter `pull_request`.
+    # A push that only touches text starts no run: no test can fail on a prose line.
+    # Per GitHub's docs "Path filters are not evaluated for pushes of tags", so the
+    # release run on the tag is unaffected. Deliberately only under `push`, never
+    # under `pull_request`.
     paths-ignore:
       - "**.md"
       - "docs/**"
+      - ".gitignore"
+      - ".gitattributes"
+      - ".editorconfig"
+      - "LICENSE"
   pull_request: {}
 
 # Cancel previous PR/branch runs when a new commit is pushed

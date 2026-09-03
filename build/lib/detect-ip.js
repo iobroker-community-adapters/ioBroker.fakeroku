@@ -42,9 +42,14 @@ function listNonInternalIPv4s(interfaces) {
   }
   return out;
 }
+const CONTAINER_BRIDGE_PREFIXES = ["172.17.", "172.18."];
+function isContainerBridge(address) {
+  return CONTAINER_BRIDGE_PREFIXES.some((prefix) => address.startsWith(prefix));
+}
 function pickPrimaryIPv4(interfaces) {
-  var _a;
-  return (_a = listNonInternalIPv4s(interfaces)[0]) != null ? _a : "";
+  var _a, _b;
+  const addresses = listNonInternalIPv4s(interfaces);
+  return (_b = (_a = addresses.find((address) => !isContainerBridge(address))) != null ? _a : addresses[0]) != null ? _b : "";
 }
 function detectPrimaryIPv4() {
   return pickPrimaryIPv4((0, import_node_os.networkInterfaces)());

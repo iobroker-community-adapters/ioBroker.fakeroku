@@ -1,0 +1,21 @@
+# Generated output — prettier must never rewrite what the compiler produced.
+build/
+coverage/
+
+# Maintained by the iobroker-community-adapters bots (dependabot, auto-merge,
+# the org's workflow standardisation). Reformatting them here would turn every
+# bot update into a conflict over whitespace.
+.github/
+
+# Frozen history: the changelog of the versions before the rewrite.
+CHANGELOG_OLD.md
+
+# Written by tools, not by hand: npm writes the lockfile, the release script and
+# sync-iopackage-from-i18n.py write the manifest (both with a plain 2-space dump).
+# Formatting it here would only start a ping-pong on the next release.
+package-lock.json
+io-package.json
+
+# The release script writes the changelog block into the README, in its own layout —
+# formatting it here would be undone by the next release and reported as drift again.
+README.md

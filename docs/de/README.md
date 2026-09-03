@@ -68,16 +68,16 @@ diese Fernbedienungen, bevor sie ein Gerät annehmen.
 
 Auf Instanz-Ebene:
 
-| Datenpunkt | Typ | Bedeutung |
-|---|---|---|
+| Datenpunkt        | Typ                 | Bedeutung                                                                                                                                                                                                                   |
+| ----------------- | ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `info.connection` | boolean, nur lesbar | Nur wahr, solange **jeder** konfigurierte Roku tatsächlich lauscht. Kann einer nicht starten — fast immer, weil sein Anschluss schon belegt ist — bleibt die Instanz getrennt, und das Protokoll nennt Gerät und Anschluss. |
 
 Je emuliertem Roku, unterhalb von `fakeroku.0.<Name>`:
 
-| Datenpunkt | Typ | Bedeutung |
-|---|---|---|
-| `command` | string, nur lesbar | Der letzte Befehl als lesbarer Text: `Home`, `Lit_a`, `launch:12`, `search:news`. |
-| `commandType` | string, nur lesbar | Um welche Art Befehl es sich handelte: `keypress`, `keydown`, `keyup`, `launch`, `install`, `input` oder `search`. |
+| Datenpunkt     | Typ                 | Bedeutung                                                                                                                                                |
+| -------------- | ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `command`      | string, nur lesbar  | Der letzte Befehl als lesbarer Text: `Home`, `Lit_a`, `launch:12`, `search:news`.                                                                        |
+| `commandType`  | string, nur lesbar  | Um welche Art Befehl es sich handelte: `keypress`, `keydown`, `keyup`, `launch`, `install`, `input` oder `search`.                                       |
 | `keys.<Taste>` | boolean, nur lesbar | Ein Datenpunkt je Taste. Ein Tastendruck setzt ihn kurz auf `true` und wieder auf `false`; eine gehaltene Taste bleibt `true`, bis sie losgelassen wird. |
 
 Tastatureingaben der Fernbedienung (`Lit_a`) und App-Starts erscheinen nur in
@@ -89,7 +89,7 @@ Der übliche Weg ist, auf eine Taste zu reagieren, die `true` wird:
 
 ```javascript
 on({ id: "fakeroku.0.Wohnzimmer.keys.Play", val: true }, () => {
-    // deine Aktion
+  // deine Aktion
 });
 ```
 
@@ -97,7 +97,7 @@ Oder `command` beobachten, wenn du mehrere Tasten an einer Stelle behandeln will
 
 ```javascript
 on({ id: "fakeroku.0.Wohnzimmer.command" }, obj => {
-    log("Fernbedienung sendete: " + obj.state.val);
+  log("Fernbedienung sendete: " + obj.state.val);
 });
 ```
 
@@ -124,6 +124,13 @@ UDP-Anschluss 1900 blockiert. Bei einem Rechner mit mehreren Netzwerkkarten die
 richtige unter **Netzwerkkarte** auswählen. Ist die Erkennung nicht verfügbar,
 schreibt der Adapter das ins Protokoll und arbeitet für bereits gekoppelte
 Fernbedienungen weiter.
+
+**Die Fernbedienung findet nichts, und im Protokoll steht „advertising on 172.17.x.x".**
+Diese Adresse gehört zu einer Docker-Brücke auf dem Rechner, nicht zu deinem
+Heimnetz — keine Fernbedienung erreicht sie. Der Adapter bevorzugt von sich aus eine
+echte Netzwerkadresse; das taucht also nur auf, wenn der Rechner in dem Moment keine
+andere zu bieten hat. Wähle unter **Netzwerkkarte** die richtige aus und starte die
+Instanz neu.
 
 **Die Instanz bleibt „nicht verbunden".**
 Mindestens ein konfigurierter Roku konnte nicht starten. Das Protokoll nennt Gerät

@@ -36,6 +36,8 @@ var import_errors = require("../lib/errors");
 var import_lan_guard = require("../lib/lan-guard");
 var import_ecp_command = require("./ecp-command");
 var import_device_info = require("./device-info");
+const MAX_LOGGED_DETAIL = 120;
+const NON_LAN_LOG_INTERVAL_MS = 6e4;
 class EcpHttpServer {
   /**
    * @param config server configuration
@@ -45,6 +47,10 @@ class EcpHttpServer {
   }
   config;
   server;
+  /** When the non-LAN rejection was last logged — a scanner must not fill the log. */
+  nonLanLoggedAt = 0;
+  /** Whether the fatal-error callback has already fired — it reports once, not per event. */
+  fatalReported = false;
   /** Bind the HTTP server to the interface + port. Rejects on bind error. */
   async start() {
     var _a;
@@ -55,7 +61,7 @@ class EcpHttpServer {
       server.once("error", onError);
       server.listen(this.config.device.port, this.config.bindIp, () => {
         server.removeListener("error", onError);
-        server.on("error", (err) => this.config.logger.error(`ECP server error: ${err.message}`));
+        server.on("error", (err) => this.onRuntimeError(err));
         resolve();
       });
     });
@@ -63,11 +69,30 @@ class EcpHttpServer {
       `ECP server "${this.config.friendlyName}" on ${(_a = this.config.bindIp) != null ? _a : "0.0.0.0"}:${this.config.device.port}`
     );
   }
+  /**
+   * A server error after a good start — this emulated Roku is gone. Report it once
+   * so the adapter can revise `info.connection` instead of showing a healthy
+   * instance whose device answers nothing; the other devices keep running.
+   *
+   * @param err the server error
+   */
+  onRuntimeError(err) {
+    this.config.logger.error(`ECP server "${this.config.friendlyName}" error: ${err.message}`);
+    const notify = this.config.onFatalError;
+    if (notify && !this.fatalReported) {
+      this.fatalReported = true;
+      notify(err);
+    }
+  }
   handle(req, res) {
     var _a, _b, _c, _d, _e, _f;
     const peer = ((_a = req.socket.remoteAddress) != null ? _a : "").replace(/^::ffff:/, "") || "?";
     if (!(0, import_lan_guard.isLanClient)(req.socket.remoteAddress)) {
-      this.config.logger.debug(`ECP request from non-LAN ${peer} rejected (403)`);
+      const now = Date.now();
+      if (now - this.nonLanLoggedAt >= NON_LAN_LOG_INTERVAL_MS) {
+        this.nonLanLoggedAt = now;
+        this.config.logger.debug(`ECP request from non-LAN ${peer} rejected (403)`);
+      }
       res.statusCode = 403;
       res.end();
       return;
@@ -96,12 +121,15 @@ class EcpHttpServer {
         res.end();
         return;
       }
-      const detail = ((_f = (_e = (_d = cmd.key) != null ? _d : cmd.appId) != null ? _e : cmd.text) != null ? _f : "").replace(new RegExp("\\p{Cc}", "gu"), "?");
-      this.config.logger.debug(`ECP ${cmd.type}${detail ? ` ${detail}` : ""} from ${peer}`);
+      let accepted = false;
       try {
-        this.config.onCommand(cmd);
+        accepted = this.config.onCommand(cmd);
       } catch (e) {
         this.config.logger.warn(`onCommand failed: ${(0, import_errors.errText)(e)}`);
+      }
+      if (accepted) {
+        const detail = ((_f = (_e = (_d = cmd.key) != null ? _d : cmd.appId) != null ? _e : cmd.text) != null ? _f : "").replace(new RegExp("\\p{Cc}", "gu"), "?").slice(0, MAX_LOGGED_DETAIL);
+        this.config.logger.debug(`ECP ${cmd.type}${detail ? ` ${detail}` : ""} from ${peer}`);
       }
       res.statusCode = 200;
       res.end();

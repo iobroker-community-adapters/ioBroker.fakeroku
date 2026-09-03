@@ -46,12 +46,15 @@ function request(
 describe("EcpHttpServer", () => {
   const commands: CommandEvent[] = [];
   /**
-   * Swappable command sink, so one test can make the adapter's handler throw.
+   * Swappable command sink, so one test can make the adapter's handler throw or
+   * report the command as dropped by the rate gate.
    *
    * @param c Command event received from the HTTP layer
+   * @returns whether the adapter applied the command
    */
-  let onCommandImpl: (c: CommandEvent) => void = c => {
+  let onCommandImpl: (c: CommandEvent) => boolean = c => {
     commands.push(c);
+    return true;
   };
   let server: EcpHttpServer;
 
@@ -148,12 +151,49 @@ describe("EcpHttpServer", () => {
     debugLogs.length = 0;
     const res = { statusCode: 0, setHeader: (): void => {}, end: (): void => {} } as unknown as http.ServerResponse;
     const req = { socket: {} } as unknown as http.IncomingMessage;
-    const h = server as unknown as { handle(q: http.IncomingMessage, s: http.ServerResponse): void };
+    const h = server as unknown as {
+      handle(q: http.IncomingMessage, s: http.ServerResponse): void;
+      nonLanLoggedAt: number;
+    };
+    // The rejection line is throttled to one per minute, and an earlier test in this
+    // file already used up this minute — reset it so this test measures its own case.
+    h.nonLanLoggedAt = 0;
     expect(() => h.handle(req, res)).not.toThrow();
     // No remote address at all is not a LAN client — a missing peer must not be
     // treated as trusted.
     expect(res.statusCode).toBe(403);
     expect(debugLogs.some(m => m.includes("non-LAN ?"))).toBe(true);
+  });
+
+  it("writes at most one non-LAN rejection per minute", () => {
+    // A port scanner sends thousands of requests. One log line each would be the
+    // very flood the rate gate exists to prevent — only on the log instead of the
+    // states database. Every request is still answered with 403.
+    const h = server as unknown as {
+      handle(q: http.IncomingMessage, s: http.ServerResponse): void;
+      nonLanLoggedAt: number;
+    };
+    h.nonLanLoggedAt = 0;
+    debugLogs.length = 0;
+    const statuses: number[] = [];
+    for (let i = 0; i < 20; i++) {
+      const res = {
+        statusCode: 0,
+        setHeader: (): void => {},
+        end: (): void => {},
+      } as unknown as http.ServerResponse;
+      h.handle(
+        {
+          socket: { remoteAddress: "8.8.8.8" },
+          method: "POST",
+          url: "/keypress/Home",
+        } as unknown as http.IncomingMessage,
+        res,
+      );
+      statuses.push(res.statusCode);
+    }
+    expect(statuses.every(s => s === 403)).toBe(true);
+    expect(debugLogs.filter(m => m.includes("non-LAN")).length).toBe(1);
   });
 
   it("treats a request without a method or url as a GET of the root description", () => {
@@ -200,6 +240,34 @@ describe("EcpHttpServer", () => {
     expect(debugLogs.some(m => /^ECP search from /.test(m))).toBe(true);
   });
 
+  it("reports a server error after a good start exactly once", async () => {
+    // A bind failure rejects start() and main.ts skips that device. THIS is the other
+    // case: the server was listening and then died — the device answers nothing while
+    // the instance still looks connected. Reported once, not per event.
+    const port = await freePort();
+    const fatals: Error[] = [];
+    const dying = new EcpHttpServer({
+      device: { uuid: "dying", port },
+      friendlyName: "Wohnzimmer",
+      apps: [],
+      deviceType: "player",
+      bindIp: "127.0.0.1",
+      logger: noopLog,
+      onCommand: () => true,
+      onFatalError: e => fatals.push(e),
+    });
+    await dying.start();
+    try {
+      const inner = (dying as unknown as { server: http.Server }).server;
+      inner.emit("error", new Error("EMFILE"));
+      inner.emit("error", new Error("EMFILE again"));
+      expect(fatals).toHaveLength(1);
+      expect(fatals[0].message).toBe("EMFILE");
+    } finally {
+      dying.stop();
+    }
+  });
+
   it("stop is safe before start and when called twice", () => {
     const idle = new EcpHttpServer({
       device: { uuid: "zzz", port: 1 },
@@ -208,7 +276,7 @@ describe("EcpHttpServer", () => {
       deviceType: "player",
       bindIp: undefined,
       logger: noopLog,
-      onCommand: () => {},
+      onCommand: () => true,
     });
     // onUnload calls stop() unconditionally, including for a device whose start
     // threw on a busy port — a throw there costs the callback and means SIGKILL.
@@ -227,7 +295,7 @@ describe("EcpHttpServer", () => {
       deviceType: "player",
       bindIp: "127.0.0.1",
       logger: noopLog,
-      onCommand: () => {},
+      onCommand: () => true,
     });
     try {
       await expect(busy.start()).rejects.toThrow(/EADDRINUSE/);
@@ -250,7 +318,7 @@ describe("EcpHttpServer", () => {
       deviceType: "player",
       bindIp: "127.0.0.1",
       logger: noopLog,
-      onCommand: () => {},
+      onCommand: () => true,
     });
     await held.start();
     const socket = net.connect(heldPort, "127.0.0.1");
@@ -313,6 +381,37 @@ describe("EcpHttpServer", () => {
     expect(commands).toEqual([]);
   });
 
+  it("stays quiet about a command the adapter's rate gate dropped", async () => {
+    // The rate gate lives in the adapter (onCommand returns false when it drops a
+    // command). Logging before asking it would leave the log open to exactly the
+    // flood the gate stops: 1000 lines a second while 25 commands reach the database.
+    debugLogs.length = 0;
+    onCommandImpl = () => false;
+    try {
+      const r = await request("POST", "/keypress/Home");
+      expect(r.status).toBe(200);
+      expect(debugLogs.some(m => m.startsWith("ECP keypress"))).toBe(false);
+    } finally {
+      onCommandImpl = c => {
+        commands.push(c);
+        return true;
+      };
+    }
+  });
+
+  it("caps the logged command text like the state value beside it", async () => {
+    // The text comes from the request URL, which a client controls up to Node's
+    // 16 KiB header limit. The `command` state is capped at 500 characters — the log
+    // line must not be the way around that cap.
+    debugLogs.length = 0;
+    const long = "x".repeat(400);
+    const r = await request("POST", `/search?${long}`);
+    expect(r.status).toBe(200);
+    const line = debugLogs.find(m => m.startsWith("ECP search"));
+    expect(line).toBeDefined();
+    expect(line).not.toContain("x".repeat(200));
+  });
+
   it("survives a throwing command handler and still answers the remote", async () => {
     warnLogs.length = 0;
     onCommandImpl = () => {
@@ -328,6 +427,7 @@ describe("EcpHttpServer", () => {
     } finally {
       onCommandImpl = c => {
         commands.push(c);
+        return true;
       };
     }
   });

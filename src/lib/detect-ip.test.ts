@@ -22,6 +22,40 @@ describe("pickPrimaryIPv4", () => {
   it("returns empty string when there are no interfaces", () => {
     expect(pickPrimaryIPv4({})).toBe("");
   });
+
+  it("skips Docker's default bridges in favour of the real LAN address", () => {
+    // An ioBroker host commonly runs Docker, and docker0 can come first in the
+    // enumeration. Advertising 172.17.0.1 puts an unreachable address into every
+    // SSDP answer while the adapter looks perfectly healthy.
+    expect(
+      pickPrimaryIPv4({
+        docker0: [{ address: "172.17.0.1", family: "IPv4", internal: false }],
+        br_compose: [{ address: "172.18.0.1", family: "IPv4", internal: false }],
+        eth0: [{ address: "192.168.1.20", family: "IPv4", internal: false }],
+      } as never),
+    ).toBe("192.168.1.20");
+  });
+
+  it("still advertises a bridge address when the host has nothing else", () => {
+    // Inside a container that IS on the bridge network, that address is all there
+    // is — an empty answer would stop the adapter for no reason.
+    expect(
+      pickPrimaryIPv4({
+        eth0: [{ address: "172.17.0.5", family: "IPv4", internal: false }],
+      } as never),
+    ).toBe("172.17.0.5");
+  });
+
+  it("keeps the rest of 172.16.0.0/12, which is ordinary private space", () => {
+    // Only 172.17/172.18 are Docker's defaults; 172.16.x.x and 172.20.x.x are
+    // perfectly normal LANs and must not be pushed to the back.
+    expect(
+      pickPrimaryIPv4({
+        eth0: [{ address: "172.16.5.4", family: "IPv4", internal: false }],
+        eth1: [{ address: "192.168.1.20", family: "IPv4", internal: false }],
+      } as never),
+    ).toBe("172.16.5.4");
+  });
 });
 
 describe("listNonInternalIPv4s", () => {

@@ -108,7 +108,7 @@ interface FakeSsdp {
 function internalOf(adapter: Fakeroku): {
   onReady(): Promise<void>;
   onUnload(cb: () => void): void;
-  applyCommand(deviceId: string, cmd: CommandEvent): void;
+  applyCommand(deviceId: string, cmd: CommandEvent): boolean;
   onSsdpFatal(): void;
   startWithTimeout(p: Promise<void>, ms: number): Promise<void>;
   objects: Map<string, Record<string, unknown>>;
@@ -903,6 +903,51 @@ describe("Fakeroku cleanup of stale objects", () => {
     expect(ctx.i.objects.has("info.connection")).toBe(true);
     expect(ctx.i.log.debug).not.toHaveBeenCalledWith(expect.stringContaining("orphaned object"));
   });
+
+  it("removes the last device's tree after the user deleted it", async () => {
+    // The device manager writes an EMPTY list when the last Roku is deleted. Before
+    // 1.5.0 onReady returned on that list before the sweep ran, so the deleted
+    // device kept its object, its command states and all its keys — forever, because
+    // no other path ever removes them.
+    const ctx = setup({ devices: [] });
+    ctx.i.objects.set("Wohnzimmer", { type: "device" });
+    ctx.i.objects.set("Wohnzimmer.command", { type: "state" });
+    ctx.i.objects.set("Wohnzimmer.keys.Home", { type: "state" });
+
+    await ctx.i.onReady();
+
+    expect(ctx.i.objects.has("Wohnzimmer")).toBe(false);
+    expect(ctx.i.objects.has("Wohnzimmer.keys.Home")).toBe(false);
+    // The adapter's own status survives the sweep.
+    expect(ctx.i.objects.has("info.connection")).toBe(true);
+  });
+
+  it("removes a deleted device even when no routable address is left", async () => {
+    // What belongs in the tree is decided by the configuration, not by the network:
+    // a host that lost its address must not resurrect a device the user removed.
+    osMock.interfaces = { lo: [{ family: "IPv4", address: "127.0.0.1", internal: true }] };
+    const ctx = setup({ networkInterface: "", devices: [] });
+    ctx.i.objects.set("Wohnzimmer", { type: "device" });
+
+    await ctx.i.onReady();
+
+    expect(ctx.i.log.warn).toHaveBeenCalledWith(expect.stringContaining("No routable IPv4 address"));
+    expect(ctx.i.objects.has("Wohnzimmer")).toBe(false);
+  });
+
+  it("sweeps nothing when the config carries no devices key at all", async () => {
+    // `devices: undefined` is not "the user deleted everything" — it is a config we
+    // could not read (or an instance nobody ever configured). Treating it as an empty
+    // list would trade a tree that stays for a tree that is gone.
+    const ctx = setup({ devices: undefined });
+    ctx.i.objects.set("Wohnzimmer", { type: "device" });
+    ctx.i.objects.set("Wohnzimmer.keys.Home", { type: "state" });
+
+    await ctx.i.onReady();
+
+    expect(ctx.i.objects.has("Wohnzimmer")).toBe(true);
+    expect(ctx.i.objects.has("Wohnzimmer.keys.Home")).toBe(true);
+  });
 });
 
 describe("Fakeroku startWithTimeout", () => {
@@ -1042,6 +1087,38 @@ describe("Fakeroku collaborator wiring", () => {
     // for as long as the instance runs.
     expect(ctx.i.clearInterval).toHaveBeenCalledTimes(1);
     expect(ctx.i.ssdp).toBeUndefined();
+  });
+
+  it("hooks each ECP server's fatal callback to the connection status", async () => {
+    // A server that dies after a good start leaves a device answering nothing. Without
+    // this wiring info.connection stays true — a green instance in front of a Roku that
+    // is gone, which nobody would notice. The SSDP responder has had the same callback
+    // since 1.1.0; the ECP servers only logged.
+    const ctx = setup({ devices: [{ name: "Wohnzimmer", port: 8060, type: "player" }] });
+    await ctx.i.onReady();
+    expect(ctx.i.states.get("info.connection")?.val).toBe(true);
+
+    const onFatal = ctx.ecp[0].options.onFatalError as () => void;
+    expect(onFatal, "the ECP server's fatal callback must be wired").toBeDefined();
+    onFatal();
+
+    expect(ctx.i.states.get("info.connection")?.val).toBe(false);
+    expect(ctx.i.log.error).toHaveBeenCalledWith(expect.stringContaining('"Wohnzimmer" stopped answering'));
+  });
+
+  it("survives a failing status write when a device dies", async () => {
+    // onEcpFatal runs from a socket event, outside any await. An unhandled rejection
+    // there is an adapter crash (exit code 6) over a state write that failed because
+    // the database is already going down — the very moment this path fires.
+    const ctx = setup();
+    await ctx.i.onReady();
+    ctx.i.setState.mockRejectedValueOnce(new Error("states db closed"));
+
+    const onFatal = ctx.ecp[0].options.onFatalError as () => void;
+    expect(() => onFatal()).not.toThrow();
+    await Promise.resolve();
+
+    expect(ctx.i.log.debug).toHaveBeenCalledWith(expect.stringContaining("states db closed"));
   });
 
   it("a fatal report with no announce running does not touch the timer API", async () => {

@@ -3,6 +3,19 @@
     "name": "fakeroku",
     "version": "1.4.0",
     "news": {
+      "NEXT": {
+        "en": "Deleting the last emulated Roku now removes its datapoints, a host running Docker no longer announces an unreachable address, and a device that fails while running is reported instead of shown as connected.",
+        "de": "Das Löschen des letzten emulierten Roku entfernt jetzt seine Datenpunkte, ein Rechner mit Docker kündigt keine unerreichbare Adresse mehr an, und ein im Betrieb ausgefallenes Gerät wird gemeldet statt als verbunden angezeigt.",
+        "ru": "Удаление последнего эмулируемого Roku теперь удаляет его точки данных, хост с Docker больше не объявляет недоступный адрес, а отказавшее во время работы устройство сообщается, а не показывается как подключённое.",
+        "pt": "Eliminar o último Roku emulado remove agora os seus pontos de dados, um sistema com Docker deixa de anunciar um endereço inacessível e um dispositivo que falha em funcionamento é comunicado em vez de aparecer como ligado.",
+        "nl": "Het verwijderen van de laatste geëmuleerde Roku wist nu zijn datapunten, een host met Docker kondigt geen onbereikbaar adres meer aan, en een tijdens bedrijf uitgevallen apparaat wordt gemeld in plaats van als verbonden getoond.",
+        "fr": "La suppression du dernier Roku émulé retire désormais ses points de données, un hôte avec Docker n'annonce plus une adresse injoignable, et un appareil défaillant en fonctionnement est signalé au lieu d'être affiché comme connecté.",
+        "it": "L'eliminazione dell'ultimo Roku emulato rimuove ora i suoi punti dati, un host con Docker non annuncia più un indirizzo irraggiungibile e un dispositivo guasto durante il funzionamento viene segnalato invece di apparire connesso.",
+        "es": "Al eliminar el último Roku emulado ahora se borran sus puntos de datos, un equipo con Docker ya no anuncia una dirección inalcanzable y un dispositivo que falla en marcha se informa en lugar de mostrarse como conectado.",
+        "pl": "Usunięcie ostatniego emulowanego Roku usuwa teraz jego punkty danych, host z Dockerem nie ogłasza już nieosiągalnego adresu, a urządzenie, które przestało działać, jest zgłaszane zamiast pokazywane jako połączone.",
+        "uk": "Видалення останнього емульованого Roku тепер прибирає його точки даних, хост із Docker більше не оголошує недосяжну адресу, а пристрій, що відмовив під час роботи, повідомляється, а не показується як підключений.",
+        "zh-cn": "删除最后一个模拟 Roku 现在会一并移除其数据点，运行 Docker 的主机不再公告无法访问的地址，运行中失效的设备会被报告而不再显示为已连接。"
+      },
       "1.4.0": {
         "en": "Renaming a Roku keeps the remote paired, a stuck key is released at start-up, all datapoints get translated names, and IPv6 remotes from your network are accepted.",
         "de": "Umbenennen behält die Kopplung der Fernbedienung, eine hängende Taste wird beim Start freigegeben, alle Datenpunkte bekommen übersetzte Namen, IPv6-Fernbedienungen werden akzeptiert.",
@@ -80,19 +93,6 @@
         "pl": "Całkowicie przepisany. Adapter obsługuje teraz pełną powierzchnię sterowania Roku, w tym device-info z aktualną wersją Roku, dzięki czemu piloty Logitech Harmony i Sofabaton działają niezawodnie. Działa od razu, pozwala zarządzać wieloma emulowanymi Roku (Player lub TV) z interfejsu administratora i używa czystszego drzewa obiektów z poprawnymi typami danych.",
         "uk": "Повністю переписано. Адаптер тепер підтримує весь набір команд керування Roku, включно з device-info з актуальною версією Roku, тож пульти Logitech Harmony і Sofabaton працюють надійно. Він працює без налаштування, дозволяє керувати кількома емульованими Roku (Player або TV) з інтерфейсу адміністратора та використовує чистіше дерево об'єктів із правильними типами даних.",
         "zh-cn": "完全重写。适配器现在可响应完整的 Roku 控制接口，包括带有当前 Roku 版本的 device-info，因此 Logitech Harmony 和 Sofabaton 遥控器可以可靠地工作。开箱即用，可从管理界面管理多个模拟 Roku（Player 或 TV），并使用具有正确数据类型的更简洁的对象树。"
-      },
-      "0.5.1": {
-        "en": "Adapter requires node.js >= 22 now\nDependencies have been updated",
-        "de": "Der Adapter benötigt jetzt Node.js >= 22.\nDie Abhängigkeiten wurden aktualisiert.",
-        "ru": "Для работы адаптера требуется Node.js версии >= 22.\nЗависимости обновлены.",
-        "pt": "O adaptador agora requer Node.js >= 22.\nAs dependências foram atualizadas.",
-        "nl": "De adapter vereist nu Node.js versie 22 of hoger.\nAfhankelijkheden zijn bijgewerkt.",
-        "fr": "L'adaptateur nécessite désormais Node.js >= 22.\nLes dépendances ont été mises à jour",
-        "it": "L'adattatore ora richiede Node.js >= 22\nLe dipendenze sono state aggiornate",
-        "es": "El adaptador ahora requiere node.js >= 22.\nSe han actualizado las dependencias.",
-        "pl": "Adapter wymaga teraz node.js >= 22\nZaktualizowano zależności",
-        "uk": "Адаптер тепер вимагає node.js >= 22\nЗалежності оновлено",
-        "zh-cn": "适配器现在需要 node.js 版本 >= 22。\n依赖项已更新"
       }
     },
     "titleLang": {

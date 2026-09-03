@@ -31,14 +31,42 @@ export function listNonInternalIPv4s(interfaces: NodeJS.Dict<NetworkInterfaceInf
 }
 
 /**
- * Pick the first non-internal IPv4 from a set of OS network interfaces. Pure —
- * takes the interface map so it can be unit-tested without real network cards.
+ * The container-bridge networks Docker hands out by default: `docker0` (172.17.x.x)
+ * and the first user-defined / compose bridge (172.18.x.x). They are non-internal
+ * IPv4 addresses like any other, but nothing on the LAN can reach them.
+ */
+const CONTAINER_BRIDGE_PREFIXES = ["172.17.", "172.18."];
+
+/**
+ * Is this address one of Docker's default bridge networks?
+ *
+ * @param address an IPv4 address
+ * @returns true for a Docker default-bridge address
+ */
+function isContainerBridge(address: string): boolean {
+  return CONTAINER_BRIDGE_PREFIXES.some(prefix => address.startsWith(prefix));
+}
+
+/**
+ * Pick the address to advertise from a set of OS network interfaces: the first
+ * routable IPv4 that is NOT a Docker default bridge, and only as a last resort a
+ * bridge address. Pure — takes the interface map so it can be unit-tested without
+ * real network cards.
+ *
+ * Why the exception exists: an ioBroker host commonly runs Docker, and `docker0`
+ * (172.17.x.x) or the first compose bridge (172.18.x.x) can come first in the
+ * interface enumeration. Advertising one of them puts an address into every SSDP
+ * answer and NOTIFY that no remote on the LAN can reach — while the adapter starts
+ * green and reports "advertising on 172.17.0.1", which looks like success. The
+ * sibling emulator hit exactly this (hassemu v1.21.0) and fixed it the same way, so
+ * the fleet gives one answer instead of two.
  *
  * @param interfaces the OS network-interface map (os.networkInterfaces() shape)
- * @returns the first routable IPv4 address, or "" if none is found
+ * @returns the routable IPv4 address to advertise, or "" if none is found
  */
 export function pickPrimaryIPv4(interfaces: NodeJS.Dict<NetworkInterfaceInfo[]>): string {
-  return listNonInternalIPv4s(interfaces)[0] ?? "";
+  const addresses = listNonInternalIPv4s(interfaces);
+  return addresses.find(address => !isContainerBridge(address)) ?? addresses[0] ?? "";
 }
 
 /**

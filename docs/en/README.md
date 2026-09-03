@@ -62,17 +62,17 @@ check before they accept a device.
 
 At instance level:
 
-| Datapoint | Type | Meaning |
-|---|---|---|
+| Datapoint         | Type               | Meaning                                                                                                                                                                                                                      |
+| ----------------- | ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `info.connection` | boolean, read-only | True only while **every** configured Roku is actually listening. If one of them cannot start — almost always because its port is already in use — the instance stays disconnected and the log names the device and the port. |
 
 For each emulated Roku, below `fakeroku.0.<name>`:
 
-| Datapoint | Type | Meaning |
-|---|---|---|
-| `command` | string, read-only | The last command as readable text: `Home`, `Lit_a`, `launch:12`, `search:news`. |
-| `commandType` | string, read-only | What kind of command it was: `keypress`, `keydown`, `keyup`, `launch`, `install`, `input` or `search`. |
-| `keys.<Key>` | boolean, read-only | One datapoint per remote key. A key press sets it to `true` for a moment and back to `false`; holding a key keeps it `true` until it is released. |
+| Datapoint     | Type               | Meaning                                                                                                                                           |
+| ------------- | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `command`     | string, read-only  | The last command as readable text: `Home`, `Lit_a`, `launch:12`, `search:news`.                                                                   |
+| `commandType` | string, read-only  | What kind of command it was: `keypress`, `keydown`, `keyup`, `launch`, `install`, `input` or `search`.                                            |
+| `keys.<Key>`  | boolean, read-only | One datapoint per remote key. A key press sets it to `true` for a moment and back to `false`; holding a key keeps it `true` until it is released. |
 
 Typing on the remote's keyboard (`Lit_a`) and app launches appear in `command` only —
 they do not get datapoints of their own.
@@ -83,7 +83,7 @@ The usual way is to react to a key becoming `true`:
 
 ```javascript
 on({ id: "fakeroku.0.Living_room.keys.Play", val: true }, () => {
-    // your action
+  // your action
 });
 ```
 
@@ -91,7 +91,7 @@ Or watch `command` if you want to handle several buttons in one place:
 
 ```javascript
 on({ id: "fakeroku.0.Living_room.command" }, obj => {
-    log("Remote sent: " + obj.state.val);
+  log("Remote sent: " + obj.state.val);
 });
 ```
 
@@ -116,6 +116,12 @@ firewall blocks UDP port 1900. On a host with several network cards, select the
 right one under **Network interface**. If discovery is unavailable the adapter says
 so in the log and keeps working for remotes that were already paired.
 
+**The remote finds nothing, and the log says "advertising on 172.17.x.x".**
+That address belongs to a Docker bridge on the host, not to your home network — no
+remote can reach it. The adapter prefers a real network address on its own, so this
+only shows up when the host has nothing else to offer at that moment. Pick the correct
+card under **Network interface** and restart the instance.
+
 **The instance stays "not connected".**
 At least one configured Roku could not start. The log names the device and its port —
 almost always the port is already used by something else (including another emulated
@@ -128,7 +134,7 @@ reaching the adapter; if it appears, the command arrived and the problem is in t
 script reading the datapoint.
 
 **Play and pause do the same thing.**
-That is the Roku protocol, not the adapter: the remote sends the *same* command for
+That is the Roku protocol, not the adapter: the remote sends the _same_ command for
 play and for pause, so the two cannot be told apart here.
 
 **The app buttons on my Harmony do nothing.**

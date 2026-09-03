@@ -50,7 +50,14 @@ export class Fakeroku extends utils.Adapter {
   private readonly commandGates = new Map<string, RateGate>();
   /** Per device, when the dropped-commands warning was last written. */
   private readonly rateWarnedAt = new Map<string, number>();
-  /** Device-manager backend: the emulated Rokus as cards with add/edit/delete. */
+  /**
+   * Device-manager backend: the emulated Rokus as cards with add/edit/delete.
+   *
+   * Nothing reads this field, and that is not an oversight: dm-utils subscribes to
+   * the adapter's `message` event from its own constructor, so creating the object
+   * IS the wiring. The field keeps it visible — and owned — instead of leaving a
+   * bare `new` in the constructor that reads like a mistake.
+   */
   private readonly deviceManagement: FakerokuDeviceManagement;
 
   // Construction seams for the two network-facing collaborators. Production uses
@@ -83,6 +90,17 @@ export class Fakeroku extends utils.Adapter {
       await I18n.init(join(this.adapterDir, "admin"), this);
       await this.refreshOwnObjects();
 
+      // Read the device list BEFORE anything can return early: the orphan sweep below
+      // has to know the configured set at every exit, or a tree the user just deleted
+      // stays in the database for good (there is no second path that removes it).
+      // `devicesKnown` separates "the user removed the last device" (an empty array —
+      // sweep) from "there is no devices key at all" (never configured, or a config we
+      // could not read — sweep nothing, or we would delete a tree we cannot account for).
+      const devicesKnown = Array.isArray(this.config.devices);
+      const configured = (devicesKnown ? this.config.devices : []).filter(
+        d => d && typeof d.name === "string" && d.name.length > 0,
+      );
+
       // Empty AND "0.0.0.0" both mean "auto": bind all interfaces, advertise the
       // detected primary IP so the adapter runs without configuration. js-controller
       // never rewrites an existing native default, so instances from before 0.5.1
@@ -94,12 +112,15 @@ export class Fakeroku extends utils.Adapter {
       const advertiseIp = bindIp ?? detectPrimaryIPv4();
       if (!advertiseIp) {
         this.log.warn("No routable IPv4 address found to advertise — set the network interface in the settings.");
+        // Sweep even here: what belongs in the tree is decided by the configuration,
+        // not by the network. A missing cable is no reason to keep a deleted device.
+        await this.sweepOrphans(devicesKnown, configured);
         return;
       }
 
-      const configured = (this.config.devices ?? []).filter(d => d && typeof d.name === "string" && d.name.length > 0);
       if (configured.length === 0) {
         this.log.warn("No emulated Roku devices configured.");
+        await this.sweepOrphans(devicesKnown, configured);
         return;
       }
 
@@ -146,6 +167,7 @@ export class Fakeroku extends utils.Adapter {
             bindIp,
             logger: this.log,
             onCommand: cmd => this.applyCommand(deviceId, cmd),
+            onFatalError: () => this.onEcpFatal(d.name),
           });
           await server.start();
           this.ecpServers.push(server);
@@ -162,7 +184,7 @@ export class Fakeroku extends utils.Adapter {
         }
       }
 
-      await this.cleanupOrphans(new Set(configured.map(d => sanitizeId(d.name))));
+      await this.sweepOrphans(devicesKnown, configured);
 
       if (adverts.length === 0) {
         // Nothing is controllable — leave info.connection false and stop here.
@@ -331,6 +353,36 @@ export class Fakeroku extends utils.Adapter {
   }
 
   /**
+   * Run the orphan sweep for the current configuration — from EVERY exit of
+   * onReady, which is the point of it existing as its own method.
+   *
+   * The sweep used to sit on the happy path only, so removing the last emulated
+   * Roku (or a host without a routable address) left its device object, its
+   * `command` / `commandType` and its 16–27 key states behind with nothing that
+   * would ever remove them: the user deletes a device in the admin and keeps its
+   * datapoints forever. The adapter answers for its own datapoints
+   * (`feedback_adapter_verantwortet_datenpunkte`), so the sweep runs whenever the
+   * configuration could be read.
+   *
+   * `devicesKnown` is that condition, and it is not pedantry: with no `devices`
+   * key at all (a never-configured instance, or a config we could not read) an
+   * empty set would mean "nothing is configured, delete everything" — trading a
+   * tree that stays for a tree that is gone.
+   *
+   * @param devicesKnown whether `native.devices` was readable as a list
+   * @param configured the configured devices with a usable name
+   */
+  private async sweepOrphans(
+    devicesKnown: boolean,
+    configured: readonly ioBroker.AdapterConfig["devices"][number][],
+  ): Promise<void> {
+    if (!devicesKnown) {
+      return;
+    }
+    await this.cleanupOrphans(new Set(configured.map(d => sanitizeId(d.name))));
+  }
+
+  /**
    * Remove objects left over from an earlier version or config — the legacy
    * `apps` node, keys no longer standard, and whole device sub-trees no longer
    * configured (a renamed/removed device). The adapter otherwise only ever
@@ -359,12 +411,16 @@ export class Fakeroku extends utils.Adapter {
    * Apply a received ECP command to this device's states: record it in `command`
    * / `commandType`, and pulse or hold the standard key if it is one.
    *
+   * Returns whether the command was applied: the ECP server logs only what got
+   * through, so the rate gate covers the log as well as the states database.
+   *
    * @param deviceId the id-safe device path segment
    * @param cmd the parsed ECP command
+   * @returns true if the command was applied, false if the rate gate dropped it
    */
-  private applyCommand(deviceId: string, cmd: CommandEvent): void {
+  private applyCommand(deviceId: string, cmd: CommandEvent): boolean {
     if (!this.admitCommand(deviceId)) {
-      return;
+      return false;
     }
     const write = commandToStateWrite(cmd);
     this.writeState(`${deviceId}.command`, write.command);
@@ -405,6 +461,7 @@ export class Fakeroku extends utils.Adapter {
         }
       }
     }
+    return true;
   }
 
   /**
@@ -447,6 +504,24 @@ export class Fakeroku extends utils.Adapter {
   private writeState(id: string, val: string | boolean): void {
     this.setState(id, { val, ack: true }).catch((e: unknown) => {
       this.log.debug(`State write ${id} failed: ${errText(e)}`);
+    });
+  }
+
+  /**
+   * One emulated Roku's ECP server died at runtime (a server error after a good
+   * start). That device answers nothing any more, so the instance is no longer
+   * "every configured Roku is listening" — revise the status instead of leaving a
+   * green instance behind a device that is gone. The other devices keep running,
+   * and the message names the one that failed so the user knows which.
+   *
+   * @param friendlyName the configured name of the device whose server died
+   */
+  private onEcpFatal(friendlyName: string): void {
+    this.log.error(
+      `Emulated Roku "${friendlyName}" stopped answering after a server error — restart the instance to bring it back.`,
+    );
+    this.setState("info.connection", { val: false, ack: true }).catch((e: unknown) => {
+      this.log.debug(`Connection state write failed: ${errText(e)}`);
     });
   }
 
