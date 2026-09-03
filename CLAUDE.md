@@ -44,7 +44,7 @@ Roku-Emulator im LAN: ein ECP/SSDP-Controller (Logitech Harmony, Sofabaton) find
 ## Befehle
 
 - `npm run build` · `npm test` · `npm run lint` · `npm run release`.
-- `npm run format` / `format:check` formatieren NUR Handgeschriebenes: `.prettierignore` (seit 1.5.0) nimmt `build/`, `coverage/`, `.github/` (Bot-Dateien der Community-Org), `CHANGELOG_OLD.md`, `package-lock.json`, `io-package.json` und `README.md` aus — die letzten beiden schreibt das Release-Werkzeug in eigener Formatierung, eine Formatierung hier wäre beim nächsten Release wieder Drift.
+- `npm run format` / `format:check` formatieren NUR Handgeschriebenes: die Ausnahmen stehen seit 1.5.0 **als Negativ-Muster im Skript** (`"!build/**" "!.github/**" "!io-package.json" "!README.md" "!CHANGELOG_OLD.md"`), wie bei nut2 und yamaha. ⚠️ **Keine `.prettierignore`** — der repochecker lehnt sie neben `prettier.config.mjs` + `@iobroker/eslint-config` ab (W0084 + W5048), deshalb führt sie kein Adapter der Flotte. Warum überhaupt Ausnahmen: `.github/` gehört den Bots der Community-Org, `io-package.json` und `README.md` schreibt das Release-Werkzeug in eigener Formatierung (sonst ist der nächste Release-Commit wieder „Drift"), `build/` ist erzeugt.
 
 ## Nutzer-Dokumentation
 
