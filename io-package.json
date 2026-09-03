@@ -4,17 +4,17 @@
     "version": "1.4.0",
     "news": {
       "NEXT": {
-        "en": "Deleting the last emulated Roku now removes its datapoints, a host running Docker no longer announces an unreachable address, and a device that fails while running is reported instead of shown as connected.",
-        "de": "Das Löschen des letzten emulierten Roku entfernt jetzt seine Datenpunkte, ein Rechner mit Docker kündigt keine unerreichbare Adresse mehr an, und ein im Betrieb ausgefallenes Gerät wird gemeldet statt als verbunden angezeigt.",
-        "ru": "Удаление последнего эмулируемого Roku теперь удаляет его точки данных, хост с Docker больше не объявляет недоступный адрес, а отказавшее во время работы устройство сообщается, а не показывается как подключённое.",
-        "pt": "Eliminar o último Roku emulado remove agora os seus pontos de dados, um sistema com Docker deixa de anunciar um endereço inacessível e um dispositivo que falha em funcionamento é comunicado em vez de aparecer como ligado.",
-        "nl": "Het verwijderen van de laatste geëmuleerde Roku wist nu zijn datapunten, een host met Docker kondigt geen onbereikbaar adres meer aan, en een tijdens bedrijf uitgevallen apparaat wordt gemeld in plaats van als verbonden getoond.",
-        "fr": "La suppression du dernier Roku émulé retire désormais ses points de données, un hôte avec Docker n'annonce plus une adresse injoignable, et un appareil défaillant en fonctionnement est signalé au lieu d'être affiché comme connecté.",
-        "it": "L'eliminazione dell'ultimo Roku emulato rimuove ora i suoi punti dati, un host con Docker non annuncia più un indirizzo irraggiungibile e un dispositivo guasto durante il funzionamento viene segnalato invece di apparire connesso.",
-        "es": "Al eliminar el último Roku emulado ahora se borran sus puntos de datos, un equipo con Docker ya no anuncia una dirección inalcanzable y un dispositivo que falla en marcha se informa en lugar de mostrarse como conectado.",
-        "pl": "Usunięcie ostatniego emulowanego Roku usuwa teraz jego punkty danych, host z Dockerem nie ogłasza już nieosiągalnego adresu, a urządzenie, które przestało działać, jest zgłaszane zamiast pokazywane jako połączone.",
-        "uk": "Видалення останнього емульованого Roku тепер прибирає його точки даних, хост із Docker більше не оголошує недосяжну адресу, а пристрій, що відмовив під час роботи, повідомляється, а не показується як підключений.",
-        "zh-cn": "删除最后一个模拟 Roku 现在会一并移除其数据点，运行 Docker 的主机不再公告无法访问的地址，运行中失效的设备会被报告而不再显示为已连接。"
+        "en": "Deleting the last emulated Roku now removes its datapoints, a host running Docker no longer announces an unreachable address, and a failed device is reported.",
+        "de": "Das Löschen des letzten emulierten Roku entfernt jetzt seine Datenpunkte, ein Rechner mit Docker kündigt keine unerreichbare Adresse mehr an, ein Ausfall wird gemeldet.",
+        "ru": "Удаление последнего эмулируемого Roku теперь удаляет его точки данных, хост с Docker не объявляет недоступный адрес, а об отказе устройства сообщается.",
+        "pt": "Eliminar o último Roku emulado remove agora os seus pontos de dados, um sistema com Docker não anuncia um endereço inacessível e uma falha é comunicada.",
+        "nl": "Het verwijderen van de laatste geëmuleerde Roku wist nu zijn datapunten, een host met Docker kondigt geen onbereikbaar adres meer aan en een uitval wordt gemeld.",
+        "fr": "La suppression du dernier Roku émulé retire ses points de données, un hôte avec Docker n'annonce plus une adresse injoignable et une panne est signalée.",
+        "it": "L'eliminazione dell'ultimo Roku emulato rimuove i suoi punti dati, un host con Docker non annuncia più un indirizzo irraggiungibile e un guasto viene segnalato.",
+        "es": "Al eliminar el último Roku emulado se borran sus puntos de datos, un equipo con Docker ya no anuncia una dirección inalcanzable y se informa de un fallo.",
+        "pl": "Usunięcie ostatniego emulowanego Roku usuwa jego punkty danych, host z Dockerem nie ogłasza już nieosiągalnego adresu, a awaria jest zgłaszana.",
+        "uk": "Видалення останнього емульованого Roku прибирає його точки даних, хост із Docker не оголошує недосяжну адресу, а про відмову повідомляється.",
+        "zh-cn": "删除最后一个模拟 Roku 会一并移除其数据点，运行 Docker 的主机不再公告无法访问的地址，设备失效会被报告。"
       },
       "1.4.0": {
         "en": "Renaming a Roku keeps the remote paired, a stuck key is released at start-up, all datapoints get translated names, and IPv6 remotes from your network are accepted.",

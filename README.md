@@ -97,7 +97,6 @@ becomes `true` — or watch `.command` for the last button as text.
 - (krobipd) Fixed: deleting the last emulated Roku left all of its datapoints behind for good. They are now removed whenever the configuration says a device is gone.
 - (krobipd) Fixed: on a host running Docker the adapter could announce itself under a container address no remote can reach. A real network address is preferred now.
 - (krobipd) Fixed: an emulated Roku whose server died while running left the instance showing "connected". It now reports the failure and names the device.
-- (krobipd) Improved: a flooding device in the network can no longer fill the log — the command rate limit now covers the log as well, and the logged text is capped.
 
 ### 1.4.0 (2026-09-03)
 - (krobipd) Fixed: renaming an emulated Roku could change its identity on the network, so a paired Harmony or Sofabaton lost the device and had to be set up again.
