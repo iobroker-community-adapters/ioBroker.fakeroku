@@ -41,3 +41,46 @@ describe("isLanClient", () => {
     expect(isLanClient("1.2.3.4")).toBe(false);
   });
 });
+
+describe("isLanClient — globally routable IPv6", () => {
+  // On a connection with native IPv6 every device in the house carries an address
+  // out of the provider's block. It looks like an internet address; only the /64
+  // prefix says whether it is on the same link.
+  const own = (): string[] => ["2003:00e1:1f28:9a00", "2a02:0908:1234:5600"];
+
+  it("accepts a remote in the host's own /64", () => {
+    expect(isLanClient("2003:e1:1f28:9a00::42", own)).toBe(true);
+    expect(isLanClient("2003:00e1:1f28:9a00:1234:5678:9abc:def0", own)).toBe(true);
+    expect(isLanClient("2a02:908:1234:5600:0:0:0:1", own)).toBe(true);
+  });
+
+  it("still refuses a global address from a different /64", () => {
+    // One group different is a different network — that is the internet.
+    expect(isLanClient("2003:e1:1f28:9a01::42", own)).toBe(false);
+    expect(isLanClient("2001:4860:4860::8888", own)).toBe(false);
+  });
+
+  it("refuses everything global when the host has no IPv6 of its own", () => {
+    expect(isLanClient("2003:e1:1f28:9a00::42", () => [])).toBe(false);
+  });
+
+  it("keeps the link-local and unique-local answers without consulting the host", () => {
+    const boom = (): string[] => {
+      throw new Error("must not be asked for a link-local or unique-local client");
+    };
+    expect(isLanClient("fe80::1%eth0", boom)).toBe(true);
+    expect(isLanClient("fd12:3456:789a::1", boom)).toBe(true);
+    expect(isLanClient("192.168.1.5", boom)).toBe(true);
+    expect(isLanClient("::ffff:10.0.0.4", boom)).toBe(true);
+  });
+
+  it("matches a zone suffix and mixed case against the prefix", () => {
+    expect(isLanClient("2003:00E1:1F28:9A00::42%eth0", own)).toBe(true);
+  });
+
+  it("refuses a malformed IPv6 value instead of guessing", () => {
+    expect(isLanClient("2003:::1", own)).toBe(false);
+    expect(isLanClient("not-an-address", own)).toBe(false);
+    expect(isLanClient("2003:e1:zzzz:9a00::1", own)).toBe(false);
+  });
+});

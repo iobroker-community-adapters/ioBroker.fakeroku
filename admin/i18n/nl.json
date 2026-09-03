@@ -23,5 +23,14 @@
   "supportHeader": "Ondersteunen",
   "aboutInfo": "Als deze adapter nuttig voor je is, helpt een kleine donatie om hem te onderhouden — bedankt!",
   "donateKofi": "Ko-fi",
-  "donatePaypal": "PayPal"
+  "donatePaypal": "PayPal",
+  "channelInfo": "Adapterinformatie",
+  "connectionStatus": "Verbindingsstatus",
+  "connectionStatusDesc": "Alleen waar zolang elke geconfigureerde geëmuleerde Roku daadwerkelijk luistert.",
+  "stateLastCommand": "Laatste opdracht",
+  "stateLastCommandDesc": "De meest recente opdracht die deze geëmuleerde Roku ontving, als platte tekst.",
+  "stateLastCommandType": "Type laatste opdracht",
+  "stateLastCommandTypeDesc": "Wat voor soort opdracht het was: een toetsdruk, een toets ingedrukt of losgelaten, een app starten of installeren, tekstinvoer of zoeken.",
+  "channelKeys": "Afstandsbedieningstoetsen",
+  "channelKeysDesc": "Eén status per toets die dit apparaat biedt; een toetsdruk zet hem kort op waar."
 }

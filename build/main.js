@@ -44,6 +44,7 @@ var import_constants = require("./lib/constants");
 var import_device_identity = require("./lib/device-identity");
 var import_detect_ip = require("./lib/detect-ip");
 var import_errors = require("./lib/errors");
+var import_i18n = require("./lib/i18n");
 var import_object_cleanup = require("./lib/object-cleanup");
 var import_pure_helpers = require("./lib/pure-helpers");
 var import_rate_gate = require("./lib/rate-gate");
@@ -53,7 +54,6 @@ const KEY_PULSE_MS = 50;
 const HOLD_MAX_MS = 3e4;
 const MAX_COMMANDS_PER_SECOND = 25;
 const RATE_WARN_INTERVAL_MS = 6e4;
-const UUID_SHAPE = /^[A-Za-z0-9-]{1,64}$/;
 class Fakeroku extends utils.Adapter {
   ssdp;
   notifyTimer;
@@ -93,6 +93,7 @@ class Fakeroku extends utils.Adapter {
     try {
       await this.setState("info.connection", { val: false, ack: true });
       await import_adapter_core.I18n.init((0, import_node_path.join)(this.adapterDir, "admin"), this);
+      await this.refreshOwnObjects();
       const configuredIp = this.config.networkInterface || this.config.BIND;
       const bindIp = configuredIp && configuredIp !== "0.0.0.0" ? configuredIp : void 0;
       const advertiseIp = bindIp != null ? bindIp : (0, import_detect_ip.detectPrimaryIPv4)();
@@ -113,9 +114,15 @@ class Fakeroku extends utils.Adapter {
           this.log.warn(`Emulated Roku "${d.name}" maps to an object id already in use (${deviceId}) \u2014 skipping it.`);
           continue;
         }
+        if (import_constants.RESERVED_IDS.has(deviceId)) {
+          this.log.warn(
+            `Emulated Roku "${d.name}" maps to the object id "${deviceId}", which the adapter reserves for its own status \u2014 skipping it.`
+          );
+          continue;
+        }
         const deviceType = d.type === "tv" ? "tv" : "player";
         const keys = (0, import_state_model.keysForType)(deviceType);
-        const uuid = typeof d.uuid === "string" && UUID_SHAPE.test(d.uuid) ? d.uuid : (0, import_device_identity.deriveUuid)(d.name);
+        const uuid = (0, import_device_identity.resolveDeviceUuid)(d);
         if (d.uuid && uuid !== d.uuid) {
           this.log.warn(`Emulated Roku "${d.name}" has an unusable device id in its config \u2014 using a derived one.`);
         }
@@ -188,25 +195,78 @@ class Fakeroku extends utils.Adapter {
     }
   }
   /**
+   * Re-apply the adapter's OWN objects — the `info` channel and `info.connection`
+   * — on every start.
+   *
+   * js-controller creates the manifest's instanceObjects only where they are
+   * missing, so a changed name or description never reaches an installation that
+   * already has them: the manifest would be correct and the real tree unchanged.
+   * extendObject is what carries the change into an existing tree, so an update
+   * always lands on every datapoint, not just on fresh installs.
+   *
+   * It also repairs the `info` channel after a hand-edited device row named
+   * "info" turned it into a device object (see the reserved-id guard in onReady).
+   */
+  async refreshOwnObjects() {
+    await this.extendObject("info", {
+      type: "channel",
+      common: { name: (0, import_i18n.tName)("channelInfo") },
+      native: {}
+    });
+    await this.extendObject("info.connection", {
+      type: "state",
+      common: {
+        name: (0, import_i18n.tName)("connectionStatus"),
+        desc: (0, import_i18n.tDesc)("connectionStatusDesc"),
+        type: "boolean",
+        role: "indicator.connected",
+        read: true,
+        write: false,
+        def: false
+      },
+      native: {}
+    });
+  }
+  /**
    * Create the fixed object tree for one emulated Roku: the device, `command` +
    * `commandType`, and one `sensor` boolean state per key the device type exposes —
    * all up front, so the tree is usable before any key is ever pressed.
+   *
+   * Every key state is also RESET to false here. A key is a momentary signal, but
+   * nothing writes its release when the adapter goes down: a keypress pulses true
+   * and schedules the false 50 ms later, a keydown holds true until its keyup, and
+   * onUnload drops both timers without writing. So a stop inside that window — or
+   * a crash, or a controller that never sent its keyup — leaves the key true in
+   * the database for good, and a rule watching for the next press never sees an
+   * edge again. The reset belongs on STARTUP, not into onUnload: only startup also
+   * covers the crash, and 27 writes per device would eat the shutdown budget that
+   * today comfortably carries a single one. setStateChanged writes only where the
+   * value actually differs, so a healthy tree costs nothing.
    *
    * @param deviceId the id-safe device path segment
    * @param friendlyName the configured device name
    * @param keys the key names to create for this device (from its type)
    */
   async createDeviceStates(deviceId, friendlyName, keys) {
-    await this.extendObject(deviceId, { type: "device", common: { name: friendlyName }, native: {} });
+    await this.extendObject(deviceId, { type: "device", common: { name: (0, import_i18n.tRaw)(friendlyName) }, native: {} });
     await this.extendObject(`${deviceId}.command`, {
       type: "state",
-      common: { name: "Last command", type: "string", role: "text", read: true, write: false, def: "" },
+      common: {
+        name: (0, import_i18n.tName)("stateLastCommand"),
+        desc: (0, import_i18n.tDesc)("stateLastCommandDesc"),
+        type: "string",
+        role: "text",
+        read: true,
+        write: false,
+        def: ""
+      },
       native: {}
     });
     await this.extendObject(`${deviceId}.commandType`, {
       type: "state",
       common: {
-        name: "Last command type",
+        name: (0, import_i18n.tName)("stateLastCommandType"),
+        desc: (0, import_i18n.tDesc)("stateLastCommandTypeDesc"),
         type: "string",
         role: "text",
         read: true,
@@ -218,17 +278,25 @@ class Fakeroku extends utils.Adapter {
       },
       native: {}
     });
-    await this.extendObject(`${deviceId}.keys`, { type: "channel", common: { name: "Remote keys" }, native: {} });
+    await this.extendObject(`${deviceId}.keys`, {
+      type: "channel",
+      common: { name: (0, import_i18n.tName)("channelKeys"), desc: (0, import_i18n.tDesc)("channelKeysDesc") },
+      native: {}
+    });
     for (const key of keys) {
       await this.extendObject(`${deviceId}.keys.${key}`, {
         type: "state",
         // "sensor" = generic boolean read-only (active/inactive). The docs suggest
         // button.press for a keypress-as-state, but the repochecker rejects it
         // (E1010 — not in its role list); sensor is the gate-conformant fit.
-        common: { name: key, type: "boolean", role: "sensor", read: true, write: false, def: false },
+        // The name is the ECP key identifier and identical in every language, but
+        // it still has to BE a translation object (tRaw), never a bare string.
+        // No desc: the key name already says everything there is to say.
+        common: { name: (0, import_i18n.tRaw)(key), type: "boolean", role: "sensor", read: true, write: false, def: false },
         native: {}
       });
     }
+    await Promise.all(keys.map((key) => this.setStateChangedAsync(`${deviceId}.keys.${key}`, { val: false, ack: true })));
   }
   /**
    * Remove objects left over from an earlier version or config — the legacy

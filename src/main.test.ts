@@ -23,6 +23,16 @@ vi.mock("@iobroker/adapter-core", () => {
       this.states.set(id.replace(`${this.namespace}.`, ""), { val: s?.val, ack: s?.ack === true });
       return Promise.resolve();
     });
+    // Writes only where the value actually differs — the js-controller contract the
+    // startup key reset relies on, so a test can tell a real reset from a blind write.
+    public setStateChangedAsync = vi.fn((id: string, state: unknown) => {
+      const s = state as { val?: unknown; ack?: boolean };
+      const key = id.replace(`${this.namespace}.`, "");
+      if (this.states.get(key)?.val !== s?.val) {
+        this.states.set(key, { val: s?.val, ack: s?.ack === true });
+      }
+      return Promise.resolve();
+    });
     public extendObject = vi.fn((id: string, obj: Record<string, unknown>) => {
       const key = id.replace(`${this.namespace}.`, "");
       this.objects.set(key, { ...(this.objects.get(key) ?? {}), ...obj });
@@ -50,7 +60,16 @@ vi.mock("@iobroker/adapter-core", () => {
     public clearTimeout = vi.fn();
     constructor(_opts: unknown) {}
   }
-  return { Adapter, I18n: { init: vi.fn(async () => {}) } };
+  // getTranslatedObject is what tName/tDesc call for every common.name and desc.
+  // The stub returns a recognisable object per key, so a test can assert WHICH key
+  // an object was named from without depending on the wording of a translation.
+  return {
+    Adapter,
+    I18n: {
+      init: vi.fn(async () => {}),
+      getTranslatedObject: vi.fn((key: string) => ({ en: key, de: key })),
+    },
+  };
 });
 
 /** os.networkInterfaces is swapped so the advertise-IP paths are deterministic. */
@@ -67,6 +86,7 @@ import { Fakeroku } from "./main";
 import type { CommandEvent } from "./ecp/ecp-command";
 import { EcpHttpServer } from "./ecp/ecp-http-server";
 import { RokuSsdpResponder } from "./discovery/ssdp-responder";
+import { deriveUuid } from "./lib/device-identity";
 
 interface FakeEcp {
   start: ReturnType<typeof vi.fn>;
@@ -104,6 +124,7 @@ function internalOf(adapter: Fakeroku): {
   pulseTimers: Set<unknown>;
   holdTimers: Map<string, unknown>;
   setState: ReturnType<typeof vi.fn>;
+  setStateChangedAsync: ReturnType<typeof vi.fn>;
   makeEcpServer: unknown;
   makeSsdpResponder: unknown;
 } {
@@ -233,10 +254,12 @@ describe("Fakeroku onReady — device wiring", () => {
     expect(ctx.ecp[0].stop).toHaveBeenCalledTimes(1);
   });
 
-  it("names the keys channel like the other objects", async () => {
+  it("names the keys channel from admin/i18n, not from a hard-coded string", async () => {
     const ctx = setup();
     await ctx.i.onReady();
-    expect(ctx.i.objects.get("Wohnzimmer.keys")).toMatchObject({ common: { name: "Remote keys" } });
+    expect(ctx.i.objects.get("Wohnzimmer.keys")).toMatchObject({
+      common: { name: { en: "channelKeys" }, desc: { en: "channelKeysDesc" } },
+    });
   });
 
   it("commandType carries the fixed verb list as plain-string labels", async () => {
@@ -383,6 +406,205 @@ describe("Fakeroku onReady — device wiring", () => {
     // name to report, so counting them would turn the instance red with nothing
     // in the log to act on.
     expect(ctx.i.states.get("info.connection")).toEqual({ val: true, ack: true });
+  });
+});
+
+describe("Fakeroku onReady — device identity", () => {
+  it("advertises the persisted device id unchanged", async () => {
+    const ctx = setup({ devices: [{ name: "Wohnzimmer", port: 8060, type: "player", uuid: "keep-me" }] });
+    await ctx.i.onReady();
+    expect((ctx.ecp[0].options.device as { uuid: string }).uuid).toBe("keep-me");
+    expect(ctx.i.log.warn).not.toHaveBeenCalled();
+  });
+
+  it("derives the id from the STORED name for a row that carries none", async () => {
+    // The manifest's default device has no uuid. This is the identity the device
+    // manager has to persist on an edit — deriving from the new name there would
+    // move the USN on a plain rename and unpair the remote.
+    const ctx = setup({ devices: [{ name: "Roku", port: 8060, type: "player" }] });
+    await ctx.i.onReady();
+    expect((ctx.ecp[0].options.device as { uuid: string }).uuid).toBe(deriveUuid("Roku"));
+  });
+
+  it("replaces an unusable stored id and says so", async () => {
+    const ctx = setup({ devices: [{ name: "Roku", port: 8060, type: "player", uuid: "not a/valid id" }] });
+    await ctx.i.onReady();
+    expect((ctx.ecp[0].options.device as { uuid: string }).uuid).toBe(deriveUuid("Roku"));
+    expect(ctx.i.log.warn).toHaveBeenCalledWith(expect.stringContaining("unusable device id"));
+  });
+});
+
+describe("Fakeroku onReady — names and descriptions", () => {
+  it("gives every object it creates a translation object, never a bare string", async () => {
+    const ctx = setup({ devices: [{ name: "Wohnzimmer", port: 8060, type: "tv" }] });
+    await ctx.i.onReady();
+    for (const [id, obj] of ctx.i.objects) {
+      const common = (obj as { common?: Record<string, unknown> }).common ?? {};
+      expect(typeof common.name, `${id} common.name`).not.toBe("string");
+      if (common.desc !== undefined) {
+        expect(typeof common.desc, `${id} common.desc`).not.toBe("string");
+      }
+    }
+  });
+
+  it("names the command datapoints from admin/i18n and explains them", async () => {
+    const ctx = setup();
+    await ctx.i.onReady();
+    expect(ctx.i.objects.get("Wohnzimmer.command")).toMatchObject({
+      common: { name: { en: "stateLastCommand" }, desc: { en: "stateLastCommandDesc" } },
+    });
+    expect(ctx.i.objects.get("Wohnzimmer.commandType")).toMatchObject({
+      common: { name: { en: "stateLastCommandType" }, desc: { en: "stateLastCommandTypeDesc" } },
+    });
+  });
+
+  it("wraps the protocol key name and the user's device name as translation objects", async () => {
+    const ctx = setup();
+    await ctx.i.onReady();
+    // Nothing to translate in either — but common.name must be an object for
+    // every object type, so the object browser shows it in any system language.
+    const key = ctx.i.objects.get("Wohnzimmer.keys.Home") as { common: { name: Record<string, string> } };
+    expect(key.common.name.en).toBe("Home");
+    expect(Object.keys(key.common.name)).toHaveLength(11);
+    const device = ctx.i.objects.get("Wohnzimmer") as { common: { name: Record<string, string> } };
+    expect(device.common.name.de).toBe("Wohnzimmer");
+    // A key carries no description — its name already says everything.
+    expect((key as { common: { desc?: unknown } }).common.desc).toBeUndefined();
+  });
+
+  it("re-applies its own info objects on EVERY start, so an update reaches an existing tree", async () => {
+    // js-controller creates the manifest's instanceObjects only where they are
+    // missing. Without this an installation that already has them would keep the
+    // old names for good and the manifest change would be cosmetic.
+    const ctx = setup();
+    ctx.i.objects.set("info", { type: "channel", common: { name: "Information" }, native: {} });
+    ctx.i.objects.set("info.connection", {
+      type: "state",
+      common: { name: "Device or service connected", type: "boolean", role: "indicator.connected" },
+      native: {},
+    });
+    await ctx.i.onReady();
+    expect(ctx.i.objects.get("info")).toMatchObject({ type: "channel", common: { name: { en: "channelInfo" } } });
+    expect(ctx.i.objects.get("info.connection")).toMatchObject({
+      common: { name: { en: "connectionStatus" }, desc: { en: "connectionStatusDesc" }, role: "indicator.connected" },
+    });
+  });
+
+  it("repairs an info channel that a device row had turned into a device object", async () => {
+    const ctx = setup();
+    ctx.i.objects.set("info", { type: "device", common: { name: "info" }, native: {} });
+    await ctx.i.onReady();
+    expect(ctx.i.objects.get("info")?.type).toBe("channel");
+  });
+});
+
+describe("Fakeroku onReady — reserved object ids", () => {
+  it("skips a hand-edited device named 'info' instead of overwriting the status channel", async () => {
+    const ctx = setup({ devices: [{ name: "info", port: 8060, type: "player" }] });
+    // The instance objects js-controller created from the manifest.
+    ctx.i.objects.set("info", { type: "channel", common: { name: "Information" }, native: {} });
+    ctx.i.objects.set("info.connection", { type: "state", common: {}, native: {} });
+    await ctx.i.onReady();
+
+    expect(ctx.i.objects.get("info")?.type).toBe("channel");
+    expect(ctx.i.objects.get("info.command")).toBeUndefined();
+    expect(ctx.i.objects.get("info.keys.Home")).toBeUndefined();
+    expect(ctx.i.log.warn).toHaveBeenCalledWith(expect.stringContaining("reserves for its own status"));
+    // Nothing is controllable, so the instance must not claim to be connected.
+    expect(ctx.i.states.get("info.connection")?.val).toBe(false);
+  });
+
+  it("starts the other devices when only one row carries a reserved name", async () => {
+    const ctx = setup({
+      devices: [
+        { name: "info", port: 8060, type: "player" },
+        { name: "Wohnzimmer", port: 8061, type: "player" },
+      ],
+    });
+    await ctx.i.onReady();
+    expect(ctx.ecp).toHaveLength(1);
+    expect(ctx.i.objects.get("Wohnzimmer.command")).toBeDefined();
+    // One configured device could not start — connected means EVERY device runs.
+    expect(ctx.i.states.get("info.connection")?.val).toBe(false);
+  });
+
+  it("removes the leftovers of an earlier run that did create them", async () => {
+    const ctx = setup();
+    ctx.i.objects.set("info", { type: "channel", common: {}, native: {} });
+    ctx.i.objects.set("info.connection", { type: "state", common: {}, native: {} });
+    ctx.i.objects.set("info.command", { type: "state", common: {}, native: {} });
+    ctx.i.objects.set("info.keys", { type: "channel", common: {}, native: {} });
+    ctx.i.objects.set("info.keys.Home", { type: "state", common: {}, native: {} });
+    await ctx.i.onReady();
+    expect(ctx.i.objects.get("info.command")).toBeUndefined();
+    expect(ctx.i.objects.get("info.keys")).toBeUndefined();
+    expect(ctx.i.objects.get("info.keys.Home")).toBeUndefined();
+    expect(ctx.i.objects.get("info.connection")).toBeDefined();
+  });
+});
+
+describe("Fakeroku onReady — key states are released at start-up", () => {
+  it("resets a key left true by a crash or a stop inside the pulse window", async () => {
+    const ctx = setup();
+    // What the states database looks like after the adapter went down mid-press:
+    // onUnload drops the pulse timer, so the scheduled false was never written.
+    ctx.i.states.set("Wohnzimmer.keys.Home", { val: true, ack: true });
+    ctx.i.states.set("Wohnzimmer.keys.Play", { val: true, ack: true });
+    await ctx.i.onReady();
+    expect(ctx.i.states.get("Wohnzimmer.keys.Home")?.val).toBe(false);
+    expect(ctx.i.states.get("Wohnzimmer.keys.Play")?.val).toBe(false);
+  });
+
+  it("releases a key that a lost keyup pinned true", async () => {
+    const ctx = setup();
+    await ctx.i.onReady();
+    ctx.i.applyCommand("Wohnzimmer", { type: "keydown", key: "Select" });
+    expect(ctx.i.states.get("Wohnzimmer.keys.Select")?.val).toBe(true);
+    await new Promise<void>(resolve => ctx.i.onUnload(resolve));
+    // Teardown does NOT write the release — that is deliberate, the shutdown budget
+    // carries one write. The next start is what clears it.
+    expect(ctx.i.states.get("Wohnzimmer.keys.Select")?.val).toBe(true);
+
+    const restarted = setup();
+    restarted.i.states.set("Wohnzimmer.keys.Select", { val: true, ack: true });
+    await restarted.i.onReady();
+    expect(restarted.i.states.get("Wohnzimmer.keys.Select")?.val).toBe(false);
+  });
+
+  it("touches no key that is already false", async () => {
+    // setStateChanged semantics: a healthy tree must not get 27 pointless writes
+    // (and 27 fresh timestamps) on every single adapter start.
+    const ctx = setup();
+    ctx.i.states.set("Wohnzimmer.keys.Home", { val: false, ack: true });
+    await ctx.i.onReady();
+    const written = ctx.i.setStateChangedAsync.mock.calls.filter(
+      (c: unknown[]) => (c[1] as { val: unknown }).val !== false,
+    );
+    expect(written).toHaveLength(0);
+    expect(ctx.i.states.get("Wohnzimmer.keys.Home")).toEqual({ val: false, ack: true });
+  });
+
+  it("resets only the keys the device type actually carries", async () => {
+    const ctx = setup({ devices: [{ name: "Wohnzimmer", port: 8060, type: "player" }] });
+    await ctx.i.onReady();
+    const ids = ctx.i.setStateChangedAsync.mock.calls.map((c: unknown[]) => c[0] as string);
+    expect(ids).toContain("Wohnzimmer.keys.Home");
+    // VolumeUp is a TV key — a player has no such object, so nothing may be written to it.
+    expect(ids).not.toContain("Wohnzimmer.keys.VolumeUp");
+  });
+
+  it("resets every configured device, not just the first", async () => {
+    const ctx = setup({
+      devices: [
+        { name: "Wohnzimmer", port: 8060, type: "player" },
+        { name: "Schlafzimmer", port: 8061, type: "tv" },
+      ],
+    });
+    ctx.i.states.set("Wohnzimmer.keys.Home", { val: true, ack: true });
+    ctx.i.states.set("Schlafzimmer.keys.VolumeUp", { val: true, ack: true });
+    await ctx.i.onReady();
+    expect(ctx.i.states.get("Wohnzimmer.keys.Home")?.val).toBe(false);
+    expect(ctx.i.states.get("Schlafzimmer.keys.VolumeUp")?.val).toBe(false);
   });
 });
 

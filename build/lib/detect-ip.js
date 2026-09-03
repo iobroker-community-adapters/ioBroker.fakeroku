@@ -19,7 +19,10 @@ var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: tru
 var detect_ip_exports = {};
 __export(detect_ip_exports, {
   detectLocalIPv4s: () => detectLocalIPv4s,
+  detectLocalIPv6Prefixes: () => detectLocalIPv6Prefixes,
   detectPrimaryIPv4: () => detectPrimaryIPv4,
+  ipv6Prefix64: () => ipv6Prefix64,
+  listLocalIPv6Prefixes: () => listLocalIPv6Prefixes,
   listNonInternalIPv4s: () => listNonInternalIPv4s,
   pickPrimaryIPv4: () => pickPrimaryIPv4
 });
@@ -49,10 +52,52 @@ function detectPrimaryIPv4() {
 function detectLocalIPv4s() {
   return listNonInternalIPv4s((0, import_node_os.networkInterfaces)());
 }
+function expandIPv6(address) {
+  const bare = address.toLowerCase().split("%")[0];
+  if (!bare.includes(":") || bare.includes(".")) {
+    return null;
+  }
+  const halves = bare.split("::");
+  if (halves.length > 2) {
+    return null;
+  }
+  const head = halves[0] ? halves[0].split(":") : [];
+  const tail = halves.length === 2 ? halves[1] ? halves[1].split(":") : [] : [];
+  const groups = halves.length === 2 ? [...head, ...Array(8 - head.length - tail.length).fill("0"), ...tail] : head;
+  if (groups.length !== 8 || groups.some((g) => !/^[0-9a-f]{1,4}$/.test(g))) {
+    return null;
+  }
+  return groups.map((g) => g.padStart(4, "0"));
+}
+function ipv6Prefix64(address) {
+  const groups = expandIPv6(address);
+  return groups ? groups.slice(0, 4).join(":") : null;
+}
+function listLocalIPv6Prefixes(interfaces) {
+  const out = /* @__PURE__ */ new Set();
+  for (const addrs of Object.values(interfaces)) {
+    for (const addr of addrs != null ? addrs : []) {
+      if (addr.family !== "IPv6" || addr.internal) {
+        continue;
+      }
+      const prefix = ipv6Prefix64(addr.address);
+      if (prefix) {
+        out.add(prefix);
+      }
+    }
+  }
+  return [...out];
+}
+function detectLocalIPv6Prefixes() {
+  return listLocalIPv6Prefixes((0, import_node_os.networkInterfaces)());
+}
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
   detectLocalIPv4s,
+  detectLocalIPv6Prefixes,
   detectPrimaryIPv4,
+  ipv6Prefix64,
+  listLocalIPv6Prefixes,
   listNonInternalIPv4s,
   pickPrimaryIPv4
 });

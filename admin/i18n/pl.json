@@ -23,5 +23,14 @@
   "supportHeader": "Wsparcie",
   "aboutInfo": "Jeśli ten adapter jest dla Ciebie przydatny, mała darowizna pomaga go utrzymać — dziękuję!",
   "donateKofi": "Ko-fi",
-  "donatePaypal": "PayPal"
+  "donatePaypal": "PayPal",
+  "channelInfo": "Informacje o adapterze",
+  "connectionStatus": "Stan połączenia",
+  "connectionStatusDesc": "Prawda tylko wtedy, gdy każdy skonfigurowany emulowany Roku faktycznie nasłuchuje.",
+  "stateLastCommand": "Ostatnie polecenie",
+  "stateLastCommandDesc": "Najnowsze polecenie odebrane przez ten emulowany Roku, jako zwykły tekst.",
+  "stateLastCommandType": "Typ ostatniego polecenia",
+  "stateLastCommandTypeDesc": "Jakiego rodzaju było to polecenie: naciśnięcie klawisza, przytrzymanie lub zwolnienie, uruchomienie lub instalacja aplikacji, wpisanie tekstu albo wyszukiwanie.",
+  "channelKeys": "Klawisze pilota",
+  "channelKeysDesc": "Jeden stan na każdy klawisz oferowany przez to urządzenie; naciśnięcie ustawia go na krótko na prawdę."
 }

@@ -18,15 +18,31 @@ var __copyProps = (to, from, except, desc) => {
 var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 var i18n_exports = {};
 __export(i18n_exports, {
-  t: () => t
+  t: () => t,
+  tDesc: () => tDesc,
+  tName: () => tName,
+  tRaw: () => tRaw
 });
 module.exports = __toCommonJS(i18n_exports);
 var import_adapter_core = require("@iobroker/adapter-core");
+const LANGUAGES = ["en", "de", "ru", "pt", "nl", "fr", "it", "es", "pl", "uk", "zh-cn"];
 function t(key, ...args) {
   return import_adapter_core.I18n.getTranslatedObject(key, ...args);
 }
+function tName(key) {
+  return import_adapter_core.I18n.getTranslatedObject(key);
+}
+function tDesc(key) {
+  return import_adapter_core.I18n.getTranslatedObject(key);
+}
+function tRaw(text) {
+  return Object.fromEntries(LANGUAGES.map((lang) => [lang, text]));
+}
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
-  t
+  t,
+  tDesc,
+  tName,
+  tRaw
 });
 //# sourceMappingURL=i18n.js.map

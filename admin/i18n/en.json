@@ -23,5 +23,14 @@
   "supportHeader": "Support",
   "aboutInfo": "If this adapter is useful to you, a small donation helps keep it maintained — thank you!",
   "donateKofi": "Ko-fi",
-  "donatePaypal": "PayPal"
+  "donatePaypal": "PayPal",
+  "channelInfo": "Adapter information",
+  "connectionStatus": "Connection status",
+  "connectionStatusDesc": "True only while every configured emulated Roku is actually listening.",
+  "stateLastCommand": "Last command",
+  "stateLastCommandDesc": "The most recent command this emulated Roku received, as plain text.",
+  "stateLastCommandType": "Last command type",
+  "stateLastCommandTypeDesc": "What kind of command it was: a key press, a key held or released, an app launch or install, a text input or a search.",
+  "channelKeys": "Remote keys",
+  "channelKeysDesc": "One state per remote key this device offers; a key press pulses it briefly."
 }

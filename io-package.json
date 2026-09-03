@@ -3,6 +3,19 @@
     "name": "fakeroku",
     "version": "1.3.0",
     "news": {
+      "NEXT": {
+        "en": "Renaming a Roku keeps the remote paired, a stuck key is released at start-up, all datapoints get translated names, and IPv6 remotes from your network are accepted.",
+        "de": "Umbenennen behält die Kopplung der Fernbedienung, eine hängende Taste wird beim Start freigegeben, alle Datenpunkte bekommen übersetzte Namen, IPv6-Fernbedienungen werden akzeptiert.",
+        "ru": "Переименование сохраняет сопряжение пульта, зависшая кнопка сбрасывается при старте, все точки данных получают переведённые названия, IPv6-пульты принимаются.",
+        "pt": "Mudar o nome mantém o emparelhamento, uma tecla presa é libertada no arranque, todos os pontos de dados recebem nomes traduzidos, comandos IPv6 são aceites.",
+        "nl": "Hernoemen behoudt de koppeling, een blijvende toets wordt bij de start vrijgegeven, alle datapunten krijgen vertaalde namen, IPv6-afstandsbedieningen worden geaccepteerd.",
+        "fr": "Renommer conserve l'appairage, une touche bloquée est libérée au démarrage, tous les points de données ont des noms traduits, les télécommandes IPv6 sont acceptées.",
+        "it": "Rinominare mantiene l'associazione, un tasto bloccato viene rilasciato all'avvio, tutti i punti dati hanno nomi tradotti, i telecomandi IPv6 sono accettati.",
+        "es": "Renombrar mantiene el emparejamiento, una tecla atascada se libera al iniciar, todos los puntos de datos tienen nombres traducidos, se aceptan mandos IPv6.",
+        "pl": "Zmiana nazwy zachowuje parowanie, zablokowany klawisz jest zwalniany przy starcie, wszystkie punkty danych mają przetłumaczone nazwy, piloty IPv6 są akceptowane.",
+        "uk": "Перейменування зберігає сполучення, залипла кнопка звільняється під час запуску, усі точки даних мають перекладені назви, IPv6-пульти приймаються.",
+        "zh-cn": "重命名后遥控器仍保持配对，卡住的按键在启动时释放，所有数据点获得翻译后的名称，接受本网络的 IPv6 遥控器。"
+      },
       "1.3.0": {
         "en": "Fixes a crash on a malformed keypress, accepts IPv6 remotes, caps each Roku at 25 commands/s, shows the correct icon, reports Roku OS 15.0, requires admin >= 8.0.11.",
         "de": "Behebt einen Absturz bei fehlerhaftem Tastendruck, akzeptiert IPv6-Fernbedienungen, begrenzt jeden Roku auf 25 Befehle/s, zeigt das richtige Symbol, meldet Roku OS 15.0, benötigt admin >= 8.0.11.",
@@ -80,19 +93,6 @@
         "pl": "Adapter wymaga teraz node.js >= 22\nZaktualizowano zależności",
         "uk": "Адаптер тепер вимагає node.js >= 22\nЗалежності оновлено",
         "zh-cn": "适配器现在需要 node.js 版本 >= 22。\n依赖项已更新"
-      },
-      "0.4.0": {
-        "en": "Adapter requires node.js >= 20 now.\nAdapter requires admin >= 7.7.22 now\nAdapter requires js-controller >= 6.0.11 now\nDependencies have been updated",
-        "de": "Adapter benötigt jetzt node.js >= 20.\nAdapter benötigt admin >= 7.7.22 jetzt\nAdapter benötigt jetzt js-controller >= 6.0.11\nAbhängigkeiten wurden aktualisiert",
-        "ru": "Адаптер требует node.js >= 20 сейчас.\nАдаптер требует администратора >= 7.7.22\nАдаптер требует js-контроллер >= 6.0.11\nЗависимости были обновлены",
-        "pt": "O adaptador requer gnod.js >= 20 agora.\nAdaptador requer admin >= 7.7.22 agora\nAdaptador requer js-controlador >= 6.0.11 agora\nAs dependências foram atualizadas",
-        "nl": "Voor de adapter zijn node.js < 20 nu nodig.\nAdapter vereist admin < 7.7.22 nu\nAdapter vereist js-controller > 6,0.11 nu\nAfhankelijkheden zijn bijgewerkt",
-        "fr": "Adaptateur nécessite node.js >= 20 maintenant.\nAdaptateur nécessite admin >= 7.7.22 maintenant\nAdaptateur nécessite js-controller >= 6.0.11 maintenant\nLes dépendances ont été actualisées",
-        "it": "Adattatore richiede node.js >= 20 ora.\nAdattatore richiede admin >= 7.7.22 ora\nAdattatore richiede js-controller >= 6.0.11 ora\nLe dipendenze sono state aggiornate",
-        "es": "Adaptador requiere node.js >= 20 ahora.\nEl adaptador requiere admin= 7.7.22 ahora\nAdaptador requiere js-controller >= 6.0.11\nSe han actualizado las dependencias",
-        "pl": "Adapter wymaga node.js > = 20 teraz.\nAdapter wymaga admin > = 7.7.22\nAdapter wymaga sterownika js- > = 6.0.11\nZaktualizowano zależności",
-        "uk": "Адаптер вимагає node.js >= 20 тепер.\nАдаптер вимагає адмін >= 7.7.22 тепер\nАдаптер вимагає js-controller >=6.0.11 тепер\nЗалежність було оновлено",
-        "zh-cn": "适配器需要节点.js >= 20 现在.\n适任者需要管理员 \\ 7.7.22 现在\n适配器需要js控制器 现在6.0.11\n依赖关系已更新"
       }
     },
     "titleLang": {
@@ -138,6 +138,14 @@
     "icon": "fakeroku.svg",
     "extIcon": "https://raw.githubusercontent.com/iobroker-community-adapters/ioBroker.fakeroku/master/admin/fakeroku.svg",
     "readme": "https://github.com/iobroker-community-adapters/ioBroker.fakeroku/blob/master/README.md",
+    "docs": {
+      "en": [
+        "docs/en/README.md"
+      ],
+      "de": [
+        "docs/de/README.md"
+      ]
+    },
     "loglevel": "info",
     "tier": 2,
     "compact": false,
@@ -232,7 +240,19 @@
       "_id": "info",
       "type": "channel",
       "common": {
-        "name": "Information"
+        "name": {
+          "en": "Adapter information",
+          "de": "Adapter-Informationen",
+          "ru": "Информация об адаптере",
+          "pt": "Informação do adaptador",
+          "nl": "Adapterinformatie",
+          "fr": "Informations sur l'adaptateur",
+          "it": "Informazioni sull'adattatore",
+          "es": "Información del adaptador",
+          "pl": "Informacje o adapterze",
+          "uk": "Інформація про адаптер",
+          "zh-cn": "适配器信息"
+        }
       },
       "native": {}
     },
@@ -241,11 +261,36 @@
       "type": "state",
       "common": {
         "role": "indicator.connected",
-        "name": "Device or service connected",
+        "name": {
+          "en": "Connection status",
+          "de": "Verbindungsstatus",
+          "ru": "Статус подключения",
+          "pt": "Estado da ligação",
+          "nl": "Verbindingsstatus",
+          "fr": "État de la connexion",
+          "it": "Stato connessione",
+          "es": "Estado de conexión",
+          "pl": "Stan połączenia",
+          "uk": "Стан з'єднання",
+          "zh-cn": "连接状态"
+        },
         "type": "boolean",
         "read": true,
         "write": false,
-        "def": false
+        "def": false,
+        "desc": {
+          "en": "True only while every configured emulated Roku is actually listening.",
+          "de": "Nur wahr, solange jeder konfigurierte emulierte Roku tatsächlich lauscht.",
+          "ru": "Истина только пока каждый настроенный эмулированный Roku действительно слушает.",
+          "pt": "Verdadeiro apenas enquanto todos os Roku emulados configurados estiverem realmente à escuta.",
+          "nl": "Alleen waar zolang elke geconfigureerde geëmuleerde Roku daadwerkelijk luistert.",
+          "fr": "Vrai uniquement tant que chaque Roku émulé configuré est réellement à l'écoute.",
+          "it": "Vero solo finché ogni Roku emulato configurato è effettivamente in ascolto.",
+          "es": "Verdadero solo mientras cada Roku emulado configurado esté realmente a la escucha.",
+          "pl": "Prawda tylko wtedy, gdy każdy skonfigurowany emulowany Roku faktycznie nasłuchuje.",
+          "uk": "Істина лише поки кожен налаштований емульований Roku справді слухає.",
+          "zh-cn": "仅当每个已配置的模拟 Roku 都在监听时才为真。"
+        }
       },
       "native": {}
     }

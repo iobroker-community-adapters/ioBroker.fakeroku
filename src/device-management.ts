@@ -5,19 +5,18 @@ import {
   type DeviceLoadContext,
   type JsonFormSchema,
 } from "@iobroker/dm-utils";
-import { DEFAULT_ECP_PORT } from "./lib/constants";
-import { deriveUuid } from "./lib/device-identity";
+import { DEFAULT_ECP_PORT, RESERVED_IDS } from "./lib/constants";
+import { deriveUuid, resolveDeviceUuid } from "./lib/device-identity";
 import { t } from "./lib/i18n";
 import { sanitizeId } from "./lib/pure-helpers";
 import type { DeviceType } from "./ecp/state-model";
-
-/** Object-id segments the adapter reserves for its own tree — a device may not take them. */
-const RESERVED_IDS = new Set(["info"]);
 
 /**
  * One emulated Roku as stored in the adapter's native.devices — the manifest's own
  * element type, so the manager and the runtime (main.ts) read the same shape.
  * `uuid` is the stable SSDP identity, carried through edits so the pairing survives.
+ * A row without one (the manifest default, or a hand-written config) is identified
+ * by `deriveUuid(name)` at runtime, so an edit must derive from the OLD name.
  */
 type RokuDeviceConfig = ioBroker.AdapterConfig["devices"][number];
 
@@ -285,6 +284,12 @@ export class FakerokuDeviceManagement extends DeviceManagement {
    * Edit a device via the pre-filled form. Its own name/port are excluded from
    * the clash check, and its uuid is preserved so the pairing survives a rename.
    *
+   * A row that carries no uuid yet — the manifest's default device, or anything
+   * written before 0.8.0 — gets one derived from its PREVIOUS name, because that
+   * is the identity main.ts is advertising right now (it derives from the stored
+   * name and never writes the value back). Deriving from the NEW name here would
+   * change the SSDP identity on a plain rename and silently unpair the remote.
+   *
    * @param index the device's list position
    * @param context the action context
    * @returns a directive to reload the list
@@ -308,7 +313,7 @@ export class FakerokuDeviceManagement extends DeviceManagement {
         await context.showMessage(clash);
         return { refresh: "devices" };
       }
-      devices[index] = { ...clean, uuid: current.uuid || deriveUuid(clean.name) };
+      devices[index] = { ...clean, uuid: resolveDeviceUuid(current) };
       await this.writeDevices(devices);
     }
     return { refresh: "devices" };

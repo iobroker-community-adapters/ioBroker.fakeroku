@@ -21,7 +21,8 @@ __export(lan_guard_exports, {
   isLanClient: () => isLanClient
 });
 module.exports = __toCommonJS(lan_guard_exports);
-function isLanClient(remoteAddress) {
+var import_detect_ip = require("./detect-ip");
+function isLanClient(remoteAddress, localPrefixes = import_detect_ip.detectLocalIPv6Prefixes) {
   if (!remoteAddress) {
     return false;
   }
@@ -45,7 +46,8 @@ function isLanClient(remoteAddress) {
   if (/^fe[89ab][0-9a-f]:/.test(v6) || /^f[cd][0-9a-f]{2}:/.test(v6)) {
     return true;
   }
-  return false;
+  const prefix = (0, import_detect_ip.ipv6Prefix64)(v6);
+  return prefix !== null && localPrefixes().includes(prefix);
 }
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {

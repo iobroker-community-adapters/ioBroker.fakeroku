@@ -6,7 +6,7 @@ vi.mock("@iobroker/adapter-core", async () => ({ I18n: await import("@iobroker/a
 
 import { I18n } from "@iobroker/adapter-core";
 import { join } from "node:path";
-import { t } from "./i18n";
+import { t, tDesc, tName, tRaw } from "./i18n";
 
 const LANGS = ["en", "de", "ru", "pt", "nl", "fr", "it", "es", "pl", "uk", "zh-cn"];
 
@@ -33,5 +33,58 @@ describe("t() — device-manager texts from the real translation files", () => {
     expect(Object.keys(text).sort()).toEqual([...LANGS].sort());
     expect(text.en).toBe("Add Roku device");
     expect(text.de).toBe("Roku-Gerät hinzufügen");
+  });
+});
+
+describe("tName / tDesc — object names and explanations from the real files", () => {
+  beforeAll(async () => {
+    await I18n.init(join(__dirname, "..", "..", "admin"), "en");
+  });
+
+  // Every key main.ts names an object from. A missing one would silently ship an
+  // object whose name is the raw key, in every language.
+  const NAME_KEYS = ["channelInfo", "connectionStatus", "stateLastCommand", "stateLastCommandType", "channelKeys"];
+  const DESC_KEYS = ["connectionStatusDesc", "stateLastCommandDesc", "stateLastCommandTypeDesc", "channelKeysDesc"];
+
+  it.each(NAME_KEYS)("resolves the object name %s in all eleven languages", key => {
+    const text = tName(key as Parameters<typeof tName>[0]) as Record<string, string>;
+    expect(Object.keys(text).sort()).toEqual([...LANGS].sort());
+    for (const lang of LANGS) {
+      expect(text[lang], lang).toBeTruthy();
+      expect(text[lang], `${lang} is not the untranslated key`).not.toBe(key);
+    }
+  });
+
+  it.each(DESC_KEYS)("resolves the explanation %s in all eleven languages", key => {
+    const text = tDesc(key as Parameters<typeof tDesc>[0]) as Record<string, string>;
+    expect(Object.keys(text).sort()).toEqual([...LANGS].sort());
+    for (const lang of LANGS) {
+      expect(text[lang], lang).toBeTruthy();
+      expect(text[lang], `${lang} is not the untranslated key`).not.toBe(key);
+    }
+  });
+
+  it("explains rather than repeating the name", () => {
+    // common.desc is an explanation a user can read, never the name again.
+    const name = tName("stateLastCommand") as Record<string, string>;
+    const desc = tDesc("stateLastCommandDesc") as Record<string, string>;
+    for (const lang of LANGS) {
+      expect(desc[lang], lang).not.toBe(name[lang]);
+      expect(desc[lang].length, lang).toBeGreaterThan(name[lang].length);
+    }
+  });
+});
+
+describe("tRaw — protocol text as a translation object", () => {
+  it("offers the same text under every admin language", () => {
+    const name = tRaw("VolumeUp") as Record<string, string>;
+    expect(Object.keys(name).sort()).toEqual([...LANGS].sort());
+    for (const lang of LANGS) {
+      expect(name[lang], lang).toBe("VolumeUp");
+    }
+  });
+
+  it("needs no I18n.init — it translates nothing", () => {
+    expect((tRaw("Home") as Record<string, string>).en).toBe("Home");
   });
 });

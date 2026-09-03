@@ -21,12 +21,20 @@ __export(object_cleanup_exports, {
   planObjectCleanup: () => planObjectCleanup
 });
 module.exports = __toCommonJS(object_cleanup_exports);
+var import_constants = require("./constants");
 function planObjectCleanup(existingIds, configuredDeviceIds, validKeysByDevice) {
   const del = /* @__PURE__ */ new Set();
   for (const id of existingIds) {
     const parts = id.split(".");
     const device = parts[0];
+    if (import_constants.OWN_INFO_IDS.has(id)) {
+      continue;
+    }
     if (device === "info") {
+      const child = `info.${parts[1]}`;
+      if (!import_constants.OWN_INFO_IDS.has(child)) {
+        del.add(child);
+      }
       continue;
     }
     if (!configuredDeviceIds.has(device)) {

@@ -18,15 +18,21 @@ var __copyProps = (to, from, except, desc) => {
 var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 var device_identity_exports = {};
 __export(device_identity_exports, {
-  deriveUuid: () => deriveUuid
+  deriveUuid: () => deriveUuid,
+  resolveDeviceUuid: () => resolveDeviceUuid
 });
 module.exports = __toCommonJS(device_identity_exports);
 var import_node_crypto = require("node:crypto");
 function deriveUuid(name) {
   return (0, import_node_crypto.createHash)("md5").update(`fakeroku:${name}`).digest("hex");
 }
+const UUID_SHAPE = /^[A-Za-z0-9-]{1,64}$/;
+function resolveDeviceUuid(device) {
+  return typeof device.uuid === "string" && UUID_SHAPE.test(device.uuid) ? device.uuid : deriveUuid(device.name);
+}
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
-  deriveUuid
+  deriveUuid,
+  resolveDeviceUuid
 });
 //# sourceMappingURL=device-identity.js.map

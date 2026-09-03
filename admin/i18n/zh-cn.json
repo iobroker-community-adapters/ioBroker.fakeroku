@@ -23,5 +23,14 @@
   "supportHeader": "支持",
   "aboutInfo": "如果此适配器对您有用，一点捐赠有助于维护它——谢谢！",
   "donateKofi": "Ko-fi",
-  "donatePaypal": "PayPal"
+  "donatePaypal": "PayPal",
+  "channelInfo": "适配器信息",
+  "connectionStatus": "连接状态",
+  "connectionStatusDesc": "仅当每个已配置的模拟 Roku 都在监听时才为真。",
+  "stateLastCommand": "最后一条命令",
+  "stateLastCommandDesc": "该模拟 Roku 最近收到的命令，以纯文本表示。",
+  "stateLastCommandType": "最后一条命令的类型",
+  "stateLastCommandTypeDesc": "命令的种类：按键、按住或松开按键、启动或安装应用、输入文本或搜索。",
+  "channelKeys": "遥控器按键",
+  "channelKeysDesc": "该设备提供的每个遥控器按键各有一个状态；按下时会短暂置为真。"
 }

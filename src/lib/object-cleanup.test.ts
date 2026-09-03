@@ -37,6 +37,30 @@ describe("planObjectCleanup", () => {
     expect(plan).toEqual([]);
   });
 
+  it("sweeps the leftovers of a hand-edited device row named 'info'", () => {
+    // Such a row turned the adapter's own channel into a device and hung its
+    // states underneath. Skipping the whole `info` subtree kept them for good.
+    const plan = planObjectCleanup(
+      ["info", "info.connection", "info.command", "info.commandType", "info.keys", "info.keys.Home"],
+      new Set(["ioBroker"]),
+      BASE,
+    );
+    expect(plan).toEqual(["info.command", "info.commandType", "info.keys"]);
+  });
+
+  it("keeps info.connection even while sweeping its siblings", () => {
+    const plan = planObjectCleanup(["info.connection", "info.keys.Home"], new Set(["ioBroker"]), BASE);
+    expect(plan).not.toContain("info.connection");
+    expect(plan).toEqual(["info.keys"]);
+  });
+
+  it("never sweeps info.connection, not even through a child path", () => {
+    // Nothing creates such an id today; the guard is what keeps a future one from
+    // taking the instance's own status down with it.
+    const plan = planObjectCleanup(["info.connection.extra"], new Set(["ioBroker"]), BASE);
+    expect(plan).toEqual([]);
+  });
+
   it("keeps a fully current device untouched", () => {
     const plan = planObjectCleanup(
       ["ioBroker", "ioBroker.command", "ioBroker.commandType", "ioBroker.keys", "ioBroker.keys.Home"],

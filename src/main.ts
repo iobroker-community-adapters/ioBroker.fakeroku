@@ -8,10 +8,11 @@ import { DEFAULT_APPS } from "./ecp/device-info";
 import { COMMAND_TYPES, type CommandEvent } from "./ecp/ecp-command";
 import { EcpHttpServer } from "./ecp/ecp-http-server";
 import { commandToStateWrite, type DeviceType, keysForType } from "./ecp/state-model";
-import { DEFAULT_ECP_PORT } from "./lib/constants";
-import { deriveUuid } from "./lib/device-identity";
+import { DEFAULT_ECP_PORT, RESERVED_IDS } from "./lib/constants";
+import { resolveDeviceUuid } from "./lib/device-identity";
 import { detectLocalIPv4s, detectPrimaryIPv4 } from "./lib/detect-ip";
 import { errText } from "./lib/errors";
+import { tDesc, tName, tRaw } from "./lib/i18n";
 import { planObjectCleanup } from "./lib/object-cleanup";
 import { sanitizeId } from "./lib/pure-helpers";
 import { RateGate } from "./lib/rate-gate";
@@ -28,8 +29,6 @@ const HOLD_MAX_MS = 30_000;
 const MAX_COMMANDS_PER_SECOND = 25;
 /** How often at most the dropped-commands warning repeats per device. */
 const RATE_WARN_INTERVAL_MS = 60_000;
-/** The only shapes a device id ever had: the md5 hex the adapters derive, or a dashed uuid. */
-const UUID_SHAPE = /^[A-Za-z0-9-]{1,64}$/;
 
 /**
  * ioBroker.fakeroku — Roku emulator (input side).
@@ -82,6 +81,7 @@ export class Fakeroku extends utils.Adapter {
     try {
       await this.setState("info.connection", { val: false, ack: true });
       await I18n.init(join(this.adapterDir, "admin"), this);
+      await this.refreshOwnObjects();
 
       // Empty AND "0.0.0.0" both mean "auto": bind all interfaces, advertise the
       // detected primary IP so the adapter runs without configuration. js-controller
@@ -114,14 +114,23 @@ export class Fakeroku extends utils.Adapter {
           this.log.warn(`Emulated Roku "${d.name}" maps to an object id already in use (${deviceId}) — skipping it.`);
           continue;
         }
+        // The dialog refuses these names, but native.devices is hand-editable. A
+        // device called "info" would rewrite the adapter's own info channel into a
+        // device object and hang its command/keys states under info.connection.
+        if (RESERVED_IDS.has(deviceId)) {
+          this.log.warn(
+            `Emulated Roku "${d.name}" maps to the object id "${deviceId}", which the adapter reserves for its own status — skipping it.`,
+          );
+          continue;
+        }
         const deviceType: DeviceType = d.type === "tv" ? "tv" : "player";
         const keys = keysForType(deviceType);
         // Adopt the device's persisted uuid (old adapter or an earlier run) so the SSDP
         // identity — and thus the controller pairing — survives an update; derive a stable
-        // one from the name only for a device that never had one. The value goes verbatim
-        // into SSDP headers and XML, so only the shape the adapters ever wrote (hex, or a
-        // dashed uuid) is accepted — a hand-edited stray value is replaced, not emitted.
-        const uuid = typeof d.uuid === "string" && UUID_SHAPE.test(d.uuid) ? d.uuid : deriveUuid(d.name);
+        // one from the name only for a device that never had one. resolveDeviceUuid is the
+        // single source for that decision, shared with the device manager so an edit
+        // persists exactly what is advertised here (lib/device-identity.ts).
+        const uuid = resolveDeviceUuid(d);
         if (d.uuid && uuid !== d.uuid) {
           this.log.warn(`Emulated Roku "${d.name}" has an unusable device id in its config — using a derived one.`);
         }
@@ -214,25 +223,81 @@ export class Fakeroku extends utils.Adapter {
   }
 
   /**
+   * Re-apply the adapter's OWN objects — the `info` channel and `info.connection`
+   * — on every start.
+   *
+   * js-controller creates the manifest's instanceObjects only where they are
+   * missing, so a changed name or description never reaches an installation that
+   * already has them: the manifest would be correct and the real tree unchanged.
+   * extendObject is what carries the change into an existing tree, so an update
+   * always lands on every datapoint, not just on fresh installs.
+   *
+   * It also repairs the `info` channel after a hand-edited device row named
+   * "info" turned it into a device object (see the reserved-id guard in onReady).
+   */
+  private async refreshOwnObjects(): Promise<void> {
+    await this.extendObject("info", {
+      type: "channel",
+      common: { name: tName("channelInfo") },
+      native: {},
+    });
+    await this.extendObject("info.connection", {
+      type: "state",
+      common: {
+        name: tName("connectionStatus"),
+        desc: tDesc("connectionStatusDesc"),
+        type: "boolean",
+        role: "indicator.connected",
+        read: true,
+        write: false,
+        def: false,
+      },
+      native: {},
+    });
+  }
+
+  /**
    * Create the fixed object tree for one emulated Roku: the device, `command` +
    * `commandType`, and one `sensor` boolean state per key the device type exposes —
    * all up front, so the tree is usable before any key is ever pressed.
+   *
+   * Every key state is also RESET to false here. A key is a momentary signal, but
+   * nothing writes its release when the adapter goes down: a keypress pulses true
+   * and schedules the false 50 ms later, a keydown holds true until its keyup, and
+   * onUnload drops both timers without writing. So a stop inside that window — or
+   * a crash, or a controller that never sent its keyup — leaves the key true in
+   * the database for good, and a rule watching for the next press never sees an
+   * edge again. The reset belongs on STARTUP, not into onUnload: only startup also
+   * covers the crash, and 27 writes per device would eat the shutdown budget that
+   * today comfortably carries a single one. setStateChanged writes only where the
+   * value actually differs, so a healthy tree costs nothing.
    *
    * @param deviceId the id-safe device path segment
    * @param friendlyName the configured device name
    * @param keys the key names to create for this device (from its type)
    */
   private async createDeviceStates(deviceId: string, friendlyName: string, keys: readonly string[]): Promise<void> {
-    await this.extendObject(deviceId, { type: "device", common: { name: friendlyName }, native: {} });
+    // The device name is the user's own text — nothing to translate, but it must
+    // still BE a translation object like every other common.name (tRaw).
+    await this.extendObject(deviceId, { type: "device", common: { name: tRaw(friendlyName) }, native: {} });
     await this.extendObject(`${deviceId}.command`, {
       type: "state",
-      common: { name: "Last command", type: "string", role: "text", read: true, write: false, def: "" },
+      common: {
+        name: tName("stateLastCommand"),
+        desc: tDesc("stateLastCommandDesc"),
+        type: "string",
+        role: "text",
+        read: true,
+        write: false,
+        def: "",
+      },
       native: {},
     });
     await this.extendObject(`${deviceId}.commandType`, {
       type: "state",
       common: {
-        name: "Last command type",
+        name: tName("stateLastCommandType"),
+        desc: tDesc("stateLastCommandTypeDesc"),
         type: "string",
         role: "text",
         read: true,
@@ -244,17 +309,25 @@ export class Fakeroku extends utils.Adapter {
       },
       native: {},
     });
-    await this.extendObject(`${deviceId}.keys`, { type: "channel", common: { name: "Remote keys" }, native: {} });
+    await this.extendObject(`${deviceId}.keys`, {
+      type: "channel",
+      common: { name: tName("channelKeys"), desc: tDesc("channelKeysDesc") },
+      native: {},
+    });
     for (const key of keys) {
       await this.extendObject(`${deviceId}.keys.${key}`, {
         type: "state",
         // "sensor" = generic boolean read-only (active/inactive). The docs suggest
         // button.press for a keypress-as-state, but the repochecker rejects it
         // (E1010 — not in its role list); sensor is the gate-conformant fit.
-        common: { name: key, type: "boolean", role: "sensor", read: true, write: false, def: false },
+        // The name is the ECP key identifier and identical in every language, but
+        // it still has to BE a translation object (tRaw), never a bare string.
+        // No desc: the key name already says everything there is to say.
+        common: { name: tRaw(key), type: "boolean", role: "sensor", read: true, write: false, def: false },
         native: {},
       });
     }
+    await Promise.all(keys.map(key => this.setStateChangedAsync(`${deviceId}.keys.${key}`, { val: false, ack: true })));
   }
 
   /**

@@ -23,5 +23,14 @@
   "supportHeader": "Sostieni",
   "aboutInfo": "Se questo adattatore ti è utile, una piccola donazione aiuta a mantenerlo — grazie!",
   "donateKofi": "Ko-fi",
-  "donatePaypal": "PayPal"
+  "donatePaypal": "PayPal",
+  "channelInfo": "Informazioni sull'adattatore",
+  "connectionStatus": "Stato connessione",
+  "connectionStatusDesc": "Vero solo finché ogni Roku emulato configurato è effettivamente in ascolto.",
+  "stateLastCommand": "Ultimo comando",
+  "stateLastCommandDesc": "Il comando più recente ricevuto da questo Roku emulato, come testo semplice.",
+  "stateLastCommandType": "Tipo dell'ultimo comando",
+  "stateLastCommandTypeDesc": "Di che tipo di comando si trattava: pressione di un tasto, tasto tenuto premuto o rilasciato, avvio o installazione di un'app, immissione di testo o ricerca.",
+  "channelKeys": "Tasti del telecomando",
+  "channelKeysDesc": "Uno stato per ogni tasto offerto da questo dispositivo; una pressione lo porta brevemente a vero."
 }

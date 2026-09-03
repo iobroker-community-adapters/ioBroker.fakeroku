@@ -30,7 +30,6 @@ var import_constants = require("./lib/constants");
 var import_device_identity = require("./lib/device-identity");
 var import_i18n = require("./lib/i18n");
 var import_pure_helpers = require("./lib/pure-helpers");
-const RESERVED_IDS = /* @__PURE__ */ new Set(["info"]);
 function nextFreePort(usedPorts) {
   const taken = new Set(usedPorts);
   let port = import_constants.DEFAULT_ECP_PORT;
@@ -90,7 +89,7 @@ function cleanDevice(raw) {
 function findClash(devices, candidate, exceptIndex) {
   const name = candidate.name.trim().toLowerCase();
   const id = (0, import_pure_helpers.sanitizeId)(candidate.name.trim());
-  if (id === "" || RESERVED_IDS.has(id)) {
+  if (id === "" || import_constants.RESERVED_IDS.has(id)) {
     return (0, import_i18n.t)("deviceNameInvalid");
   }
   for (let i = 0; i < devices.length; i++) {
@@ -225,6 +224,12 @@ class FakerokuDeviceManagement extends import_dm_utils.DeviceManagement {
    * Edit a device via the pre-filled form. Its own name/port are excluded from
    * the clash check, and its uuid is preserved so the pairing survives a rename.
    *
+   * A row that carries no uuid yet — the manifest's default device, or anything
+   * written before 0.8.0 — gets one derived from its PREVIOUS name, because that
+   * is the identity main.ts is advertising right now (it derives from the stored
+   * name and never writes the value back). Deriving from the NEW name here would
+   * change the SSDP identity on a plain rename and silently unpair the remote.
+   *
    * @param index the device's list position
    * @param context the action context
    * @returns a directive to reload the list
@@ -248,7 +253,7 @@ class FakerokuDeviceManagement extends import_dm_utils.DeviceManagement {
         await context.showMessage(clash);
         return { refresh: "devices" };
       }
-      devices[index] = { ...clean, uuid: current.uuid || (0, import_device_identity.deriveUuid)(clean.name) };
+      devices[index] = { ...clean, uuid: (0, import_device_identity.resolveDeviceUuid)(current) };
       await this.writeDevices(devices);
     }
     return { refresh: "devices" };

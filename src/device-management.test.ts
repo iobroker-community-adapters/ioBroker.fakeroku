@@ -5,7 +5,7 @@ import type { Mock } from "vitest";
 vi.mock("./lib/i18n", () => ({ t: (key: string, ...args: unknown[]) => (args.length ? { key, args } : key) }));
 
 import { FakerokuDeviceManagement, buildDeviceForm, cleanDevice, findClash, nextFreePort } from "./device-management";
-import { deriveUuid } from "./lib/device-identity";
+import { deriveUuid, resolveDeviceUuid } from "./lib/device-identity";
 
 describe("nextFreePort", () => {
   it("returns the real-Roku default when nothing is taken", () => {
@@ -330,6 +330,39 @@ describe("FakerokuDeviceManagement", () => {
       const i = make([{ name: "Old", port: 8060, type: "player" }]);
       await i.editDevice(0, mockContext({ form: { name: "Old", port: 8060, type: "player" } }));
       expect(adapter._stored()[0].uuid).toBe(deriveUuid("Old"));
+    });
+
+    it("derives the uuid of a row without one from its OLD name, so a rename keeps the identity", async () => {
+      // The manifest's default device carries no uuid, so main.ts identifies it by
+      // deriveUuid(storedName). Deriving from the NEW name here would move the SSDP
+      // identity on a plain rename and silently unpair the remote.
+      const i = make([{ name: "Roku", port: 8060, type: "player" }]);
+      await i.editDevice(0, mockContext({ form: { name: "Wohnzimmer", port: 8060, type: "player" } }));
+      expect(adapter._stored()[0]).toEqual({
+        name: "Wohnzimmer",
+        port: 8060,
+        type: "player",
+        uuid: deriveUuid("Roku"),
+      });
+      expect(adapter._stored()[0].uuid).not.toBe(deriveUuid("Wohnzimmer"));
+    });
+
+    it("stores exactly the identity the runtime resolves for that row", async () => {
+      // Binds the two sites that must agree: both go through resolveDeviceUuid, so
+      // an edit can never persist a different answer than the one being advertised.
+      const stored = { name: "Roku", port: 8060, type: "player" as const };
+      const i = make([stored]);
+      await i.editDevice(0, mockContext({ form: { name: "Schlafzimmer", port: 8060, type: "player" } }));
+      expect(adapter._stored()[0].uuid).toBe(resolveDeviceUuid(stored));
+    });
+
+    it("heals an unusable stored device id instead of writing it back unchanged", async () => {
+      // A hand-edited id with characters that cannot go into an SSDP header was
+      // rejected by the runtime on every start (a warning per start) but survived
+      // every edit. The edit now replaces it with the derived one.
+      const i = make([{ name: "Roku", port: 8060, type: "player", uuid: "not a/valid id" }]);
+      await i.editDevice(0, mockContext({ form: { name: "Roku", port: 8060, type: "player" } }));
+      expect(adapter._stored()[0].uuid).toBe(deriveUuid("Roku"));
     });
 
     it("pre-fills the form with the current device", async () => {

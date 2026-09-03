@@ -23,5 +23,14 @@
   "supportHeader": "Unterstützen",
   "aboutInfo": "Wenn dir dieser Adapter nützt, hilft eine kleine Spende, ihn zu pflegen — danke!",
   "donateKofi": "Ko-fi",
-  "donatePaypal": "PayPal"
+  "donatePaypal": "PayPal",
+  "channelInfo": "Adapter-Informationen",
+  "connectionStatus": "Verbindungsstatus",
+  "connectionStatusDesc": "Nur wahr, solange jeder konfigurierte emulierte Roku tatsächlich lauscht.",
+  "stateLastCommand": "Letzter Befehl",
+  "stateLastCommandDesc": "Der zuletzt empfangene Befehl dieses emulierten Roku als Klartext.",
+  "stateLastCommandType": "Art des letzten Befehls",
+  "stateLastCommandTypeDesc": "Um welche Art Befehl es sich handelte: Tastendruck, Taste gehalten oder losgelassen, App-Start oder -Installation, Texteingabe oder Suche.",
+  "channelKeys": "Fernbedienungstasten",
+  "channelKeysDesc": "Ein Datenpunkt je Taste, die dieses Gerät anbietet; ein Tastendruck setzt ihn kurz auf wahr."
 }
