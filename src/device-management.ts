@@ -16,7 +16,8 @@ import type { DeviceType } from "./ecp/state-model";
  * element type, so the manager and the runtime (main.ts) read the same shape.
  * `uuid` is the stable SSDP identity, carried through edits so the pairing survives.
  * A row without one (the manifest default, or a hand-written config) is identified
- * by `deriveUuid(name)` at runtime, so an edit must derive from the OLD name.
+ * by its name at runtime, so an edit resolves the identity through the SAME helper
+ * the runtime uses (`resolveDeviceUuid`) instead of computing a second answer.
  */
 type RokuDeviceConfig = ioBroker.AdapterConfig["devices"][number];
 
