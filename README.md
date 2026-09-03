@@ -92,7 +92,7 @@ becomes `true` — or watch `.command` for the last button as text.
 	Placeholder for the next version (at the beginning of the line):
 	### **WORK IN PROGRESS**
 -->
-### **WORK IN PROGRESS**
+### 1.5.0 (2026-09-03)
 
 - (krobipd) Fixed: deleting the last emulated Roku left all of its datapoints behind for good. They are now removed whenever the configuration says a device is gone.
 - (krobipd) Fixed: on a host running Docker the adapter could announce itself under a container address no remote can reach. A real network address is preferred now.
@@ -126,10 +126,6 @@ becomes `true` — or watch `.command` for the last button as text.
 - (krobipd) Discovery now covers every network interface on a host that has more than one, so a remote on any of your local networks can find the emulated Rokus.
 - (krobipd) The device dialog now refuses a name that would clash with another device or a reserved name, preventing a naming conflict.
 - (krobipd) The adapter description now reads correctly in the non-English and non-German admin languages.
-
-### 1.0.0 (2026-08-05)
-- (krobipd) First stable release — version 1.0.0 marks the complete rewrite as the mature, supported version of the adapter.
-- (krobipd) Upgrading from an older version now shows a one-time notice that the button data points changed from text to real boolean values, so scripts and visualizations can be checked.
 
 [Older changelogs can be found there](CHANGELOG_OLD.md)
 

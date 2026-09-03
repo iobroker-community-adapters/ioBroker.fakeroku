@@ -1,9 +1,9 @@
 {
   "common": {
     "name": "fakeroku",
-    "version": "1.4.0",
+    "version": "1.5.0",
     "news": {
-      "NEXT": {
+      "1.5.0": {
         "en": "Deleting the last emulated Roku now removes its datapoints, a host running Docker no longer announces an unreachable address, and a failed device is reported.",
         "de": "Das Löschen des letzten emulierten Roku entfernt jetzt seine Datenpunkte, ein Rechner mit Docker kündigt keine unerreichbare Adresse mehr an, ein Ausfall wird gemeldet.",
         "ru": "Удаление последнего эмулируемого Roku теперь удаляет его точки данных, хост с Docker не объявляет недоступный адрес, а об отказе устройства сообщается.",

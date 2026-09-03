@@ -1,4 +1,8 @@
 # Older changes
+## 1.0.0 (2026-08-05)
+- (krobipd) First stable release — version 1.0.0 marks the complete rewrite as the mature, supported version of the adapter.
+- (krobipd) Upgrading from an older version now shows a one-time notice that the button data points changed from text to real boolean values, so scripts and visualizations can be checked.
+
 ## 0.6.0 (2026-08-05)
 - (krobipd) Complete rewrite. The adapter now answers the full Roku control surface — including device-info with a current Roku version — so Logitech Harmony and Sofabaton remotes pair and work reliably.
 - (krobipd) Works out of the box: it detects the network address to advertise on its own, no manual interface picking.
