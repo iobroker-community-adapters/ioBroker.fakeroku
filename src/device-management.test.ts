@@ -1,25 +1,12 @@
+import { runInNewContext } from "node:vm";
 import type { Mock } from "vitest";
 // t() returns something identifiable instead of a translation object, so the
 // tests assert on the message CHOICE, not on wording; keys with arguments keep
 // the arguments visible.
 vi.mock("./lib/i18n", () => ({ t: (key: string, ...args: unknown[]) => (args.length ? { key, args } : key) }));
 
-import { FakerokuDeviceManagement, buildDeviceForm, cleanDevice, findClash, nextFreePort } from "./device-management";
+import { FakerokuDeviceManagement, buildDeviceForm, cleanDevice } from "./device-management";
 import { deriveUuid, resolveDeviceUuid } from "./lib/device-identity";
-
-describe("nextFreePort", () => {
-  it("returns the real-Roku default when nothing is taken", () => {
-    expect(nextFreePort([])).toBe(8060);
-  });
-
-  it("skips a run of taken ports", () => {
-    expect(nextFreePort([8060, 8061, 8062])).toBe(8063);
-  });
-
-  it("returns 8060 when only a higher port is taken", () => {
-    expect(nextFreePort([9000])).toBe(8060);
-  });
-});
 
 describe("cleanDevice", () => {
   it("trims the name, coerces the port, defaults an unknown type to player", () => {
@@ -33,38 +20,16 @@ describe("cleanDevice", () => {
   it("keeps a tv type and falls back to the default port on garbage", () => {
     expect(cleanDevice({ name: "TV", port: "abc", type: "tv" })).toEqual({ name: "TV", port: 8060, type: "tv" });
   });
-});
 
-describe("findClash", () => {
-  const devices = [
-    { name: "Living room", port: 8060, type: "player" as const },
-    { name: "Kitchen", port: 8061, type: "tv" as const },
-  ];
-
-  it("flags a duplicate name case-insensitively", () => {
-    expect(findClash(devices, { name: "living ROOM", port: 9000 }, -1)).toBe("deviceNameInUse");
+  it("turns a name that is not a string into an empty one, so the caller can refuse it", () => {
+    // The form hands back whatever the admin sent; the callers treat "" as a cancel.
+    expect(cleanDevice({ name: 42, port: 8060 }).name).toBe("");
+    expect(cleanDevice({ port: 8060 }).name).toBe("");
   });
 
-  it("flags a duplicate port", () => {
-    expect(findClash(devices, { name: "New", port: 8061 }, -1)).toBe("devicePortInUse");
-  });
-
-  it("returns null when both name and port are free", () => {
-    expect(findClash(devices, { name: "New", port: 9000 }, -1)).toBeNull();
-  });
-
-  it("excludes the edited device so its own name+port do not clash with itself", () => {
-    expect(findClash(devices, { name: "Living room", port: 8060 }, 0)).toBeNull();
-  });
-
-  it("rejects a name that maps to the reserved 'info' object id", () => {
-    expect(findClash(devices, { name: "info", port: 9000 }, -1)).toBe("deviceNameInvalid");
-  });
-
-  it("rejects a different name that sanitizes to the same id as another device", () => {
-    // "Living room" and "Living*room" both sanitize to "Living_room" — distinct
-    // names, same object tree. The plain-name check misses it; the id check catches it.
-    expect(findClash(devices, { name: "Living*room", port: 9000 }, -1)).toBe("deviceNameInvalid");
+  it("refuses a port a server could not bind, instead of storing it", () => {
+    expect(cleanDevice({ name: "TV", port: -5, type: "tv" }).port).toBe(8060);
+    expect(cleanDevice({ name: "TV", port: 70000, type: "tv" }).port).toBe(8060);
   });
 });
 
@@ -76,6 +41,12 @@ describe("findClash", () => {
 
 /**
  * An in-memory `system.adapter.fakeroku.0` config object as the manager sees it.
+ *
+ * `extendForeignObjectAsync` REPLACES native.devices here, and that is faithful, not a
+ * shortcut: js-controller clears the stored array before merging for exactly four key
+ * names, and `native.devices` is one of them (adapter.ts `_extendForeignObject`). Under any
+ * other name the merge would be element-wise and a shorter list would leave the tail in
+ * place — see the "writes the list under the key js-controller replaces" test below.
  *
  * @param devices Device list stored in native.devices
  */
@@ -121,12 +92,12 @@ type RokuDeviceConfig = { name: string; port: number; type: "player" | "tv"; uui
 
 /** Typed access to the private manager methods under test (mirrors main.test.ts). */
 interface DmInternals {
-  readDevices(): Promise<RokuDeviceConfig[]>;
+  readDevices(): Promise<{ storedName: string; name: string; port: number; type: string; identity: string }[]>;
   loadDevices(ctx: { addDevice: (info: unknown) => void }): Promise<void>;
   getInstanceInfo(): { apiVersion: string; identifierLabel: unknown; actions: DmAction[] };
   addDevice(ctx: MockCtx): Promise<{ refresh: boolean }>;
-  editDevice(index: number, ctx: MockCtx): Promise<{ refresh: "devices" }>;
-  deleteDevice(index: number, ctx: MockCtx): Promise<{ refresh: "devices" }>;
+  editDevice(cardId: string, ctx: MockCtx): Promise<{ refresh: "devices" }>;
+  deleteDevice(cardId: string, ctx: MockCtx): Promise<{ refresh: "devices" }>;
 }
 interface DmAction {
   id: string;
@@ -170,7 +141,9 @@ describe("FakerokuDeviceManagement", () => {
 
   it("reads the list from the instance's OWN config object", async () => {
     const i = make([living]);
-    await expect(i.readDevices()).resolves.toEqual([living]);
+    const rows = await i.readDevices();
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ name: "Living room", port: 8060, type: "player", identity: "keep-me" });
     expect(adapter.getForeignObjectAsync).toHaveBeenCalledWith("system.adapter.fakeroku.0");
   });
 
@@ -184,20 +157,21 @@ describe("FakerokuDeviceManagement", () => {
   it("normalises hand-edited rows so the dialogs keep working", async () => {
     // Expert mode / CLI can leave anything in native.devices: a numeric name, a
     // garbage port, a null row. The clash check's .trim() used to throw on the
-    // numeric name, and with it every add/edit dialog failed.
+    // numeric name, and with it every add/edit dialog failed. A row with no usable
+    // name is dropped now — the manager could not have saved it either.
     const i = make([{ name: 42, port: "abc" }, null, { name: "Ok", port: 8061, type: "tv", uuid: "u1" }]);
-    await expect(i.readDevices()).resolves.toEqual([
-      { name: "", port: 8060, type: "player" },
-      { name: "Ok", port: 8061, type: "tv", uuid: "u1" },
-    ]);
+    const rows = await i.readDevices();
+    expect(rows.map(r => r.name)).toEqual(["Ok"]);
     const ctx = mockContext({ form: { name: "New", port: 8070, type: "player" } });
     await expect(i.addDevice(ctx)).resolves.toEqual({ refresh: true });
-    expect(adapter._stored()).toHaveLength(3);
+    expect(adapter._stored()).toHaveLength(2);
   });
 
-  it("shows one card per device, keyed by list position", async () => {
+  it("shows one card per device, keyed by the device identity", async () => {
     const out = await cards([living, kitchen]);
-    expect(out.map(c => c.id)).toEqual(["0", "1"]);
+    // NOT the list position: a card id has to survive a list that changed underneath
+    // the view (a second admin tab), or edit/delete hits a different device.
+    expect(out.map(c => c.id)).toEqual(["keep-me", "kitchen-uuid"]);
     expect(out.map(c => c.name)).toEqual(["Living room", "Kitchen"]);
   });
 
@@ -209,28 +183,41 @@ describe("FakerokuDeviceManagement", () => {
     expect(out[1].identifier).toBe("8061");
   });
 
-  it("falls back to a numbered name and the default port on an incomplete entry", async () => {
-    const out = await cards([{ name: "", port: 0, type: "player" }]);
-    // An empty card title is unclickable in the manager, and "0" as the port line
-    // would tell the user the wrong thing — the adapter binds 8060 in that case.
-    expect(out[0].name).toBe("Roku 1");
+  it("shows the trimmed name and the port the adapter really binds", async () => {
+    const out = await cards([{ name: " ⏻ ", port: 0, type: "player" }]);
+    // "0" as the port line would tell the user the wrong thing — the adapter binds 8060.
+    expect(out[0].name).toBe("⏻");
     expect(out[0].identifier).toBe("8060");
   });
 
-  it("routes each card's edit/delete action to THAT card's index", async () => {
+  it("shows no card at all for a row without a usable name", async () => {
+    // There is no "unnamed card" case any more: such a row is dropped when the list is
+    // read, so the manager never has to invent a stand-in name for it.
+    expect(await cards([{ name: "   ", port: 8060, type: "player" }])).toEqual([]);
+  });
+
+  it("routes each card's delete action to THAT card's device", async () => {
     const out = await cards([living, kitchen]);
     const del = out[1].actions.find(a => a.id === "delete")!;
-    await del.handler("1", mockContext({ confirm: true }));
-    // Deleting card 1 must remove Kitchen — an index mix-up here silently deletes
-    // the wrong Roku, and the card ids are strings.
+    await del.handler(out[1].id, mockContext({ confirm: true }));
     expect(adapter._stored()).toEqual([living]);
   });
 
-  it("routes a card's edit action to THAT card's index", async () => {
+  it("routes a card's edit action to THAT card's device", async () => {
     const out = await cards([living, kitchen]);
     const edit = out[1].actions.find(a => a.id === "edit")!;
-    await edit.handler("1", mockContext({ form: { name: "Kueche", port: 8061, type: "tv" } }));
+    await edit.handler(out[1].id, mockContext({ form: { name: "Kueche", port: 8061, type: "tv" } }));
     expect(adapter._stored()).toEqual([living, { name: "Kueche", port: 8061, type: "tv", uuid: "kitchen-uuid" }]);
+  });
+
+  it("acts on the clicked device even when the list shifted under a stale view", async () => {
+    // Two admin tabs: the view still shows [living, kitchen], the config already lost
+    // living. With a positional card id, "delete kitchen" would have deleted whatever
+    // now sits at index 1 — or nothing at all.
+    const out = await cards([living, kitchen]);
+    const i = make([kitchen]);
+    await i.deleteDevice(out[1].id, mockContext({ confirm: true }));
+    expect(adapter._stored()).toEqual([]);
   });
 
   it("routes the instance-level add action to addDevice", async () => {
@@ -252,6 +239,21 @@ describe("FakerokuDeviceManagement", () => {
     expect(info.apiVersion).toBe("v3");
     expect(info.identifierLabel).toBe("portLabel");
     expect(info.actions.map(a => a.id)).toEqual(["add"]);
+  });
+
+  it("writes the list under the key js-controller replaces instead of merging", async () => {
+    // js-controller merges an extendObject payload with node.extend(true, …), which
+    // merges arrays ELEMENT-WISE — a shorter list would leave the tail in place and a
+    // deleted device would come back. It clears the old array first for exactly four key
+    // names, `native.devices` among them. This test pins the key: renaming it (or writing
+    // the list anywhere else) silently breaks every deletion.
+    const i = make([living, kitchen]);
+    await i.deleteDevice("kitchen-uuid", mockContext({ confirm: true }));
+    const [, patch] = adapter.extendForeignObjectAsync.mock.calls[0];
+    expect(Object.keys(patch)).toEqual(["native"]);
+    expect(Object.keys(patch.native)).toEqual(["devices"]);
+    // The FULL remaining list, not a patch of the changed positions.
+    expect(patch.native.devices).toEqual([living]);
   });
 
   describe("add", () => {
@@ -320,7 +322,7 @@ describe("FakerokuDeviceManagement", () => {
     it("keeps the stored uuid across a rename so the pairing survives", async () => {
       const i = make([living]);
       const ctx = mockContext({ form: { name: "Lounge", port: 8060, type: "player" } });
-      await expect(i.editDevice(0, ctx)).resolves.toEqual({ refresh: "devices" });
+      await expect(i.editDevice("keep-me", ctx)).resolves.toEqual({ refresh: "devices" });
       // A new uuid means a new USN — the Harmony/Sofabaton drops the pairing and
       // the user has to re-add the device after a simple rename.
       expect(adapter._stored()).toEqual([{ name: "Lounge", port: 8060, type: "player", uuid: "keep-me" }]);
@@ -328,7 +330,7 @@ describe("FakerokuDeviceManagement", () => {
 
     it("derives a uuid for a device stored without one", async () => {
       const i = make([{ name: "Old", port: 8060, type: "player" }]);
-      await i.editDevice(0, mockContext({ form: { name: "Old", port: 8060, type: "player" } }));
+      await i.editDevice(deriveUuid("Old"), mockContext({ form: { name: "Old", port: 8060, type: "player" } }));
       expect(adapter._stored()[0].uuid).toBe(deriveUuid("Old"));
     });
 
@@ -337,7 +339,7 @@ describe("FakerokuDeviceManagement", () => {
       // deriveUuid(storedName). Deriving from the NEW name here would move the SSDP
       // identity on a plain rename and silently unpair the remote.
       const i = make([{ name: "Roku", port: 8060, type: "player" }]);
-      await i.editDevice(0, mockContext({ form: { name: "Wohnzimmer", port: 8060, type: "player" } }));
+      await i.editDevice(deriveUuid("Roku"), mockContext({ form: { name: "Wohnzimmer", port: 8060, type: "player" } }));
       expect(adapter._stored()[0]).toEqual({
         name: "Wohnzimmer",
         port: 8060,
@@ -348,12 +350,43 @@ describe("FakerokuDeviceManagement", () => {
     });
 
     it("stores exactly the identity the runtime resolves for that row", async () => {
-      // Binds the two sites that must agree: both go through resolveDeviceUuid, so
+      // Binds the two sites that must agree: both go through the same normaliser, so
       // an edit can never persist a different answer than the one being advertised.
       const stored = { name: "Roku", port: 8060, type: "player" as const };
       const i = make([stored]);
-      await i.editDevice(0, mockContext({ form: { name: "Schlafzimmer", port: 8060, type: "player" } }));
+      await i.editDevice(
+        resolveDeviceUuid(stored),
+        mockContext({ form: { name: "Schlafzimmer", port: 8060, type: "player" } }),
+      );
       expect(adapter._stored()[0].uuid).toBe(resolveDeviceUuid(stored));
+    });
+
+    it("keeps the identity of an UNTRIMMED stored name — saving must not re-pair the remote", async () => {
+      // The measured defect: the manager normalised the row before resolving its
+      // identity, so for a name stored with surrounding whitespace it saved
+      // deriveUuid("Roku") while the runtime was advertising deriveUuid(" Roku ").
+      // Opening the card and pressing save — changing nothing — unpaired the remote.
+      const stored = { name: " Roku ", port: 8060, type: "player" as const };
+      const i = make([stored]);
+      const runtimeIdentity = resolveDeviceUuid(stored);
+      await i.editDevice(runtimeIdentity, mockContext({ form: { name: "Roku", port: 8060, type: "player" } }));
+      expect(adapter._stored()[0].uuid).toBe(runtimeIdentity);
+      expect(adapter._stored()[0].uuid).not.toBe(deriveUuid("Roku"));
+    });
+
+    it("leaves the name of a device the user did not touch exactly as it was stored", async () => {
+      // Trimming someone else's row would move ITS object id on the next start — a tree
+      // wandering, and every script pointing into it breaking, because a different card
+      // was saved. Only the edited row takes the trimmed name.
+      const untouched = { name: " Bedroom ", port: 8061, type: "player" as const };
+      const i = make([living, untouched]);
+      await i.editDevice("keep-me", mockContext({ form: { name: "Lounge", port: 8060, type: "player" } }));
+      expect(adapter._stored()[1]).toEqual({
+        name: " Bedroom ",
+        port: 8061,
+        type: "player",
+        uuid: deriveUuid(" Bedroom "),
+      });
     });
 
     it("heals an unusable stored device id instead of writing it back unchanged", async () => {
@@ -361,21 +394,21 @@ describe("FakerokuDeviceManagement", () => {
       // rejected by the runtime on every start (a warning per start) but survived
       // every edit. The edit now replaces it with the derived one.
       const i = make([{ name: "Roku", port: 8060, type: "player", uuid: "not a/valid id" }]);
-      await i.editDevice(0, mockContext({ form: { name: "Roku", port: 8060, type: "player" } }));
+      await i.editDevice(deriveUuid("Roku"), mockContext({ form: { name: "Roku", port: 8060, type: "player" } }));
       expect(adapter._stored()[0].uuid).toBe(deriveUuid("Roku"));
     });
 
     it("pre-fills the form with the current device", async () => {
       const i = make([living, kitchen]);
       const ctx = mockContext({ form: undefined });
-      await i.editDevice(1, ctx);
-      expect(ctx.showForm.mock.calls[0][1]).toMatchObject({ data: kitchen });
+      await i.editDevice("kitchen-uuid", ctx);
+      expect(ctx.showForm.mock.calls[0][1]).toMatchObject({ data: { name: "Kitchen", port: 8061, type: "tv" } });
     });
 
     it("leaves the edited device out of the dialog's in-use lists", async () => {
       const i = make([living, kitchen]);
       const ctx = mockContext({ form: undefined });
-      await i.editDevice(1, ctx);
+      await i.editDevice("kitchen-uuid", ctx);
       const schema = ctx.showForm.mock.calls[0][0] as FormSchema;
       // Otherwise opening a device and pressing OK without changing anything greys
       // the button out: it clashes with itself and the user cannot edit at all.
@@ -388,7 +421,7 @@ describe("FakerokuDeviceManagement", () => {
     it("does not clash a device with its own name and port", async () => {
       const i = make([living, kitchen]);
       const ctx = mockContext({ form: { name: "Kitchen", port: 8061, type: "tv" } });
-      await i.editDevice(1, ctx);
+      await i.editDevice("kitchen-uuid", ctx);
       expect(ctx.showMessage).not.toHaveBeenCalled();
       expect(adapter._stored()).toHaveLength(2);
     });
@@ -396,15 +429,15 @@ describe("FakerokuDeviceManagement", () => {
     it("still refuses to move a device onto ANOTHER device's port", async () => {
       const i = make([living, kitchen]);
       const ctx = mockContext({ form: { name: "Kitchen", port: 8060, type: "tv" } });
-      await i.editDevice(1, ctx);
+      await i.editDevice("kitchen-uuid", ctx);
       expect(ctx.showMessage).toHaveBeenCalledWith("devicePortInUse");
       expect(adapter.extendForeignObjectAsync).not.toHaveBeenCalled();
     });
 
-    it("does nothing for a card index that no longer exists", async () => {
+    it("does nothing for a card that no longer exists", async () => {
       const i = make([living]);
       const ctx = mockContext({ form: { name: "Ghost", port: 9000, type: "player" } });
-      await expect(i.editDevice(5, ctx)).resolves.toEqual({ refresh: "devices" });
+      await expect(i.editDevice("gone", ctx)).resolves.toEqual({ refresh: "devices" });
       // A stale manager view must not open a form that would then append a device.
       expect(ctx.showForm).not.toHaveBeenCalled();
       expect(adapter.extendForeignObjectAsync).not.toHaveBeenCalled();
@@ -415,26 +448,32 @@ describe("FakerokuDeviceManagement", () => {
     it("removes exactly the selected device after confirmation", async () => {
       const i = make([living, kitchen]);
       const ctx = mockContext({ confirm: true });
-      await expect(i.deleteDevice(0, ctx)).resolves.toEqual({ refresh: "devices" });
+      await expect(i.deleteDevice("keep-me", ctx)).resolves.toEqual({ refresh: "devices" });
       expect(ctx.showConfirmation).toHaveBeenCalledWith({ key: "dmDeleteConfirm", args: ["Living room"] });
       expect(adapter._stored()).toEqual([kitchen]);
     });
 
     it("keeps the device when the user declines", async () => {
       const i = make([living, kitchen]);
-      await i.deleteDevice(0, mockContext({ confirm: false }));
+      await i.deleteDevice("keep-me", mockContext({ confirm: false }));
       expect(adapter.extendForeignObjectAsync).not.toHaveBeenCalled();
       expect(adapter._stored()).toEqual([living, kitchen]);
     });
 
-    it("does not even ask for a card index that no longer exists", async () => {
+    it("does not even ask for a card that no longer exists", async () => {
       const i = make([living]);
       const ctx = mockContext({ confirm: true });
-      await expect(i.deleteDevice(5, ctx)).resolves.toEqual({ refresh: "devices" });
-      // Without the guard, splice(5,1) is a no-op but the write still fires and the
-      // user has confirmed deleting a device that was never named.
+      await expect(i.deleteDevice("gone", ctx)).resolves.toEqual({ refresh: "devices" });
+      // Without the guard, splice(-1,1) removes the LAST device — the user confirms
+      // deleting one Roku and loses another.
       expect(ctx.showConfirmation).not.toHaveBeenCalled();
       expect(adapter.extendForeignObjectAsync).not.toHaveBeenCalled();
+    });
+
+    it("writes the empty list when the last device goes, so the tree gets swept", async () => {
+      const i = make([living]);
+      await i.deleteDevice("keep-me", mockContext({ confirm: true }));
+      expect(adapter._stored()).toEqual([]);
     });
   });
 });
@@ -443,6 +482,22 @@ describe("FakerokuDeviceManagement", () => {
 interface FormSchema {
   type: string;
   items: Record<string, { type?: string; validator?: string; validatorNoSaveOnError?: boolean; default?: unknown }>;
+}
+
+/**
+ * Run a validator expression the way the admin does: as JavaScript over the form `data`.
+ *
+ * The expression is a STRING in the shipped panel — no test executes it by looking at it,
+ * which is exactly how a wrong decision stays green (a text-pattern test passes while the
+ * dialog lets the clash through). An isolated context is the honest stand-in for the
+ * admin's evaluation.
+ *
+ * @param validator the validator expression from the schema
+ * @param data the form values to evaluate it against
+ * @returns what the admin would get: true = valid, false = show the error and block saving
+ */
+function evaluateValidator(validator: string, data: Record<string, unknown>): boolean {
+  return runInNewContext(`(${validator})`, { data }) as boolean;
 }
 
 describe("buildDeviceForm", () => {
@@ -468,15 +523,50 @@ describe("buildDeviceForm", () => {
 
   it("keeps the validator valid code when a name carries quotes or backslashes", () => {
     const form = buildDeviceForm(['Say "hi"', "back\\slash"], []) as unknown as FormSchema;
-    const literal = form.items.name.validator!.match(/^!(\[.*\])\.includes\(/)?.[1];
+    const literal = form.items.name.validator!.match(/\[[^\]]*"say \\"hi\\""[^\]]*\]/)?.[0];
     expect(literal).toBeDefined();
     // The admin evaluates this string as JavaScript. An unescaped quote ends the array
     // early and every duplicate-name check in the dialog silently stops working.
     expect(JSON.parse(literal!)).toEqual(['say "hi"', "back\\slash"]);
   });
 
+  describe("the name validator, evaluated the way the admin evaluates it", () => {
+    const form = buildDeviceForm(["  Living room ", "Kitchen"], [8060]) as unknown as FormSchema;
+    const check = (name: unknown): boolean => evaluateValidator(form.items.name.validator!, { name });
+
+    it("accepts a free name", () => {
+      expect(check("Bedroom")).toBe(true);
+    });
+
+    it("refuses a name already in use, however it is typed", () => {
+      expect(check("living room")).toBe(false);
+      expect(check("  LIVING ROOM  ")).toBe(false);
+      expect(check("Kitchen")).toBe(false);
+    });
+
+    it("refuses the reserved name that would overwrite the adapter's own status channel", () => {
+      expect(check("info")).toBe(false);
+    });
+
+    it("refuses a different name that lands on another device's object id", () => {
+      // "Living*room" and "Living room" both sanitize to "Living_room": two cards, one tree.
+      // The id comparison is case-SENSITIVE on purpose — ioBroker object ids are, and a
+      // name differing only in case is already caught by the name rule above.
+      expect(check("Living*room")).toBe(false);
+      expect(check("Living*Room")).toBe(true);
+    });
+
+    it("refuses a name that sanitizes to nothing at all", () => {
+      expect(check("")).toBe(false);
+      expect(check("   ")).toBe(false);
+      expect(check(undefined)).toBe(false);
+    });
+  });
+
   it("compares ports as numbers, so a typed '8060' is caught", () => {
     const form = buildDeviceForm([], [8060]) as unknown as FormSchema;
     expect(form.items.port.validator).toBe("![8060].includes(Number(data.port))");
+    expect(evaluateValidator(form.items.port.validator!, { port: "8060" })).toBe(false);
+    expect(evaluateValidator(form.items.port.validator!, { port: 8061 })).toBe(true);
   });
 });

@@ -38,6 +38,7 @@ var import_ecp_command = require("./ecp-command");
 var import_device_info = require("./device-info");
 const MAX_LOGGED_DETAIL = 120;
 const NON_LAN_LOG_INTERVAL_MS = 6e4;
+const MAX_CONNECTIONS = 32;
 class EcpHttpServer {
   /**
    * @param config server configuration
@@ -55,6 +56,7 @@ class EcpHttpServer {
   async start() {
     var _a;
     const server = http.createServer((req, res) => this.handle(req, res));
+    server.maxConnections = MAX_CONNECTIONS;
     this.server = server;
     await new Promise((resolve, reject) => {
       const onError = (err) => reject(err);
@@ -146,6 +148,10 @@ class EcpHttpServer {
         return (0, import_device_info.buildDeviceInfoXml)(this.config.device, this.config.friendlyName, this.config.deviceType);
       case "/query/apps":
         return (0, import_device_info.buildAppsXml)(this.config.apps);
+      // The root description points at this document; answering 404 for a path the device
+      // itself advertises is a contradiction a strict UPnP control point can trip over.
+      case "/ecp_SCPD.xml":
+        return (0, import_device_info.buildScpdXml)();
       default:
         return null;
     }

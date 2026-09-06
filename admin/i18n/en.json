@@ -20,6 +20,7 @@
   "deviceNameInUse": "This name is already used by another device.",
   "devicePortInUse": "This port is already used by another Roku.",
   "deviceNameInvalid": "This name can't be used — it is reserved or maps to the same object id as another device.",
+  "deviceNameRejected": "This name can't be used: it is already taken, reserved for the adapter, or maps to the same object id as another device.",
   "supportHeader": "Support",
   "aboutInfo": "If this adapter is useful to you, a small donation helps keep it maintained — thank you!",
   "donateKofi": "Ko-fi",

@@ -3,6 +3,19 @@
     "name": "fakeroku",
     "version": "1.5.0",
     "news": {
+      "NEXT": {
+        "en": "Saving a device no longer changes its network identity, a busy ECP port is retried, and a stopped instance takes its emulated Rokus out of the remote.",
+        "de": "Das Speichern eines Geräts ändert seine Netzkennung nicht mehr, ein belegter ECP-Anschluss wird erneut versucht, und eine gestoppte Instanz meldet ihre Rokus ab.",
+        "ru": "Сохранение устройства больше не меняет его сетевой идентификатор, занятый порт ECP повторяется, а остановленный экземпляр убирает свои Roku из пульта.",
+        "pt": "Guardar um dispositivo já não altera a sua identidade de rede, uma porta ECP ocupada é repetida e uma instância parada remove os seus Roku do comando.",
+        "nl": "Een apparaat opslaan verandert zijn netwerkidentiteit niet meer, een bezette ECP-poort wordt opnieuw geprobeerd en een gestopte instantie meldt zijn Roku's af.",
+        "fr": "Enregistrer un appareil ne change plus son identité réseau, un port ECP occupé est réessayé, et une instance arrêtée retire ses Roku de la télécommande.",
+        "it": "Salvare un dispositivo non ne cambia più l'identità di rete, una porta ECP occupata viene ritentata e un'istanza fermata rimuove i suoi Roku dal telecomando.",
+        "es": "Guardar un dispositivo ya no cambia su identidad de red, un puerto ECP ocupado se reintenta y una instancia detenida retira sus Roku del mando.",
+        "pl": "Zapis urządzenia nie zmienia już jego tożsamości sieciowej, zajęty port ECP jest ponawiany, a zatrzymana instancja usuwa swoje Roku z pilota.",
+        "uk": "Збереження пристрою більше не змінює його мережевий ідентифікатор, зайнятий порт ECP повторюється, а зупинений екземпляр прибирає свої Roku з пульта.",
+        "zh-cn": "保存设备不再改变其网络标识，被占用的 ECP 端口会重试，停止的实例会将其模拟 Roku 从遥控器中移除。"
+      },
       "1.5.0": {
         "en": "Deleting the last emulated Roku now removes its datapoints, a host running Docker no longer announces an unreachable address, and a failed device is reported.",
         "de": "Das Löschen des letzten emulierten Roku entfernt jetzt seine Datenpunkte, ein Rechner mit Docker kündigt keine unerreichbare Adresse mehr an, ein Ausfall wird gemeldet.",
@@ -80,19 +93,6 @@
         "pl": "Wersja 1.0.0 stabilizuje przebudowę. Przy aktualizacji jednorazowe powiadomienie wyjaśnia, że przyciski są teraz boolean zamiast tekstu — sprawdź skrypty i wizualizacje.",
         "uk": "Версія 1.0.0 робить переробку стабільною. Під час оновлення одноразове сповіщення пояснює, що кнопки тепер boolean замість тексту — перевірте скрипти та візуалізації.",
         "zh-cn": "版本 1.0.0 将重写标记为稳定版。更新时一次性提示会说明按键现在为 boolean 而非文本——请检查读取它们的脚本和可视化。"
-      },
-      "0.6.0": {
-        "en": "Complete rewrite. The adapter now answers the full Roku control surface including device-info with a current Roku version, so Logitech Harmony and Sofabaton remotes work reliably. It runs out of the box, lets you manage several emulated Rokus (Player or TV) from the admin UI, and uses a cleaner object tree with correct data types.",
-        "de": "Komplett neu aufgebaut. Der Adapter bedient jetzt die volle Roku-Steueroberfläche inklusive device-info mit aktueller Roku-Version, sodass Logitech Harmony und Sofabaton zuverlässig funktionieren. Er läuft ohne Einrichtung, mehrere emulierte Rokus (Player oder TV) lassen sich im Admin verwalten, und der Objektbaum ist sauberer mit korrekten Datentypen.",
-        "ru": "Полностью переработан. Адаптер теперь поддерживает весь набор команд управления Roku, включая device-info с актуальной версией Roku, поэтому пульты Logitech Harmony и Sofabaton работают надёжно. Он работает без настройки, позволяет управлять несколькими эмулируемыми Roku (Player или TV) из интерфейса администратора и использует более чистое дерево объектов с правильными типами данных.",
-        "pt": "Reescrita completa. O adaptador agora responde a toda a superfície de controle Roku, incluindo device-info com uma versão Roku atual, para que os controles Logitech Harmony e Sofabaton funcionem de forma confiável. Funciona sem configuração, permite gerenciar vários Rokus emulados (Player ou TV) pela interface de administração e usa uma árvore de objetos mais limpa com tipos de dados corretos.",
-        "nl": "Volledig herschreven. De adapter beantwoordt nu het volledige Roku-besturingsoppervlak inclusief device-info met een actuele Roku-versie, zodat Logitech Harmony- en Sofabaton-afstandsbedieningen betrouwbaar werken. Hij werkt out of the box, laat je meerdere geëmuleerde Rokus (Player of TV) beheren vanuit de admin-UI en gebruikt een schonere objectboom met correcte datatypes.",
-        "fr": "Réécriture complète. L'adaptateur répond désormais à toute la surface de contrôle Roku, y compris device-info avec une version Roku actuelle, afin que les télécommandes Logitech Harmony et Sofabaton fonctionnent de manière fiable. Il fonctionne sans configuration, permet de gérer plusieurs Roku émulés (Player ou TV) depuis l'interface d'administration et utilise une arborescence d'objets plus propre avec des types de données corrects.",
-        "it": "Riscrittura completa. L'adattatore ora risponde all'intera superficie di controllo Roku, incluso device-info con una versione Roku attuale, così i telecomandi Logitech Harmony e Sofabaton funzionano in modo affidabile. Funziona senza configurazione, consente di gestire più Roku emulati (Player o TV) dall'interfaccia di amministrazione e utilizza un albero degli oggetti più pulito con tipi di dati corretti.",
-        "es": "Reescritura completa. El adaptador ahora responde a toda la superficie de control de Roku, incluido device-info con una versión de Roku actual, por lo que los mandos Logitech Harmony y Sofabaton funcionan de forma fiable. Funciona sin configuración, permite gestionar varios Roku emulados (Player o TV) desde la interfaz de administración y usa un árbol de objetos más limpio con tipos de datos correctos.",
-        "pl": "Całkowicie przepisany. Adapter obsługuje teraz pełną powierzchnię sterowania Roku, w tym device-info z aktualną wersją Roku, dzięki czemu piloty Logitech Harmony i Sofabaton działają niezawodnie. Działa od razu, pozwala zarządzać wieloma emulowanymi Roku (Player lub TV) z interfejsu administratora i używa czystszego drzewa obiektów z poprawnymi typami danych.",
-        "uk": "Повністю переписано. Адаптер тепер підтримує весь набір команд керування Roku, включно з device-info з актуальною версією Roku, тож пульти Logitech Harmony і Sofabaton працюють надійно. Він працює без налаштування, дозволяє керувати кількома емульованими Roku (Player або TV) з інтерфейсу адміністратора та використовує чистіше дерево об'єктів із правильними типами даних.",
-        "zh-cn": "完全重写。适配器现在可响应完整的 Roku 控制接口，包括带有当前 Roku 版本的 device-info，因此 Logitech Harmony 和 Sofabaton 遥控器可以可靠地工作。开箱即用，可从管理界面管理多个模拟 Roku（Player 或 TV），并使用具有正确数据类型的更简洁的对象树。"
       }
     },
     "titleLang": {

@@ -18,6 +18,7 @@ var __copyProps = (to, from, except, desc) => {
 var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 var object_cleanup_exports = {};
 __export(object_cleanup_exports, {
+  planNativePrune: () => planNativePrune,
   planObjectCleanup: () => planObjectCleanup
 });
 module.exports = __toCommonJS(object_cleanup_exports);
@@ -52,8 +53,21 @@ function planObjectCleanup(existingIds, configuredDeviceIds, validKeysByDevice) 
   }
   return [...del];
 }
+function planNativePrune(objects, deleted = /* @__PURE__ */ new Set()) {
+  const stale = [];
+  for (const [id, obj] of objects) {
+    if (deleted.has(id) || [...deleted].some((prefix) => id.startsWith(`${prefix}.`))) {
+      continue;
+    }
+    if (obj.native && typeof obj.native === "object" && Object.keys(obj.native).length > 0) {
+      stale.push([id, obj]);
+    }
+  }
+  return stale;
+}
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
+  planNativePrune,
   planObjectCleanup
 });
 //# sourceMappingURL=object-cleanup.js.map

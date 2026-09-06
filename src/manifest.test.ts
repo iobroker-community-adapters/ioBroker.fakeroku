@@ -1,23 +1,44 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import { BASE_KEYS, TV_KEYS } from "./ecp/state-model";
 
 const root = join(__dirname, "..");
+/** The eleven languages every ioBroker manifest and admin translation carries. */
+const LANGS = ["en", "de", "ru", "pt", "nl", "fr", "it", "es", "pl", "uk", "zh-cn"];
 
 /**
  * Manifest wiring the integration boot test cannot see.
  */
 describe("io-package.json manifest", () => {
   const io = JSON.parse(readFileSync(join(root, "io-package.json"), "utf8")) as {
-    common?: { icon?: string; extIcon?: string; supportedMessages?: { deviceManager?: boolean } };
+    common?: { icon?: string; extIcon?: string; supportedMessages?: Record<string, boolean> };
     instanceObjects?: { _id: string; common?: { name?: unknown; desc?: unknown } }[];
+    native?: Record<string, unknown>;
   };
-  const LANGS = ["en", "de", "ru", "pt", "nl", "fr", "it", "es", "pl", "uk", "zh-cn"];
 
   // The device manager only works if `common.supportedMessages.deviceManager` is
   // set: without it the js-controller delivers no `dm:*` message, so neither the
   // add button nor the device cards appear — yet the adapter still boots green.
   it("enables device-manager messages (common.supportedMessages.deviceManager)", () => {
     expect(io.common?.supportedMessages?.deviceManager).toBe(true);
+  });
+
+  // stopInstance in that same list means onUnload never runs at all — no farewell, no
+  // final info.connection write. The key is a positive list, so it must not appear even
+  // as `false`: an object without a truthy entry silently shuts the messagebox.
+  it("declares no message the adapter does not serve, stopInstance above all", () => {
+    expect(Object.keys(io.common?.supportedMessages ?? {})).toEqual(["deviceManager"]);
+  });
+
+  // The device list is stored under `native.devices`, and that name is load-bearing:
+  // js-controller clears the stored array before merging for exactly four key names
+  // (`common.members`, `native.repositories`, `native.certificates`, `native.devices` —
+  // adapter.ts `_extendForeignObject`). Under any other name extendObject would merge the
+  // arrays element-wise, so writing a shorter list would leave the tail in place and a
+  // deleted device would come back on the next start.
+  it("keeps the device list under the one native key js-controller replaces instead of merging", () => {
+    expect(io.native).toHaveProperty("devices");
+    expect(Array.isArray(io.native?.devices)).toBe(true);
   });
 
   // The admin shows `common.icon`, GitHub shows the README logo. Until 1.3.0 these
@@ -58,5 +79,132 @@ describe("io-package.json manifest", () => {
       expect(typeof desc, `${obj._id} common.desc is not a plain string`).not.toBe("string");
       expect(Object.keys(desc as Record<string, string>).sort(), `${obj._id} languages`).toEqual([...LANGS].sort());
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Catalogue completeness — the decisions the object-inventory gate hands back to
+// the adapter (fleet template, section "Objekt-Inventar"):
+//   1. every language file carries exactly the keys en.json has,
+//   2. no language file leaves a key empty,
+//   3. no i18n key is dead,
+//   4. every datapoint in the generated inventory has a description or a recorded
+//      reason for having none — an invented sentence is worse than none, but the
+//      judgement has to be WRITTEN somewhere, not implied by absence,
+//   5. the inventory really covers every key of every device type.
+// ---------------------------------------------------------------------------
+
+/**
+ * Datapoints that carry NO description, each with the reason it needs none. A datapoint
+ * whose name already says everything gets no invented sentence — but the judgement is
+ * recorded here, so "no description" is always a decision and never an oversight.
+ */
+const SELF_EXPLAINING: { pattern: RegExp; reason: string }[] = [
+  {
+    pattern: /\.keys\.[A-Za-z0-9_]+$/,
+    reason:
+      "The name IS the remote key (Home, VolumeUp, InputHDMI1) — the ECP identifier the " +
+      "controller sends. A description could only repeat it in worse words.",
+  },
+];
+
+describe("naming catalogue", () => {
+  const i18nDir = join(root, "admin", "i18n");
+  const en = JSON.parse(readFileSync(join(i18nDir, "en.json"), "utf8")) as Record<string, string>;
+
+  it("every language file carries exactly the keys en.json has", () => {
+    const expected = Object.keys(en).sort();
+    for (const lang of LANGS) {
+      const data = JSON.parse(readFileSync(join(i18nDir, `${lang}.json`), "utf8")) as Record<string, string>;
+      const actual = Object.keys(data).sort();
+      expect(
+        expected.filter(k => !actual.includes(k)),
+        `${lang}.json is missing keys`,
+      ).toEqual([]);
+      expect(
+        actual.filter(k => !expected.includes(k)),
+        `${lang}.json has keys en.json does not`,
+      ).toEqual([]);
+    }
+  });
+
+  it("no language file leaves a key empty", () => {
+    for (const lang of LANGS) {
+      const data = JSON.parse(readFileSync(join(i18nDir, `${lang}.json`), "utf8")) as Record<string, string>;
+      const blank = Object.entries(data)
+        .filter(([, v]) => typeof v !== "string" || v.trim() === "")
+        .map(([k]) => k);
+      expect(blank, `${lang}.json has blank values`).toEqual([]);
+    }
+  });
+
+  it("carries no key nothing reads any more", () => {
+    // A dead key is pure maintenance load: eleven files to keep in step for a text no
+    // code asks for. The manifest and the admin panel are consumers too — the fleet's
+    // sync script fills instanceObjects names/descs from these keys.
+    const sources = [
+      readFileSync(join(root, "src", "main.ts"), "utf8"),
+      readFileSync(join(root, "src", "device-management.ts"), "utf8"),
+      readFileSync(join(root, "io-package.json"), "utf8"),
+      readFileSync(join(root, "admin", "jsonConfig.json"), "utf8"),
+    ];
+    const libDir = join(root, "src", "lib");
+    for (const f of readdirSync(libDir).filter(name => name.endsWith(".ts") && !name.endsWith(".test.ts"))) {
+      sources.push(readFileSync(join(libDir, f), "utf8"));
+    }
+    const haystack = sources.join("\n");
+    const dead = Object.keys(en).filter(k => !haystack.includes(`"${k}"`) && !haystack.includes(`'${k}'`));
+    expect(dead, "i18n keys no source, manifest or panel reads").toEqual([]);
+  });
+});
+
+describe("datapoint descriptions", () => {
+  const inventoryFile = join(root, "test", "objects.inventory.json");
+  const inventory = JSON.parse(readFileSync(inventoryFile, "utf8")) as Record<
+    string,
+    { type: string; common?: { desc?: unknown; name?: unknown } }
+  >;
+
+  it("every datapoint has a description or a recorded reason for having none", () => {
+    const undecided = Object.entries(inventory)
+      .filter(([id, obj]) => {
+        if (obj.type !== "state" || obj.common?.desc !== undefined) {
+          return false; // containers carry a name; a description would have nothing to add
+        }
+        return !SELF_EXPLAINING.some(entry => entry.pattern.test(id));
+      })
+      .map(([id]) => id);
+    expect(undecided, "datapoints with neither a description nor a recorded reason").toEqual([]);
+  });
+
+  it("every self-explaining rule still matches a datapoint that has no description", () => {
+    // Guards the other direction: a rule left behind after descriptions WERE added would
+    // quietly excuse datapoints that no longer need excusing.
+    const stale = SELF_EXPLAINING.filter(
+      entry =>
+        !Object.entries(inventory).some(
+          ([id, obj]) => entry.pattern.test(id) && obj.type === "state" && obj.common?.desc === undefined,
+        ),
+    ).map(entry => String(entry.pattern));
+    expect(stale, "self-explaining rules that no longer excuse anything").toEqual([]);
+  });
+
+  it("the inventory covers every key of every device type", () => {
+    // The gate can only judge what the inventory contains. A fixture that stopped
+    // covering the TV would shrink the inventory and quietly narrow the check.
+    const ids = Object.keys(inventory);
+    for (const key of BASE_KEYS) {
+      expect(ids, `player key ${key}`).toContain(`fakeroku.0.Player.keys.${key}`);
+      expect(ids, `tv key ${key}`).toContain(`fakeroku.0.TV.keys.${key}`);
+    }
+    for (const key of TV_KEYS) {
+      expect(ids, `tv-only key ${key}`).toContain(`fakeroku.0.TV.keys.${key}`);
+      expect(ids, `player must NOT carry ${key}`).not.toContain(`fakeroku.0.Player.keys.${key}`);
+    }
+    for (const device of ["Player", "TV"]) {
+      expect(ids).toContain(`fakeroku.0.${device}.command`);
+      expect(ids).toContain(`fakeroku.0.${device}.commandType`);
+    }
+    expect(ids).toContain("fakeroku.0.info.connection");
   });
 });

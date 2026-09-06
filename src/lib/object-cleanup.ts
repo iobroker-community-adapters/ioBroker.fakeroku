@@ -58,3 +58,36 @@ export function planObjectCleanup(
   }
   return [...del];
 }
+
+/**
+ * Find the objects that still carry a `native` attribute this adapter does not write.
+ *
+ * Every object this adapter creates declares `native: {}`. The pre-0.5.0 adapter wrote
+ * `native: { url: "keys/Home" }` on every key state, and `extendObject` merges — an
+ * attribute only the stored object carries survives forever, and writing `null` would store
+ * `null` rather than remove it. So an installation upgraded from <= 0.4.0 keeps a dead
+ * attribute on every key datapoint until something writes the object in full.
+ *
+ * Pure: the caller performs the writes, and it decides nothing about `common` — the object
+ * is handed back as it was read so the full write can preserve it (that is where
+ * `common.custom`, the user's own history configuration, lives).
+ *
+ * @param objects the adapter's objects, keyed relative to the namespace
+ * @param deleted ids the orphan sweep is removing — writing to those would be pointless
+ * @returns the ids and objects to rewrite without their stale native attributes
+ */
+export function planNativePrune(
+  objects: ReadonlyMap<string, ioBroker.Object>,
+  deleted: ReadonlySet<string> = new Set(),
+): [string, ioBroker.Object][] {
+  const stale: [string, ioBroker.Object][] = [];
+  for (const [id, obj] of objects) {
+    if (deleted.has(id) || [...deleted].some(prefix => id.startsWith(`${prefix}.`))) {
+      continue;
+    }
+    if (obj.native && typeof obj.native === "object" && Object.keys(obj.native).length > 0) {
+      stale.push([id, obj]);
+    }
+  }
+  return stale;
+}

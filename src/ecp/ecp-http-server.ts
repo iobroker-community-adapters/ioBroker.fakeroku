@@ -4,7 +4,7 @@ import { errText } from "../lib/errors";
 import { isLanClient } from "../lib/lan-guard";
 import type { AdapterLogger } from "../lib/logger";
 import { type CommandEvent, parseEcpCommand } from "./ecp-command";
-import { type AppEntry, buildAppsXml, buildDescXml, buildDeviceInfoXml } from "./device-info";
+import { type AppEntry, buildAppsXml, buildDescXml, buildDeviceInfoXml, buildScpdXml } from "./device-info";
 import type { DeviceType } from "./state-model";
 
 /** Configuration for one emulated Roku's ECP HTTP server. */
@@ -49,6 +49,17 @@ const MAX_LOGGED_DETAIL = 120;
 const NON_LAN_LOG_INTERVAL_MS = 60_000;
 
 /**
+ * Concurrent connections one emulated Roku accepts.
+ *
+ * Node bounds the two classic per-connection attacks by itself (`headersTimeout` 60 s,
+ * `requestTimeout` 300 s), but not the NUMBER of sockets: a LAN host can open them until
+ * the process runs out of file descriptors, which takes the whole adapter down, not just
+ * this device. A real remote holds one keep-alive connection, so this is far above any
+ * legitimate use and still a bound.
+ */
+const MAX_CONNECTIONS = 32;
+
+/**
  * The Roku ECP HTTP server for one emulated device. Serves the UPnP description,
  * /query/device-info (with a current version) and /query/apps; turns POST
  * key/launch/input/search into command events. Unknown GET paths get a clean 404
@@ -69,6 +80,7 @@ export class EcpHttpServer {
   /** Bind the HTTP server to the interface + port. Rejects on bind error. */
   public async start(): Promise<void> {
     const server = http.createServer((req, res) => this.handle(req, res));
+    server.maxConnections = MAX_CONNECTIONS;
     this.server = server;
     await new Promise<void>((resolve, reject) => {
       const onError = (err: Error): void => reject(err);
@@ -181,6 +193,10 @@ export class EcpHttpServer {
         return buildDeviceInfoXml(this.config.device, this.config.friendlyName, this.config.deviceType);
       case "/query/apps":
         return buildAppsXml(this.config.apps);
+      // The root description points at this document; answering 404 for a path the device
+      // itself advertises is a contradiction a strict UPnP control point can trip over.
+      case "/ecp_SCPD.xml":
+        return buildScpdXml();
       default:
         return null;
     }

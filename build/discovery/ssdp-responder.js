@@ -43,10 +43,43 @@ class RokuSsdpResponder {
    */
   constructor(config) {
     this.config = config;
+    this.devices = [...config.devices];
   }
   config;
   socket;
   fatalReported = false;
+  /**
+   * The devices this responder answers for — its OWN list, not the caller's array.
+   *
+   * The set changes while the responder runs: a device whose port was busy at start-up
+   * joins when its retry succeeds, and one whose server died leaves. Copying the list here
+   * (instead of announcing whatever array the caller happens to still hold) keeps that
+   * explicit — {@link addDevice} and {@link removeDevice} are the only ways in and out.
+   */
+  devices;
+  /**
+   * Announce one more device from now on — an emulated Roku that started late (its ECP port
+   * was taken at boot and the retry got it).
+   *
+   * @param device the advert to answer for
+   */
+  addDevice(device) {
+    if (!this.devices.some((d) => d.uuid === device.uuid)) {
+      this.devices.push(device);
+    }
+  }
+  /**
+   * Stop answering for a device — its ECP server died, so discovery must stop pointing
+   * remotes at a port nobody serves any more.
+   *
+   * @param uuid the identity of the device to drop
+   */
+  removeDevice(uuid) {
+    const at = this.devices.findIndex((d) => d.uuid === uuid);
+    if (at >= 0) {
+      this.devices.splice(at, 1);
+    }
+  }
   /** Bind on 1900, join multicast on the selected interface(s), start answering. Rejects on bind error. */
   async start() {
     const socket = dgram.createSocket({ type: "udp4", reuseAddr: true });
@@ -125,15 +158,16 @@ class RokuSsdpResponder {
   }
   onMessage(text, address, port) {
     var _a;
-    if (!(0, import_ssdp_messages.matchesRokuSearch)(text)) {
+    const target = (0, import_ssdp_messages.rokuSearchTarget)(text);
+    if (!target) {
       return;
     }
     if (!(0, import_lan_guard.isLanClient)(address)) {
       this.config.logger.debug(`SSDP search from non-LAN ${address} ignored`);
       return;
     }
-    for (const device of this.config.devices) {
-      const response = Buffer.from((0, import_ssdp_messages.buildSearchResponse)(device, this.config.advertiseIp));
+    for (const device of this.devices) {
+      const response = Buffer.from((0, import_ssdp_messages.buildSearchResponse)(device, this.config.advertiseIp, target));
       (_a = this.socket) == null ? void 0 : _a.send(response, port, address, (err) => {
         if (err) {
           this.config.logger.warn(`SSDP response send failed: ${err.message}`);
@@ -146,7 +180,7 @@ class RokuSsdpResponder {
     if (!this.socket) {
       return;
     }
-    for (const device of this.config.devices) {
+    for (const device of this.devices) {
       const notify = Buffer.from((0, import_ssdp_messages.buildAliveNotify)(device, this.config.advertiseIp));
       this.socket.send(notify, SSDP_PORT, MULTICAST_ADDR, (err) => {
         if (err) {
@@ -154,6 +188,48 @@ class RokuSsdpResponder {
         }
       });
     }
+  }
+  /**
+   * Say goodbye for every device and resolve once the datagrams are out (or the deadline
+   * passed). Without this a controller keeps the emulated Roku for the announced max-age —
+   * an hour of a device that answers nothing, and of key presses going nowhere.
+   *
+   * Resolves once every datagram is out, and it always resolves: a `dgram` send reports
+   * back through its callback either way, an error included, so there is no case that needs
+   * a deadline of its own — and a deadline here could only be a plain `setTimeout`, which
+   * this adapter does not use (the managed one refuses during shutdown). The host's
+   * `stopTimeout` is the bound for teardown as a whole.
+   *
+   * The socket stays open until {@link stop} — sending into a closed one would throw.
+   *
+   * @returns a promise that always resolves
+   */
+  byebye() {
+    const socket = this.socket;
+    if (!socket || this.devices.length === 0) {
+      return Promise.resolve();
+    }
+    return new Promise((resolve) => {
+      let open = this.devices.length;
+      const done = () => {
+        if (--open === 0) {
+          resolve();
+        }
+      };
+      for (const device of this.devices) {
+        try {
+          socket.send(Buffer.from((0, import_ssdp_messages.buildByebyeNotify)(device)), SSDP_PORT, MULTICAST_ADDR, (err) => {
+            if (err) {
+              this.config.logger.debug(`SSDP byebye send failed: ${err.message}`);
+            }
+            done();
+          });
+        } catch (e) {
+          this.config.logger.debug(`SSDP byebye send failed: ${(0, import_errors.errText)(e)}`);
+          done();
+        }
+      }
+    });
   }
   /** Synchronous close — safe to call from onUnload. Closing the socket drops its memberships. */
   stop() {

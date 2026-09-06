@@ -159,3 +159,22 @@ export function buildAppsXml(apps: AppEntry[]): string {
   const entries = apps.map(a => `  <app id="${xmlEscape(a.id)}">${xmlEscape(a.name)}</app>`).join("\n");
   return `<apps>\n${entries}\n</apps>`;
 }
+
+/**
+ * The service description the root description points at (`<SCPDURL>ecp_SCPD.xml</SCPDURL>`).
+ *
+ * ECP is a plain HTTP interface, not a SOAP service, so there is nothing to declare — but a
+ * description that advertises a document and then answers 404 for it is a contradiction a
+ * strict UPnP control point can trip over. This is the minimal valid SCPD: the mandatory
+ * version block and two empty lists.
+ *
+ * @returns the SCPD XML
+ */
+export function buildScpdXml(): string {
+  return `<?xml version="1.0" encoding="UTF-8" ?>
+<scpd xmlns="urn:schemas-upnp-org:service-1-0">
+  <specVersion><major>1</major><minor>0</minor></specVersion>
+  <actionList/>
+  <serviceStateTable/>
+</scpd>`;
+}

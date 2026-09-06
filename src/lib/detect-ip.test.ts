@@ -1,4 +1,10 @@
-import { ipv6Prefix64, listLocalIPv6Prefixes, listNonInternalIPv4s, pickPrimaryIPv4 } from "./detect-ip";
+import {
+  ipv6Prefix64,
+  listLocalIPv6Prefixes,
+  listNonInternalIPv4s,
+  pickMembershipIPv4s,
+  pickPrimaryIPv4,
+} from "./detect-ip";
 
 describe("pickPrimaryIPv4", () => {
   it("returns the first non-internal IPv4 (skips loopback)", () => {
@@ -162,5 +168,36 @@ describe("listLocalIPv6Prefixes", () => {
     expect(
       listLocalIPv6Prefixes({ eth0: [{ address: "192.168.1.5", family: "IPv4", internal: false } as never] }),
     ).toEqual([]);
+  });
+});
+
+describe("pickMembershipIPv4s", () => {
+  it("joins every real LAN interface", () => {
+    expect(
+      pickMembershipIPv4s({
+        eth0: [{ family: "IPv4", address: "10.47.88.2", internal: false } as any],
+        eth1: [{ family: "IPv4", address: "192.168.1.5", internal: false } as any],
+        lo: [{ family: "IPv4", address: "127.0.0.1", internal: true } as any],
+      }),
+    ).toEqual(["10.47.88.2", "192.168.1.5"]);
+  });
+
+  it("skips a Docker bridge — nothing a remote sends can arrive there", () => {
+    // The same exception the advertised address makes, and for the same reason. A join on
+    // docker0 cannot hear an M-SEARCH, costs a syscall, and on a host whose bridge is not
+    // in the multicast routing table it writes a warning that reads like a defect.
+    expect(
+      pickMembershipIPv4s({
+        docker0: [{ family: "IPv4", address: "172.17.0.1", internal: false } as any],
+        br1: [{ family: "IPv4", address: "172.18.0.1", internal: false } as any],
+        eth0: [{ family: "IPv4", address: "10.47.88.2", internal: false } as any],
+      }),
+    ).toEqual(["10.47.88.2"]);
+  });
+
+  it("uses the bridge after all when it is everything the host has (inside a container)", () => {
+    expect(pickMembershipIPv4s({ eth0: [{ family: "IPv4", address: "172.17.0.5", internal: false } as any] })).toEqual([
+      "172.17.0.5",
+    ]);
   });
 });

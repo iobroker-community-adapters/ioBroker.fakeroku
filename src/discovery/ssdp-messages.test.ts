@@ -1,4 +1,4 @@
-import { buildAliveNotify, buildSearchResponse, matchesRokuSearch } from "./ssdp-messages";
+import { buildAliveNotify, buildByebyeNotify, buildSearchResponse, rokuSearchTarget } from "./ssdp-messages";
 
 const MSEARCH = [
   "M-SEARCH * HTTP/1.1",
@@ -10,26 +10,26 @@ const MSEARCH = [
   "",
 ].join("\r\n");
 
-describe("matchesRokuSearch", () => {
+describe("rokuSearchTarget", () => {
   it("accepts an M-SEARCH for roku:ecp", () => {
-    expect(matchesRokuSearch(MSEARCH)).toBe(true);
+    expect(rokuSearchTarget(MSEARCH)).toBe("roku:ecp");
   });
   it("accepts ssdp:all", () => {
-    expect(matchesRokuSearch(MSEARCH.replace("ST: roku:ecp", "ST: ssdp:all"))).toBe(true);
+    expect(rokuSearchTarget(MSEARCH.replace("ST: roku:ecp", "ST: ssdp:all"))).toBe("ssdp:all");
   });
   it("accepts upnp:rootdevice (the generic UPnP sweep a controller may start with)", () => {
-    expect(matchesRokuSearch(MSEARCH.replace("ST: roku:ecp", "ST: upnp:rootdevice"))).toBe(true);
+    expect(rokuSearchTarget(MSEARCH.replace("ST: roku:ecp", "ST: upnp:rootdevice"))).toBe("upnp:rootdevice");
   });
   it("rejects a foreign ST", () => {
-    expect(matchesRokuSearch(MSEARCH.replace("ST: roku:ecp", "ST: urn:schemas-upnp-org:device:MediaRenderer:1"))).toBe(
-      false,
+    expect(rokuSearchTarget(MSEARCH.replace("ST: roku:ecp", "ST: urn:schemas-upnp-org:device:MediaRenderer:1"))).toBe(
+      null,
     );
   });
   it("rejects a NOTIFY (not an M-SEARCH)", () => {
-    expect(matchesRokuSearch(MSEARCH.replace("M-SEARCH * HTTP/1.1", "NOTIFY * HTTP/1.1"))).toBe(false);
+    expect(rokuSearchTarget(MSEARCH.replace("M-SEARCH * HTTP/1.1", "NOTIFY * HTTP/1.1"))).toBe(null);
   });
   it("rejects an M-SEARCH without ssdp:discover", () => {
-    expect(matchesRokuSearch(MSEARCH.replace('MAN: "ssdp:discover"', "MAN: whatever"))).toBe(false);
+    expect(rokuSearchTarget(MSEARCH.replace('MAN: "ssdp:discover"', "MAN: whatever"))).toBe(null);
   });
 });
 
@@ -47,6 +47,17 @@ describe("buildSearchResponse", () => {
   it("answers with ST roku:ecp", () => {
     expect(r).toContain("ST: roku:ecp");
   });
+  it("answers a wildcard search as the Roku service", () => {
+    expect(buildSearchResponse({ uuid: "abc123", port: 8060 }, "10.47.88.2", "ssdp:all")).toContain("ST: roku:ecp");
+  });
+  it("mirrors a upnp:rootdevice search, because a control point drops an answer with a foreign ST", () => {
+    const root = buildSearchResponse({ uuid: "abc123", port: 8060 }, "10.47.88.2", "upnp:rootdevice");
+    expect(root).toContain("ST: upnp:rootdevice");
+    // The USN keeps Roku's plain form even there — the `::<device>` suffix a strict UPnP
+    // answer would carry is exactly what made node-ssdp unusable for this adapter.
+    expect(root).toContain("USN: uuid:roku:ecp:abc123");
+    expect(root).not.toContain("::");
+  });
 });
 
 describe("buildAliveNotify", () => {
@@ -54,5 +65,17 @@ describe("buildAliveNotify", () => {
   it("announces ssdp:alive with the Roku USN", () => {
     expect(n).toContain("NTS: ssdp:alive");
     expect(n).toContain("USN: uuid:roku:ecp:abc123");
+  });
+});
+
+describe("buildByebyeNotify", () => {
+  const n = buildByebyeNotify({ uuid: "abc123", port: 8060 });
+  it("withdraws the device under the same identity it was announced with", () => {
+    expect(n).toContain("NTS: ssdp:byebye");
+    expect(n).toContain("NT: roku:ecp");
+    expect(n).toContain("USN: uuid:roku:ecp:abc123");
+  });
+  it("carries no LOCATION — the device is gone, there is nothing left to fetch", () => {
+    expect(n).not.toContain("LOCATION");
   });
 });

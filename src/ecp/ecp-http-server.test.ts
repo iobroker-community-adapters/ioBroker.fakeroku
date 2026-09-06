@@ -94,6 +94,26 @@ describe("EcpHttpServer", () => {
     const r = await request("GET", "/query/does-not-exist");
     expect(r.status).toBe(404);
   });
+
+  it("serves the service description the root description points at", async () => {
+    // The root description advertises <SCPDURL>ecp_SCPD.xml</SCPDURL>. Advertising a
+    // document and then answering 404 for it is a contradiction a strict UPnP control
+    // point can trip over.
+    const root = await request("GET", "/");
+    expect(root.body).toContain("<SCPDURL>ecp_SCPD.xml</SCPDURL>");
+    const r = await request("GET", "/ecp_SCPD.xml");
+    expect(r.status).toBe(200);
+    expect(r.body).toContain("urn:schemas-upnp-org:service-1-0");
+    expect(r.headers["content-type"]).toMatch(/^text\/xml/);
+  });
+
+  it("bounds the number of open connections one device accepts", () => {
+    // Node bounds the two classic per-connection attacks itself, but not the NUMBER of
+    // sockets: without a cap a LAN host can exhaust the process's file descriptors and
+    // take every emulated Roku down, not just this one.
+    const inner = (server as unknown as { server: { maxConnections: number } }).server;
+    expect(inner.maxConnections).toBe(32);
+  });
   it("routes a keypress to onCommand and answers 200", async () => {
     commands.length = 0;
     const r = await request("POST", "/keypress/Home");

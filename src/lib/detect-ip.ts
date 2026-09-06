@@ -82,15 +82,33 @@ export function detectPrimaryIPv4(): string {
 }
 
 /**
- * All routable IPv4 addresses of the host — the interfaces to join the SSDP
- * multicast group on when no specific interface is configured, so discovery
- * works on every LAN the host is on. Without this a multi-homed host only hears
- * M-SEARCH on the OS default interface. Empty when the host has no routable IPv4.
+ * The interfaces to join the SSDP multicast group on: every routable IPv4 that is not a
+ * Docker default bridge — and the bridges after all if that is everything the host has
+ * (inside a container it is). Pure, so it can be unit-tested without real network cards.
  *
- * @returns every routable IPv4 address of the host (may be empty)
+ * Same exception as {@link pickPrimaryIPv4}, and for the same reason: no remote lives behind
+ * `docker0`, so joining there cannot hear anything. It costs a syscall and, when the bridge
+ * is not in the multicast routing table, a warning that reads like a defect. Advertising and
+ * joining now answer the question about a container bridge the same way.
+ *
+ * @param interfaces the OS network-interface map (os.networkInterfaces() shape)
+ * @returns the addresses to join the multicast group on (may be empty)
+ */
+export function pickMembershipIPv4s(interfaces: NodeJS.Dict<NetworkInterfaceInfo[]>): string[] {
+  const addresses = listNonInternalIPv4s(interfaces);
+  const real = addresses.filter(address => !isContainerBridge(address));
+  return real.length > 0 ? real : addresses;
+}
+
+/**
+ * The host's interfaces to join the SSDP multicast group on when no specific interface is
+ * configured, so discovery works on every LAN the host is on. Without this a multi-homed
+ * host only hears M-SEARCH on the OS default interface.
+ *
+ * @returns the addresses to join on (may be empty)
  */
 export function detectLocalIPv4s(): string[] {
-  return listNonInternalIPv4s(networkInterfaces());
+  return pickMembershipIPv4s(networkInterfaces());
 }
 
 /**

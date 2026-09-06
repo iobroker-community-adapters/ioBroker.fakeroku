@@ -1,4 +1,4 @@
-import { planObjectCleanup } from "./object-cleanup";
+import { planNativePrune, planObjectCleanup } from "./object-cleanup";
 
 /**
  * One configured device "ioBroker" exposing the given keys.
@@ -68,5 +68,39 @@ describe("planObjectCleanup", () => {
       BASE,
     );
     expect(plan).toEqual([]);
+  });
+});
+
+describe("planNativePrune", () => {
+  const state = (native: Record<string, unknown>): ioBroker.Object =>
+    ({ type: "state", common: { name: "Home" }, native }) as unknown as ioBroker.Object;
+
+  it("finds an object carrying a native attribute this version does not write", () => {
+    // The pre-0.5.0 adapter wrote native.url on every key state; extendObject merges, so
+    // it survives every update. Only a full write removes it.
+    const objects = new Map([
+      ["Wohnzimmer.keys.Home", state({ url: "keys/Home" })],
+      ["Wohnzimmer.keys.Back", state({})],
+    ]);
+    expect(planNativePrune(objects).map(([id]) => id)).toEqual(["Wohnzimmer.keys.Home"]);
+  });
+
+  it("hands the object back untouched, so the caller can preserve common.custom", () => {
+    const obj = state({ url: "keys/Home" });
+    const [[, handed]] = planNativePrune(new Map([["Wohnzimmer.keys.Home", obj]]));
+    expect(handed).toBe(obj);
+  });
+
+  it("skips what the sweep is deleting anyway, children included", () => {
+    const objects = new Map([
+      ["Alt", state({ url: "x" })],
+      ["Alt.keys.Home", state({ url: "x" })],
+      ["Neu.keys.Home", state({ url: "x" })],
+    ]);
+    expect(planNativePrune(objects, new Set(["Alt"])).map(([id]) => id)).toEqual(["Neu.keys.Home"]);
+  });
+
+  it("says nothing about a clean tree", () => {
+    expect(planNativePrune(new Map([["Wohnzimmer.keys.Home", state({})]]))).toEqual([]);
   });
 });

@@ -103,7 +103,8 @@ on({ id: "fakeroku.0.Wohnzimmer.command" }, obj => {
 
 Die Tasten-Datenpunkte werden bei jedem Adapterstart auf `false` zurückgesetzt. Eine
 Taste, die beim Stoppen von ioBroker gedrückt stehen geblieben ist, kann deine Regel
-danach also nicht blockieren.
+danach also nicht blockieren. Das Loslassen einer Taste wird nie verworfen — auch dann
+nicht, wenn der Adapter gerade eine Befehlsflut abweist.
 
 ## Genutzte Anschlüsse
 
@@ -115,6 +116,10 @@ danach also nicht blockieren.
 
 Beantwortet werden nur Geräte aus deinem eigenen Heimnetz. Eine Anfrage aus dem
 Internet wird abgewiesen, eine Suche von außen ignoriert.
+
+Beim Stoppen der Instanz melden sich die emulierten Rokus im Netz ab. Die Fernbedienung
+nimmt sie damit sofort aus ihrer Liste, statt noch eine Stunde lang Tastendrücke ins
+Leere zu schicken.
 
 ## Fehlersuche
 
@@ -136,6 +141,9 @@ Instanz neu.
 Mindestens ein konfigurierter Roku konnte nicht starten. Das Protokoll nennt Gerät
 und Anschluss — fast immer ist der Anschluss schon von etwas anderem belegt (auch von
 einem zweiten emulierten Roku mit demselben Anschluss). Gib ihm einen freien.
+Der Adapter versucht es bei so einem Gerät jede Minute erneut und meldet im Protokoll,
+wenn es hochkommt — ein Anschluss, den der vorherige Prozess nach einem Neustart noch
+hielt, löst sich damit von allein.
 
 **Ich drücke eine Taste und in ioBroker passiert nichts.**
 Stelle die Protokollstufe der Instanz kurz auf `debug`. Jeder empfangene Befehl wird

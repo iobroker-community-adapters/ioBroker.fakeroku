@@ -10,6 +10,55 @@ import type * as OsModule from "node:os";
  * nothing here binds a port.
  */
 vi.mock("@iobroker/adapter-core", () => {
+  /**
+   * Is this a plain object — the only thing node.extend recurses into besides an array?
+   *
+   * @param v the value to test
+   * @returns true for a plain object
+   */
+  const isPlainObject = (v: unknown): v is Record<string, unknown> =>
+    typeof v === "object" && v !== null && !Array.isArray(v) && Object.getPrototypeOf(v) === Object.prototype;
+
+  /**
+   * `node.extend(true, target, source)` — the exact merge js-controller performs in its
+   * single merge site (objectsInRedisClient `extend(true, oldObj, objClone)`), rebuilt here
+   * because the semantics are what several of this adapter's design decisions rest on:
+   *
+   *  - a key only the OLD object carries SURVIVES, forever, through every further extend;
+   *  - a plain object / array source recurses into the old value, everything else replaces it;
+   *  - a shorter array does NOT replace a longer one, it merges element-wise;
+   *  - `undefined` in the source is skipped, `null` is copied (it does not delete).
+   *
+   * A flat `{ ...old, ...new }` shows none of that: it drops old keys that really survive.
+   * Measured against the real `extend` package on this adapter's own objects — an upgrade
+   * from <= 0.4.0 leaves `native.url` on every key state, which the flat spread hid.
+   *
+   * @param target the stored object (mutated, like js-controller mutates its copy)
+   * @param source the partial object handed to extendObject
+   * @returns the merged object
+   */
+  const nodeExtend = (target: Record<string, unknown>, source: Record<string, unknown>): Record<string, unknown> => {
+    for (const [key, copy] of Object.entries(source)) {
+      if (copy === undefined || copy === target) {
+        continue;
+      }
+      if (isPlainObject(copy) || Array.isArray(copy)) {
+        const src = target[key];
+        const base = Array.isArray(copy)
+          ? Array.isArray(src)
+            ? (src as unknown[])
+            : []
+          : isPlainObject(src)
+            ? src
+            : {};
+        target[key] = nodeExtend(base as Record<string, unknown>, copy as Record<string, unknown>);
+      } else {
+        target[key] = copy;
+      }
+    }
+    return target;
+  };
+
   class Adapter {
     public log = { silly: vi.fn(), debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() };
     public namespace = "fakeroku.0";
@@ -33,10 +82,23 @@ vi.mock("@iobroker/adapter-core", () => {
       }
       return Promise.resolve();
     });
+    // Deep merge, not a flat spread: js-controller merges with node.extend(true, …), so an
+    // attribute the new definition no longer carries survives in the stored object forever.
+    // The tests below assert the tree an installation really ends up with, not an idealised one.
     public extendObject = vi.fn((id: string, obj: Record<string, unknown>) => {
       const key = id.replace(`${this.namespace}.`, "");
-      this.objects.set(key, { ...(this.objects.get(key) ?? {}), ...obj });
+      const stored = structuredClone(this.objects.get(key) ?? {});
+      this.objects.set(key, nodeExtend(stored, structuredClone(obj)));
       return Promise.resolve();
+    });
+    public setObject = vi.fn((id: string, obj: Record<string, unknown>) => {
+      // Full write — replaces the object, which is the only way to REMOVE an attribute.
+      this.objects.set(id.replace(`${this.namespace}.`, ""), structuredClone(obj));
+      return Promise.resolve();
+    });
+    public getObjectAsync = vi.fn((id: string) => {
+      const stored = this.objects.get(id.replace(`${this.namespace}.`, ""));
+      return Promise.resolve(stored ? structuredClone(stored) : null);
     });
     public getAdapterObjectsAsync = vi.fn(() => {
       const out: Record<string, unknown> = {};
@@ -97,6 +159,9 @@ interface FakeSsdp {
   start: ReturnType<typeof vi.fn>;
   stop: ReturnType<typeof vi.fn>;
   announce: ReturnType<typeof vi.fn>;
+  addDevice: ReturnType<typeof vi.fn>;
+  removeDevice: ReturnType<typeof vi.fn>;
+  byebye: ReturnType<typeof vi.fn>;
   options: Record<string, unknown>;
 }
 
@@ -120,11 +185,16 @@ function internalOf(adapter: Fakeroku): {
   setInterval: ReturnType<typeof vi.fn>;
   clearInterval: ReturnType<typeof vi.fn>;
   ssdp: FakeSsdp | undefined;
+  running: { uuid: string; port: number }[];
+  pending: { deviceId: string; friendlyName: string }[];
+  retryPendingDevices(): Promise<void>;
   deviceKeys: Map<string, ReadonlySet<string>>;
   pulseTimers: Set<unknown>;
   holdTimers: Map<string, unknown>;
   setState: ReturnType<typeof vi.fn>;
   setStateChangedAsync: ReturnType<typeof vi.fn>;
+  setObject: ReturnType<typeof vi.fn>;
+  extendObject: ReturnType<typeof vi.fn>;
   makeEcpServer: unknown;
   makeSsdpResponder: unknown;
 } {
@@ -136,6 +206,8 @@ interface Ctx {
   i: ReturnType<typeof internalOf>;
   ecp: FakeEcp[];
   ssdps: FakeSsdp[];
+  /** Release the blocked ECP port — what a restart race looks like a minute later. */
+  freeEcpPort: () => void;
 }
 
 /**
@@ -180,6 +252,9 @@ function setup(
       options,
       stop: vi.fn(),
       announce: vi.fn(),
+      addDevice: vi.fn(),
+      removeDevice: vi.fn(),
+      byebye: vi.fn(() => Promise.resolve()),
       start: vi.fn(() => {
         if (opts.ssdpStartFails) {
           return Promise.reject(new Error("port 1900 busy"));
@@ -190,7 +265,15 @@ function setup(
     ssdps.push(responder);
     return responder;
   };
-  return { adapter, i, ecp, ssdps };
+  return {
+    adapter,
+    i,
+    ecp,
+    ssdps,
+    freeEcpPort: () => {
+      opts.failEcpPort = undefined;
+    },
+  };
 }
 
 afterEach(() => {
@@ -334,13 +417,26 @@ describe("Fakeroku onReady — device wiring", () => {
     expect(ctx.i.log.info).toHaveBeenCalledWith(expect.stringContaining("Emulating 2 Roku device(s)"));
   });
 
-  it("stops with an error when no device could be started", async () => {
+  it("reports the failure and starts no discovery when the only device's port is taken", async () => {
     const ctx = setup({ devices: [{ name: "Wohnzimmer", port: 8060, type: "player" }] }, { failEcpPort: 8060 });
+    await ctx.i.onReady();
+
+    expect(ctx.i.log.error).toHaveBeenCalledWith(expect.stringContaining("Only 0 of 1 configured Roku device"));
+    expect(ctx.i.states.get("info.connection")).toEqual({ val: false, ack: true });
+    // Nothing is listening, so there is nothing to announce — but the device is queued
+    // for a retry rather than written off (a port taken at boot is usually a restart race).
+    expect(ctx.ssdps).toHaveLength(0);
+    expect(ctx.i.pending.map(p => p.friendlyName)).toEqual(["Wohnzimmer"]);
+  });
+
+  it("gives up only when no device is startable at all, and says why", async () => {
+    // Every row unusable for a reason a retry cannot fix (here: the reserved name).
+    const ctx = setup({ devices: [{ name: "info", port: 8060, type: "player" }] });
     await ctx.i.onReady();
 
     expect(ctx.i.log.error).toHaveBeenCalledWith(expect.stringContaining("No emulated Roku device could be started"));
     expect(ctx.i.states.get("info.connection")).toEqual({ val: false, ack: true });
-    expect(ctx.ssdps).toHaveLength(0);
+    expect(ctx.i.pending).toHaveLength(0);
   });
 
   it("skips a second device whose name maps to the same object id", async () => {
@@ -1208,5 +1304,291 @@ describe("Fakeroku start-up robustness", () => {
     await new Promise<void>(resolve => ctx.i.onUnload(() => (cb(), resolve())));
     expect(ctx.i.clearInterval).not.toHaveBeenCalled();
     expect(cb).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("Fakeroku — a key release is never dropped", () => {
+  it("lets a keyup through even while the flood gate is closed", async () => {
+    // The gate protects the states database from a flood. Dropping a keypress costs one
+    // event; dropping the RELEASE leaves the key true until the 30 s watchdog — the
+    // protection would be the thing that falsifies the tree.
+    const ctx = setup();
+    await ctx.i.onReady();
+    ctx.i.applyCommand("Wohnzimmer", { type: "keydown", key: "Home" });
+    for (let n = 0; n < 60; n++) {
+      ctx.i.applyCommand("Wohnzimmer", { type: "keypress", key: "Select" });
+    }
+    expect(ctx.i.applyCommand("Wohnzimmer", { type: "keypress", key: "Select" })).toBe(false);
+
+    expect(ctx.i.applyCommand("Wohnzimmer", { type: "keyup", key: "Home" })).toBe(true);
+    expect(ctx.i.states.get("Wohnzimmer.keys.Home")).toEqual({ val: false, ack: true });
+  });
+
+  it("a keypress on a HELD key disarms the hold watchdog it replaces", async () => {
+    // Otherwise the watchdog fires 30 s later and writes a release for a key that the
+    // pulse already released — a phantom edge for every rule watching that key.
+    const ctx = setup();
+    await ctx.i.onReady();
+    ctx.i.applyCommand("Wohnzimmer", { type: "keydown", key: "Home" });
+    expect(ctx.i.holdTimers.has("Wohnzimmer.keys.Home")).toBe(true);
+
+    ctx.i.applyCommand("Wohnzimmer", { type: "keypress", key: "Home" });
+
+    expect(ctx.i.holdTimers.has("Wohnzimmer.keys.Home")).toBe(false);
+    expect(ctx.i.clearTimeout).toHaveBeenCalled();
+  });
+});
+
+describe("Fakeroku — a device whose port was busy is retried", () => {
+  it("queues the device, arms a timer and leaves the others running", async () => {
+    const ctx = setup(
+      {
+        devices: [
+          { name: "Wohnzimmer", port: 8060, type: "player" },
+          { name: "Kueche", port: 8061, type: "player" },
+        ],
+      },
+      { failEcpPort: 8061 },
+    );
+    await ctx.i.onReady();
+
+    expect(ctx.i.pending.map(p => p.friendlyName)).toEqual(["Kueche"]);
+    expect(ctx.i.running).toHaveLength(1);
+    expect(ctx.i.states.get("info.connection")).toEqual({ val: false, ack: true });
+    // The objects of the waiting device exist — only its server is missing.
+    expect(ctx.i.objects.has("Kueche.keys.Home")).toBe(true);
+    expect(ctx.i.setTimeout).toHaveBeenCalledWith(expect.any(Function), 60_000);
+  });
+
+  it("brings the device up on the retry and announces it from then on", async () => {
+    const ctx = setup({ devices: [{ name: "Kueche", port: 8061, type: "player" }] }, { failEcpPort: 8061 });
+    await ctx.i.onReady();
+    expect(ctx.i.states.get("info.connection")).toEqual({ val: false, ack: true });
+
+    // The port is free now — what a restart race looks like a minute later.
+    ctx.freeEcpPort();
+    await ctx.i.retryPendingDevices();
+
+    expect(ctx.i.pending).toHaveLength(0);
+    expect(ctx.i.running).toHaveLength(1);
+    expect(ctx.i.states.get("info.connection")).toEqual({ val: true, ack: true });
+    expect(ctx.i.log.info).toHaveBeenCalledWith(expect.stringContaining("is listening on port 8061 again"));
+    // Discovery never started (nothing was listening) — the recovery brings it up.
+    expect(ctx.ssdps).toHaveLength(1);
+  });
+
+  it("announces a device that joins an already running discovery", async () => {
+    const ctx = setup(
+      {
+        devices: [
+          { name: "Wohnzimmer", port: 8060, type: "player" },
+          { name: "Kueche", port: 8061, type: "player" },
+        ],
+      },
+      { failEcpPort: 8061 },
+    );
+    await ctx.i.onReady();
+    ctx.freeEcpPort();
+
+    await ctx.i.retryPendingDevices();
+
+    // Not by pushing into an array the responder happens to share — through its own door.
+    expect(ctx.ssdps[0].addDevice).toHaveBeenCalledWith({ uuid: deriveUuid("Kueche"), port: 8061 });
+    expect(ctx.i.states.get("info.connection")).toEqual({ val: true, ack: true });
+  });
+
+  it("the armed timer really runs the retry — not just the timer", async () => {
+    // Wiring test: the queue is only worked off if the scheduled callback calls it. A
+    // timer that fires into nothing leaves the device dead forever while every direct
+    // test of retryPendingDevices stays green (the mutation run of 1.6.0 found this gap).
+    const ctx = setup({ devices: [{ name: "Kueche", port: 8061, type: "player" }] }, { failEcpPort: 8061 });
+    await ctx.i.onReady();
+    const scheduled = ctx.i.setTimeout.mock.calls.find(([, ms]) => ms === 60_000)?.[0] as () => void;
+    expect(scheduled, "a retry timer was armed").toBeTypeOf("function");
+    ctx.freeEcpPort();
+
+    scheduled();
+    await vi.waitFor(() => expect(ctx.i.running).toHaveLength(1));
+
+    expect(ctx.i.pending).toHaveLength(0);
+    expect(ctx.i.states.get("info.connection")).toEqual({ val: true, ack: true });
+  });
+
+  it("keeps quiet about a retry that fails again — one warning, not one a minute", async () => {
+    const ctx = setup({ devices: [{ name: "Kueche", port: 8061, type: "player" }] }, { failEcpPort: 8061 });
+    await ctx.i.onReady();
+    ctx.i.log.warn.mockClear();
+
+    await ctx.i.retryPendingDevices();
+
+    expect(ctx.i.log.warn).not.toHaveBeenCalled();
+    expect(ctx.i.log.debug).toHaveBeenCalledWith(expect.stringContaining("still cannot start"));
+    expect(ctx.i.pending).toHaveLength(1);
+  });
+
+  it("does not queue a device whose server died at runtime", async () => {
+    // A port busy at boot is a restart race and heals; a server that died while running
+    // died for a reason this code does not know, and retrying it would flood the log.
+    const ctx = setup();
+    await ctx.i.onReady();
+    const fatal = ctx.ecp[0].options.onFatalError as () => void;
+
+    fatal();
+
+    expect(ctx.i.pending).toHaveLength(0);
+    expect(ctx.i.running).toHaveLength(0);
+    expect(ctx.i.states.get("info.connection")).toEqual({ val: false, ack: true });
+    // And discovery stops pointing remotes at a port nobody serves any more.
+    expect(ctx.ssdps[0].removeDevice).toHaveBeenCalledWith(deriveUuid("Wohnzimmer"));
+  });
+});
+
+describe("Fakeroku — the configured row is read once, for everyone", () => {
+  it("derives object id and identity from the name AS STORED", async () => {
+    // The manager may display and save a trimmed name; the runtime must keep answering
+    // for the tree and the SSDP identity the installation already has.
+    const ctx = setup({ devices: [{ name: " Wohnzimmer ", port: 8060, type: "player" }] });
+    await ctx.i.onReady();
+
+    expect(ctx.i.objects.has("_Wohnzimmer_")).toBe(true);
+    expect((ctx.ecp[0].options.device as { uuid: string }).uuid).toBe(deriveUuid(" Wohnzimmer "));
+  });
+
+  it("replaces a port no server could bind and names it", async () => {
+    const ctx = setup({ devices: [{ name: "Wohnzimmer", port: -5, type: "player" }] });
+    await ctx.i.onReady();
+
+    expect((ctx.ecp[0].options.device as { port: number }).port).toBe(8060);
+    expect(ctx.i.log.warn).toHaveBeenCalledWith(expect.stringContaining("unusable ECP port"));
+  });
+
+  it("ignores a row whose name is nothing but whitespace", async () => {
+    const ctx = setup({ devices: [{ name: "   ", port: 8060, type: "player" }] });
+    await ctx.i.onReady();
+
+    expect(ctx.ecp).toHaveLength(0);
+    expect(ctx.i.log.warn).toHaveBeenCalledWith(expect.stringContaining("No emulated Roku devices configured"));
+  });
+});
+
+describe("Fakeroku — leftovers of an older version inside an object", () => {
+  it("removes a native attribute this version does not write, keeping the user's own common", async () => {
+    // The pre-0.5.0 adapter wrote native.url on every key state. extendObject MERGES, so
+    // it survives every update — and writing null would store null, not remove it. Only a
+    // full write removes it, and that write must carry common.custom (the user's history
+    // configuration) back unchanged.
+    const ctx = setup();
+    ctx.i.objects.set("Wohnzimmer.keys.Home", {
+      type: "state",
+      common: { name: "Home", type: "boolean", custom: { "history.0": { enabled: true } } },
+      native: { url: "keys/Home" },
+    });
+
+    await ctx.i.onReady();
+
+    const obj = ctx.i.objects.get("Wohnzimmer.keys.Home")!;
+    expect(obj.native).toEqual({});
+    expect((obj.common as { custom: unknown }).custom).toEqual({ "history.0": { enabled: true } });
+    // And the update still reached the datapoint: the bare string the old adapter stored
+    // is a translation object now (tRaw carries the key name in all eleven languages).
+    const name = (obj.common as { name: Record<string, string> }).name;
+    expect(name).toMatchObject({ en: "Home", de: "Home", "zh-cn": "Home" });
+    expect(ctx.i.log.debug).toHaveBeenCalledWith(expect.stringContaining("stale native attribute"));
+  });
+
+  it("leaves an object alone when its native is already empty", async () => {
+    const ctx = setup();
+    await ctx.i.onReady();
+    ctx.i.setObject.mockClear();
+
+    await ctx.i.onReady();
+
+    expect(ctx.i.setObject).not.toHaveBeenCalled();
+  });
+});
+
+describe("Fakeroku — the farewell on shutdown", () => {
+  it("says goodbye before the socket closes, so the remote drops the device", async () => {
+    // Without it a controller keeps the emulated Roku for the announced max-age — an hour
+    // of a device that answers nothing.
+    const ctx = setup();
+    await ctx.i.onReady();
+    const order: string[] = [];
+    ctx.ssdps[0].byebye.mockImplementation(() => {
+      order.push("byebye");
+      return Promise.resolve();
+    });
+    ctx.ssdps[0].stop.mockImplementation(() => void order.push("stop"));
+
+    await new Promise<void>(resolve => ctx.i.onUnload(resolve));
+
+    expect(order).toEqual(["byebye", "stop"]);
+  });
+
+  it("still reports done when there is no discovery to say goodbye through", async () => {
+    const ctx = setup({}, { ssdpStartFails: true });
+    await ctx.i.onReady();
+    const cb = vi.fn();
+    await new Promise<void>(resolve => ctx.i.onUnload(() => (cb(), resolve())));
+    expect(cb).toHaveBeenCalledTimes(1);
+  });
+
+  it("drops every per-device collection it built", async () => {
+    const ctx = setup();
+    await ctx.i.onReady();
+    ctx.i.applyCommand("Wohnzimmer", { type: "keypress", key: "Home" });
+
+    await new Promise<void>(resolve => ctx.i.onUnload(resolve));
+
+    expect(ctx.i.deviceKeys.size).toBe(0);
+    expect(ctx.i.running).toHaveLength(0);
+    expect(ctx.i.pending).toHaveLength(0);
+  });
+});
+
+describe("Fakeroku — the paths that only a failing database reaches", () => {
+  it("skips a device whose objects cannot be created and keeps the others", async () => {
+    const ctx = setup({
+      devices: [
+        { name: "Wohnzimmer", port: 8060, type: "player" },
+        { name: "Kueche", port: 8061, type: "player" },
+      ],
+    });
+    const realExtend = ctx.i.extendObject.getMockImplementation() as (
+      id: string,
+      obj: Record<string, unknown>,
+    ) => Promise<void>;
+    ctx.i.extendObject.mockImplementation((id: string, obj: Record<string, unknown>) =>
+      id.startsWith("Wohnzimmer") ? Promise.reject(new Error("objects database is closed")) : realExtend(id, obj),
+    );
+
+    await ctx.i.onReady();
+
+    expect(ctx.i.log.warn).toHaveBeenCalledWith(expect.stringContaining("could not be created"));
+    // The other device still comes up — one broken tree must not take the instance down.
+    expect(ctx.ecp).toHaveLength(1);
+    expect((ctx.ecp[0].options.device as { port: number }).port).toBe(8061);
+  });
+
+  it("traces a rewrite it cannot perform instead of failing the start", async () => {
+    const ctx = setup();
+    ctx.i.objects.set("Wohnzimmer.keys.Home", { type: "state", common: {}, native: { url: "keys/Home" } });
+    ctx.i.setObject.mockImplementation(() => Promise.reject(new Error("read-only")));
+
+    await ctx.i.onReady();
+
+    expect(ctx.i.log.debug).toHaveBeenCalledWith(expect.stringContaining("could not rewrite"));
+    expect(ctx.i.states.get("info.connection")).toEqual({ val: true, ack: true });
+  });
+
+  it("disarms the retry timer on unload", async () => {
+    const ctx = setup({ devices: [{ name: "Kueche", port: 8061, type: "player" }] }, { failEcpPort: 8061 });
+    await ctx.i.onReady();
+    ctx.i.clearTimeout.mockClear();
+
+    await new Promise<void>(resolve => ctx.i.onUnload(resolve));
+
+    // A timer left armed keeps firing into an adapter that is already gone.
+    expect(ctx.i.clearTimeout).toHaveBeenCalledWith({ kind: "timeout" });
   });
 });

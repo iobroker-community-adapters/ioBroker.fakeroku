@@ -1,4 +1,5 @@
 # Older changes
+
 ## 1.0.0 (2026-08-05)
 - (krobipd) First stable release — version 1.0.0 marks the complete rewrite as the mature, supported version of the adapter.
 - (krobipd) Upgrading from an older version now shows a one-time notice that the button data points changed from text to real boolean values, so scripts and visualizations can be checked.

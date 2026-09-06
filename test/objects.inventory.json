@@ -1,0 +1,1411 @@
+{
+  "fakeroku.0.info": {
+    "_id": "fakeroku.0.info",
+    "type": "channel",
+    "common": {
+      "name": {
+        "en": "Adapter information",
+        "de": "Adapter-Informationen",
+        "ru": "Информация об адаптере",
+        "pt": "Informação do adaptador",
+        "nl": "Adapterinformatie",
+        "fr": "Informations sur l'adaptateur",
+        "it": "Informazioni sull'adattatore",
+        "es": "Información del adaptador",
+        "pl": "Informacje o adapterze",
+        "uk": "Інформація про адаптер",
+        "zh-cn": "适配器信息"
+      }
+    },
+    "native": {}
+  },
+  "fakeroku.0.info.connection": {
+    "_id": "fakeroku.0.info.connection",
+    "type": "state",
+    "common": {
+      "role": "indicator.connected",
+      "name": {
+        "en": "Connection status",
+        "de": "Verbindungsstatus",
+        "ru": "Статус подключения",
+        "pt": "Estado da ligação",
+        "nl": "Verbindingsstatus",
+        "fr": "État de la connexion",
+        "it": "Stato connessione",
+        "es": "Estado de conexión",
+        "pl": "Stan połączenia",
+        "uk": "Стан з'єднання",
+        "zh-cn": "连接状态"
+      },
+      "type": "boolean",
+      "read": true,
+      "write": false,
+      "def": false,
+      "desc": {
+        "en": "True only while every configured emulated Roku is actually listening.",
+        "de": "Nur wahr, solange jeder konfigurierte emulierte Roku tatsächlich lauscht.",
+        "ru": "Истина только пока каждый настроенный эмулированный Roku действительно слушает.",
+        "pt": "Verdadeiro apenas enquanto todos os Roku emulados configurados estiverem realmente à escuta.",
+        "nl": "Alleen waar zolang elke geconfigureerde geëmuleerde Roku daadwerkelijk luistert.",
+        "fr": "Vrai uniquement tant que chaque Roku émulé configuré est réellement à l'écoute.",
+        "it": "Vero solo finché ogni Roku emulato configurato è effettivamente in ascolto.",
+        "es": "Verdadero solo mientras cada Roku emulado configurado esté realmente a la escucha.",
+        "pl": "Prawda tylko wtedy, gdy każdy skonfigurowany emulowany Roku faktycznie nasłuchuje.",
+        "uk": "Істина лише поки кожен налаштований емульований Roku справді слухає.",
+        "zh-cn": "仅当每个已配置的模拟 Roku 都在监听时才为真。"
+      }
+    },
+    "native": {}
+  },
+  "fakeroku.0.Player": {
+    "type": "device",
+    "common": {
+      "name": {
+        "en": "Player",
+        "de": "Player",
+        "ru": "Player",
+        "pt": "Player",
+        "nl": "Player",
+        "fr": "Player",
+        "it": "Player",
+        "es": "Player",
+        "pl": "Player",
+        "uk": "Player",
+        "zh-cn": "Player"
+      }
+    },
+    "native": {},
+    "_id": "fakeroku.0.Player"
+  },
+  "fakeroku.0.Player.command": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Letzter Befehl",
+        "en": "Last command",
+        "es": "Último comando",
+        "fr": "Dernière commande",
+        "it": "Ultimo comando",
+        "nl": "Laatste opdracht",
+        "pl": "Ostatnie polecenie",
+        "pt": "Último comando",
+        "ru": "Последняя команда",
+        "uk": "Остання команда",
+        "zh-cn": "最后一条命令"
+      },
+      "desc": {
+        "de": "Der zuletzt empfangene Befehl dieses emulierten Roku als Klartext.",
+        "en": "The most recent command this emulated Roku received, as plain text.",
+        "es": "El comando más reciente que recibió este Roku emulado, como texto simple.",
+        "fr": "La commande la plus récente reçue par ce Roku émulé, en texte brut.",
+        "it": "Il comando più recente ricevuto da questo Roku emulato, come testo semplice.",
+        "nl": "De meest recente opdracht die deze geëmuleerde Roku ontving, als platte tekst.",
+        "pl": "Najnowsze polecenie odebrane przez ten emulowany Roku, jako zwykły tekst.",
+        "pt": "O comando mais recente recebido por este Roku emulado, em texto simples.",
+        "ru": "Последняя команда, полученная этим эмулированным Roku, в виде текста.",
+        "uk": "Найновіша команда, яку отримав цей емульований Roku, у вигляді тексту.",
+        "zh-cn": "该模拟 Roku 最近收到的命令，以纯文本表示。"
+      },
+      "type": "string",
+      "role": "text",
+      "read": true,
+      "write": false,
+      "def": ""
+    },
+    "native": {},
+    "_id": "fakeroku.0.Player.command"
+  },
+  "fakeroku.0.Player.commandType": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Art des letzten Befehls",
+        "en": "Last command type",
+        "es": "Tipo del último comando",
+        "fr": "Type de la dernière commande",
+        "it": "Tipo dell'ultimo comando",
+        "nl": "Type laatste opdracht",
+        "pl": "Typ ostatniego polecenia",
+        "pt": "Tipo do último comando",
+        "ru": "Тип последней команды",
+        "uk": "Тип останньої команди",
+        "zh-cn": "最后一条命令的类型"
+      },
+      "desc": {
+        "de": "Um welche Art Befehl es sich handelte: Tastendruck, Taste gehalten oder losgelassen, App-Start oder -Installation, Texteingabe oder Suche.",
+        "en": "What kind of command it was: a key press, a key held or released, an app launch or install, a text input or a search.",
+        "es": "Qué tipo de comando fue: pulsar una tecla, mantenerla o soltarla, iniciar o instalar una aplicación, introducir texto o buscar.",
+        "fr": "De quel type de commande il s'agissait : appui sur une touche, touche maintenue ou relâchée, lancement ou installation d'une application, saisie de texte ou recherche.",
+        "it": "Di che tipo di comando si trattava: pressione di un tasto, tasto tenuto premuto o rilasciato, avvio o installazione di un'app, immissione di testo o ricerca.",
+        "nl": "Wat voor soort opdracht het was: een toetsdruk, een toets ingedrukt of losgelaten, een app starten of installeren, tekstinvoer of zoeken.",
+        "pl": "Jakiego rodzaju było to polecenie: naciśnięcie klawisza, przytrzymanie lub zwolnienie, uruchomienie lub instalacja aplikacji, wpisanie tekstu albo wyszukiwanie.",
+        "pt": "Que tipo de comando foi: pressionar uma tecla, manter ou soltar, iniciar ou instalar uma aplicação, introduzir texto ou pesquisar.",
+        "ru": "Какого рода была команда: нажатие кнопки, удержание или отпускание, запуск или установка приложения, ввод текста или поиск.",
+        "uk": "Якого роду була команда: натискання кнопки, утримання чи відпускання, запуск або встановлення застосунку, введення тексту чи пошук.",
+        "zh-cn": "命令的种类：按键、按住或松开按键、启动或安装应用、输入文本或搜索。"
+      },
+      "type": "string",
+      "role": "text",
+      "read": true,
+      "write": false,
+      "def": "",
+      "states": {
+        "keypress": "keypress",
+        "keydown": "keydown",
+        "keyup": "keyup",
+        "launch": "launch",
+        "install": "install",
+        "input": "input",
+        "search": "search"
+      }
+    },
+    "native": {},
+    "_id": "fakeroku.0.Player.commandType"
+  },
+  "fakeroku.0.Player.keys": {
+    "type": "channel",
+    "common": {
+      "name": {
+        "de": "Fernbedienungstasten",
+        "en": "Remote keys",
+        "es": "Teclas del mando",
+        "fr": "Touches de la télécommande",
+        "it": "Tasti del telecomando",
+        "nl": "Afstandsbedieningstoetsen",
+        "pl": "Klawisze pilota",
+        "pt": "Teclas do comando",
+        "ru": "Кнопки пульта",
+        "uk": "Кнопки пульта",
+        "zh-cn": "遥控器按键"
+      },
+      "desc": {
+        "de": "Ein Datenpunkt je Taste, die dieses Gerät anbietet; ein Tastendruck setzt ihn kurz auf wahr.",
+        "en": "One state per remote key this device offers; a key press pulses it briefly.",
+        "es": "Un estado por cada tecla que ofrece este dispositivo; una pulsación lo pone brevemente en verdadero.",
+        "fr": "Un état par touche proposée par cet appareil ; un appui le met brièvement à vrai.",
+        "it": "Uno stato per ogni tasto offerto da questo dispositivo; una pressione lo porta brevemente a vero.",
+        "nl": "Eén status per toets die dit apparaat biedt; een toetsdruk zet hem kort op waar.",
+        "pl": "Jeden stan na każdy klawisz oferowany przez to urządzenie; naciśnięcie ustawia go na krótko na prawdę.",
+        "pt": "Um estado por cada tecla que este dispositivo oferece; uma pressão coloca-o brevemente a verdadeiro.",
+        "ru": "По одному состоянию на каждую кнопку пульта этого устройства; нажатие кратко переводит его в истину.",
+        "uk": "По одному стану на кожну кнопку, яку пропонує цей пристрій; натискання ненадовго переводить його в істину.",
+        "zh-cn": "该设备提供的每个遥控器按键各有一个状态；按下时会短暂置为真。"
+      }
+    },
+    "native": {},
+    "_id": "fakeroku.0.Player.keys"
+  },
+  "fakeroku.0.Player.keys.Back": {
+    "type": "state",
+    "common": {
+      "name": {
+        "en": "Back",
+        "de": "Back",
+        "ru": "Back",
+        "pt": "Back",
+        "nl": "Back",
+        "fr": "Back",
+        "it": "Back",
+        "es": "Back",
+        "pl": "Back",
+        "uk": "Back",
+        "zh-cn": "Back"
+      },
+      "type": "boolean",
+      "role": "sensor",
+      "read": true,
+      "write": false,
+      "def": false
+    },
+    "native": {},
+    "_id": "fakeroku.0.Player.keys.Back"
+  },
+  "fakeroku.0.Player.keys.Backspace": {
+    "type": "state",
+    "common": {
+      "name": {
+        "en": "Backspace",
+        "de": "Backspace",
+        "ru": "Backspace",
+        "pt": "Backspace",
+        "nl": "Backspace",
+        "fr": "Backspace",
+        "it": "Backspace",
+        "es": "Backspace",
+        "pl": "Backspace",
+        "uk": "Backspace",
+        "zh-cn": "Backspace"
+      },
+      "type": "boolean",
+      "role": "sensor",
+      "read": true,
+      "write": false,
+      "def": false
+    },
+    "native": {},
+    "_id": "fakeroku.0.Player.keys.Backspace"
+  },
+  "fakeroku.0.Player.keys.Down": {
+    "type": "state",
+    "common": {
+      "name": {
+        "en": "Down",
+        "de": "Down",
+        "ru": "Down",
+        "pt": "Down",
+        "nl": "Down",
+        "fr": "Down",
+        "it": "Down",
+        "es": "Down",
+        "pl": "Down",
+        "uk": "Down",
+        "zh-cn": "Down"
+      },
+      "type": "boolean",
+      "role": "sensor",
+      "read": true,
+      "write": false,
+      "def": false
+    },
+    "native": {},
+    "_id": "fakeroku.0.Player.keys.Down"
+  },
+  "fakeroku.0.Player.keys.Enter": {
+    "type": "state",
+    "common": {
+      "name": {
+        "en": "Enter",
+        "de": "Enter",
+        "ru": "Enter",
+        "pt": "Enter",
+        "nl": "Enter",
+        "fr": "Enter",
+        "it": "Enter",
+        "es": "Enter",
+        "pl": "Enter",
+        "uk": "Enter",
+        "zh-cn": "Enter"
+      },
+      "type": "boolean",
+      "role": "sensor",
+      "read": true,
+      "write": false,
+      "def": false
+    },
+    "native": {},
+    "_id": "fakeroku.0.Player.keys.Enter"
+  },
+  "fakeroku.0.Player.keys.FindRemote": {
+    "type": "state",
+    "common": {
+      "name": {
+        "en": "FindRemote",
+        "de": "FindRemote",
+        "ru": "FindRemote",
+        "pt": "FindRemote",
+        "nl": "FindRemote",
+        "fr": "FindRemote",
+        "it": "FindRemote",
+        "es": "FindRemote",
+        "pl": "FindRemote",
+        "uk": "FindRemote",
+        "zh-cn": "FindRemote"
+      },
+      "type": "boolean",
+      "role": "sensor",
+      "read": true,
+      "write": false,
+      "def": false
+    },
+    "native": {},
+    "_id": "fakeroku.0.Player.keys.FindRemote"
+  },
+  "fakeroku.0.Player.keys.Fwd": {
+    "type": "state",
+    "common": {
+      "name": {
+        "en": "Fwd",
+        "de": "Fwd",
+        "ru": "Fwd",
+        "pt": "Fwd",
+        "nl": "Fwd",
+        "fr": "Fwd",
+        "it": "Fwd",
+        "es": "Fwd",
+        "pl": "Fwd",
+        "uk": "Fwd",
+        "zh-cn": "Fwd"
+      },
+      "type": "boolean",
+      "role": "sensor",
+      "read": true,
+      "write": false,
+      "def": false
+    },
+    "native": {},
+    "_id": "fakeroku.0.Player.keys.Fwd"
+  },
+  "fakeroku.0.Player.keys.Home": {
+    "type": "state",
+    "common": {
+      "name": {
+        "en": "Home",
+        "de": "Home",
+        "ru": "Home",
+        "pt": "Home",
+        "nl": "Home",
+        "fr": "Home",
+        "it": "Home",
+        "es": "Home",
+        "pl": "Home",
+        "uk": "Home",
+        "zh-cn": "Home"
+      },
+      "type": "boolean",
+      "role": "sensor",
+      "read": true,
+      "write": false,
+      "def": false
+    },
+    "native": {},
+    "_id": "fakeroku.0.Player.keys.Home"
+  },
+  "fakeroku.0.Player.keys.Info": {
+    "type": "state",
+    "common": {
+      "name": {
+        "en": "Info",
+        "de": "Info",
+        "ru": "Info",
+        "pt": "Info",
+        "nl": "Info",
+        "fr": "Info",
+        "it": "Info",
+        "es": "Info",
+        "pl": "Info",
+        "uk": "Info",
+        "zh-cn": "Info"
+      },
+      "type": "boolean",
+      "role": "sensor",
+      "read": true,
+      "write": false,
+      "def": false
+    },
+    "native": {},
+    "_id": "fakeroku.0.Player.keys.Info"
+  },
+  "fakeroku.0.Player.keys.InstantReplay": {
+    "type": "state",
+    "common": {
+      "name": {
+        "en": "InstantReplay",
+        "de": "InstantReplay",
+        "ru": "InstantReplay",
+        "pt": "InstantReplay",
+        "nl": "InstantReplay",
+        "fr": "InstantReplay",
+        "it": "InstantReplay",
+        "es": "InstantReplay",
+        "pl": "InstantReplay",
+        "uk": "InstantReplay",
+        "zh-cn": "InstantReplay"
+      },
+      "type": "boolean",
+      "role": "sensor",
+      "read": true,
+      "write": false,
+      "def": false
+    },
+    "native": {},
+    "_id": "fakeroku.0.Player.keys.InstantReplay"
+  },
+  "fakeroku.0.Player.keys.Left": {
+    "type": "state",
+    "common": {
+      "name": {
+        "en": "Left",
+        "de": "Left",
+        "ru": "Left",
+        "pt": "Left",
+        "nl": "Left",
+        "fr": "Left",
+        "it": "Left",
+        "es": "Left",
+        "pl": "Left",
+        "uk": "Left",
+        "zh-cn": "Left"
+      },
+      "type": "boolean",
+      "role": "sensor",
+      "read": true,
+      "write": false,
+      "def": false
+    },
+    "native": {},
+    "_id": "fakeroku.0.Player.keys.Left"
+  },
+  "fakeroku.0.Player.keys.Play": {
+    "type": "state",
+    "common": {
+      "name": {
+        "en": "Play",
+        "de": "Play",
+        "ru": "Play",
+        "pt": "Play",
+        "nl": "Play",
+        "fr": "Play",
+        "it": "Play",
+        "es": "Play",
+        "pl": "Play",
+        "uk": "Play",
+        "zh-cn": "Play"
+      },
+      "type": "boolean",
+      "role": "sensor",
+      "read": true,
+      "write": false,
+      "def": false
+    },
+    "native": {},
+    "_id": "fakeroku.0.Player.keys.Play"
+  },
+  "fakeroku.0.Player.keys.Rev": {
+    "type": "state",
+    "common": {
+      "name": {
+        "en": "Rev",
+        "de": "Rev",
+        "ru": "Rev",
+        "pt": "Rev",
+        "nl": "Rev",
+        "fr": "Rev",
+        "it": "Rev",
+        "es": "Rev",
+        "pl": "Rev",
+        "uk": "Rev",
+        "zh-cn": "Rev"
+      },
+      "type": "boolean",
+      "role": "sensor",
+      "read": true,
+      "write": false,
+      "def": false
+    },
+    "native": {},
+    "_id": "fakeroku.0.Player.keys.Rev"
+  },
+  "fakeroku.0.Player.keys.Right": {
+    "type": "state",
+    "common": {
+      "name": {
+        "en": "Right",
+        "de": "Right",
+        "ru": "Right",
+        "pt": "Right",
+        "nl": "Right",
+        "fr": "Right",
+        "it": "Right",
+        "es": "Right",
+        "pl": "Right",
+        "uk": "Right",
+        "zh-cn": "Right"
+      },
+      "type": "boolean",
+      "role": "sensor",
+      "read": true,
+      "write": false,
+      "def": false
+    },
+    "native": {},
+    "_id": "fakeroku.0.Player.keys.Right"
+  },
+  "fakeroku.0.Player.keys.Search": {
+    "type": "state",
+    "common": {
+      "name": {
+        "en": "Search",
+        "de": "Search",
+        "ru": "Search",
+        "pt": "Search",
+        "nl": "Search",
+        "fr": "Search",
+        "it": "Search",
+        "es": "Search",
+        "pl": "Search",
+        "uk": "Search",
+        "zh-cn": "Search"
+      },
+      "type": "boolean",
+      "role": "sensor",
+      "read": true,
+      "write": false,
+      "def": false
+    },
+    "native": {},
+    "_id": "fakeroku.0.Player.keys.Search"
+  },
+  "fakeroku.0.Player.keys.Select": {
+    "type": "state",
+    "common": {
+      "name": {
+        "en": "Select",
+        "de": "Select",
+        "ru": "Select",
+        "pt": "Select",
+        "nl": "Select",
+        "fr": "Select",
+        "it": "Select",
+        "es": "Select",
+        "pl": "Select",
+        "uk": "Select",
+        "zh-cn": "Select"
+      },
+      "type": "boolean",
+      "role": "sensor",
+      "read": true,
+      "write": false,
+      "def": false
+    },
+    "native": {},
+    "_id": "fakeroku.0.Player.keys.Select"
+  },
+  "fakeroku.0.Player.keys.Up": {
+    "type": "state",
+    "common": {
+      "name": {
+        "en": "Up",
+        "de": "Up",
+        "ru": "Up",
+        "pt": "Up",
+        "nl": "Up",
+        "fr": "Up",
+        "it": "Up",
+        "es": "Up",
+        "pl": "Up",
+        "uk": "Up",
+        "zh-cn": "Up"
+      },
+      "type": "boolean",
+      "role": "sensor",
+      "read": true,
+      "write": false,
+      "def": false
+    },
+    "native": {},
+    "_id": "fakeroku.0.Player.keys.Up"
+  },
+  "fakeroku.0.TV": {
+    "type": "device",
+    "common": {
+      "name": {
+        "en": "TV",
+        "de": "TV",
+        "ru": "TV",
+        "pt": "TV",
+        "nl": "TV",
+        "fr": "TV",
+        "it": "TV",
+        "es": "TV",
+        "pl": "TV",
+        "uk": "TV",
+        "zh-cn": "TV"
+      }
+    },
+    "native": {},
+    "_id": "fakeroku.0.TV"
+  },
+  "fakeroku.0.TV.command": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Letzter Befehl",
+        "en": "Last command",
+        "es": "Último comando",
+        "fr": "Dernière commande",
+        "it": "Ultimo comando",
+        "nl": "Laatste opdracht",
+        "pl": "Ostatnie polecenie",
+        "pt": "Último comando",
+        "ru": "Последняя команда",
+        "uk": "Остання команда",
+        "zh-cn": "最后一条命令"
+      },
+      "desc": {
+        "de": "Der zuletzt empfangene Befehl dieses emulierten Roku als Klartext.",
+        "en": "The most recent command this emulated Roku received, as plain text.",
+        "es": "El comando más reciente que recibió este Roku emulado, como texto simple.",
+        "fr": "La commande la plus récente reçue par ce Roku émulé, en texte brut.",
+        "it": "Il comando più recente ricevuto da questo Roku emulato, come testo semplice.",
+        "nl": "De meest recente opdracht die deze geëmuleerde Roku ontving, als platte tekst.",
+        "pl": "Najnowsze polecenie odebrane przez ten emulowany Roku, jako zwykły tekst.",
+        "pt": "O comando mais recente recebido por este Roku emulado, em texto simples.",
+        "ru": "Последняя команда, полученная этим эмулированным Roku, в виде текста.",
+        "uk": "Найновіша команда, яку отримав цей емульований Roku, у вигляді тексту.",
+        "zh-cn": "该模拟 Roku 最近收到的命令，以纯文本表示。"
+      },
+      "type": "string",
+      "role": "text",
+      "read": true,
+      "write": false,
+      "def": ""
+    },
+    "native": {},
+    "_id": "fakeroku.0.TV.command"
+  },
+  "fakeroku.0.TV.commandType": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Art des letzten Befehls",
+        "en": "Last command type",
+        "es": "Tipo del último comando",
+        "fr": "Type de la dernière commande",
+        "it": "Tipo dell'ultimo comando",
+        "nl": "Type laatste opdracht",
+        "pl": "Typ ostatniego polecenia",
+        "pt": "Tipo do último comando",
+        "ru": "Тип последней команды",
+        "uk": "Тип останньої команди",
+        "zh-cn": "最后一条命令的类型"
+      },
+      "desc": {
+        "de": "Um welche Art Befehl es sich handelte: Tastendruck, Taste gehalten oder losgelassen, App-Start oder -Installation, Texteingabe oder Suche.",
+        "en": "What kind of command it was: a key press, a key held or released, an app launch or install, a text input or a search.",
+        "es": "Qué tipo de comando fue: pulsar una tecla, mantenerla o soltarla, iniciar o instalar una aplicación, introducir texto o buscar.",
+        "fr": "De quel type de commande il s'agissait : appui sur une touche, touche maintenue ou relâchée, lancement ou installation d'une application, saisie de texte ou recherche.",
+        "it": "Di che tipo di comando si trattava: pressione di un tasto, tasto tenuto premuto o rilasciato, avvio o installazione di un'app, immissione di testo o ricerca.",
+        "nl": "Wat voor soort opdracht het was: een toetsdruk, een toets ingedrukt of losgelaten, een app starten of installeren, tekstinvoer of zoeken.",
+        "pl": "Jakiego rodzaju było to polecenie: naciśnięcie klawisza, przytrzymanie lub zwolnienie, uruchomienie lub instalacja aplikacji, wpisanie tekstu albo wyszukiwanie.",
+        "pt": "Que tipo de comando foi: pressionar uma tecla, manter ou soltar, iniciar ou instalar uma aplicação, introduzir texto ou pesquisar.",
+        "ru": "Какого рода была команда: нажатие кнопки, удержание или отпускание, запуск или установка приложения, ввод текста или поиск.",
+        "uk": "Якого роду була команда: натискання кнопки, утримання чи відпускання, запуск або встановлення застосунку, введення тексту чи пошук.",
+        "zh-cn": "命令的种类：按键、按住或松开按键、启动或安装应用、输入文本或搜索。"
+      },
+      "type": "string",
+      "role": "text",
+      "read": true,
+      "write": false,
+      "def": "",
+      "states": {
+        "keypress": "keypress",
+        "keydown": "keydown",
+        "keyup": "keyup",
+        "launch": "launch",
+        "install": "install",
+        "input": "input",
+        "search": "search"
+      }
+    },
+    "native": {},
+    "_id": "fakeroku.0.TV.commandType"
+  },
+  "fakeroku.0.TV.keys": {
+    "type": "channel",
+    "common": {
+      "name": {
+        "de": "Fernbedienungstasten",
+        "en": "Remote keys",
+        "es": "Teclas del mando",
+        "fr": "Touches de la télécommande",
+        "it": "Tasti del telecomando",
+        "nl": "Afstandsbedieningstoetsen",
+        "pl": "Klawisze pilota",
+        "pt": "Teclas do comando",
+        "ru": "Кнопки пульта",
+        "uk": "Кнопки пульта",
+        "zh-cn": "遥控器按键"
+      },
+      "desc": {
+        "de": "Ein Datenpunkt je Taste, die dieses Gerät anbietet; ein Tastendruck setzt ihn kurz auf wahr.",
+        "en": "One state per remote key this device offers; a key press pulses it briefly.",
+        "es": "Un estado por cada tecla que ofrece este dispositivo; una pulsación lo pone brevemente en verdadero.",
+        "fr": "Un état par touche proposée par cet appareil ; un appui le met brièvement à vrai.",
+        "it": "Uno stato per ogni tasto offerto da questo dispositivo; una pressione lo porta brevemente a vero.",
+        "nl": "Eén status per toets die dit apparaat biedt; een toetsdruk zet hem kort op waar.",
+        "pl": "Jeden stan na każdy klawisz oferowany przez to urządzenie; naciśnięcie ustawia go na krótko na prawdę.",
+        "pt": "Um estado por cada tecla que este dispositivo oferece; uma pressão coloca-o brevemente a verdadeiro.",
+        "ru": "По одному состоянию на каждую кнопку пульта этого устройства; нажатие кратко переводит его в истину.",
+        "uk": "По одному стану на кожну кнопку, яку пропонує цей пристрій; натискання ненадовго переводить його в істину.",
+        "zh-cn": "该设备提供的每个遥控器按键各有一个状态；按下时会短暂置为真。"
+      }
+    },
+    "native": {},
+    "_id": "fakeroku.0.TV.keys"
+  },
+  "fakeroku.0.TV.keys.Back": {
+    "type": "state",
+    "common": {
+      "name": {
+        "en": "Back",
+        "de": "Back",
+        "ru": "Back",
+        "pt": "Back",
+        "nl": "Back",
+        "fr": "Back",
+        "it": "Back",
+        "es": "Back",
+        "pl": "Back",
+        "uk": "Back",
+        "zh-cn": "Back"
+      },
+      "type": "boolean",
+      "role": "sensor",
+      "read": true,
+      "write": false,
+      "def": false
+    },
+    "native": {},
+    "_id": "fakeroku.0.TV.keys.Back"
+  },
+  "fakeroku.0.TV.keys.Backspace": {
+    "type": "state",
+    "common": {
+      "name": {
+        "en": "Backspace",
+        "de": "Backspace",
+        "ru": "Backspace",
+        "pt": "Backspace",
+        "nl": "Backspace",
+        "fr": "Backspace",
+        "it": "Backspace",
+        "es": "Backspace",
+        "pl": "Backspace",
+        "uk": "Backspace",
+        "zh-cn": "Backspace"
+      },
+      "type": "boolean",
+      "role": "sensor",
+      "read": true,
+      "write": false,
+      "def": false
+    },
+    "native": {},
+    "_id": "fakeroku.0.TV.keys.Backspace"
+  },
+  "fakeroku.0.TV.keys.ChannelDown": {
+    "type": "state",
+    "common": {
+      "name": {
+        "en": "ChannelDown",
+        "de": "ChannelDown",
+        "ru": "ChannelDown",
+        "pt": "ChannelDown",
+        "nl": "ChannelDown",
+        "fr": "ChannelDown",
+        "it": "ChannelDown",
+        "es": "ChannelDown",
+        "pl": "ChannelDown",
+        "uk": "ChannelDown",
+        "zh-cn": "ChannelDown"
+      },
+      "type": "boolean",
+      "role": "sensor",
+      "read": true,
+      "write": false,
+      "def": false
+    },
+    "native": {},
+    "_id": "fakeroku.0.TV.keys.ChannelDown"
+  },
+  "fakeroku.0.TV.keys.ChannelUp": {
+    "type": "state",
+    "common": {
+      "name": {
+        "en": "ChannelUp",
+        "de": "ChannelUp",
+        "ru": "ChannelUp",
+        "pt": "ChannelUp",
+        "nl": "ChannelUp",
+        "fr": "ChannelUp",
+        "it": "ChannelUp",
+        "es": "ChannelUp",
+        "pl": "ChannelUp",
+        "uk": "ChannelUp",
+        "zh-cn": "ChannelUp"
+      },
+      "type": "boolean",
+      "role": "sensor",
+      "read": true,
+      "write": false,
+      "def": false
+    },
+    "native": {},
+    "_id": "fakeroku.0.TV.keys.ChannelUp"
+  },
+  "fakeroku.0.TV.keys.Down": {
+    "type": "state",
+    "common": {
+      "name": {
+        "en": "Down",
+        "de": "Down",
+        "ru": "Down",
+        "pt": "Down",
+        "nl": "Down",
+        "fr": "Down",
+        "it": "Down",
+        "es": "Down",
+        "pl": "Down",
+        "uk": "Down",
+        "zh-cn": "Down"
+      },
+      "type": "boolean",
+      "role": "sensor",
+      "read": true,
+      "write": false,
+      "def": false
+    },
+    "native": {},
+    "_id": "fakeroku.0.TV.keys.Down"
+  },
+  "fakeroku.0.TV.keys.Enter": {
+    "type": "state",
+    "common": {
+      "name": {
+        "en": "Enter",
+        "de": "Enter",
+        "ru": "Enter",
+        "pt": "Enter",
+        "nl": "Enter",
+        "fr": "Enter",
+        "it": "Enter",
+        "es": "Enter",
+        "pl": "Enter",
+        "uk": "Enter",
+        "zh-cn": "Enter"
+      },
+      "type": "boolean",
+      "role": "sensor",
+      "read": true,
+      "write": false,
+      "def": false
+    },
+    "native": {},
+    "_id": "fakeroku.0.TV.keys.Enter"
+  },
+  "fakeroku.0.TV.keys.FindRemote": {
+    "type": "state",
+    "common": {
+      "name": {
+        "en": "FindRemote",
+        "de": "FindRemote",
+        "ru": "FindRemote",
+        "pt": "FindRemote",
+        "nl": "FindRemote",
+        "fr": "FindRemote",
+        "it": "FindRemote",
+        "es": "FindRemote",
+        "pl": "FindRemote",
+        "uk": "FindRemote",
+        "zh-cn": "FindRemote"
+      },
+      "type": "boolean",
+      "role": "sensor",
+      "read": true,
+      "write": false,
+      "def": false
+    },
+    "native": {},
+    "_id": "fakeroku.0.TV.keys.FindRemote"
+  },
+  "fakeroku.0.TV.keys.Fwd": {
+    "type": "state",
+    "common": {
+      "name": {
+        "en": "Fwd",
+        "de": "Fwd",
+        "ru": "Fwd",
+        "pt": "Fwd",
+        "nl": "Fwd",
+        "fr": "Fwd",
+        "it": "Fwd",
+        "es": "Fwd",
+        "pl": "Fwd",
+        "uk": "Fwd",
+        "zh-cn": "Fwd"
+      },
+      "type": "boolean",
+      "role": "sensor",
+      "read": true,
+      "write": false,
+      "def": false
+    },
+    "native": {},
+    "_id": "fakeroku.0.TV.keys.Fwd"
+  },
+  "fakeroku.0.TV.keys.Home": {
+    "type": "state",
+    "common": {
+      "name": {
+        "en": "Home",
+        "de": "Home",
+        "ru": "Home",
+        "pt": "Home",
+        "nl": "Home",
+        "fr": "Home",
+        "it": "Home",
+        "es": "Home",
+        "pl": "Home",
+        "uk": "Home",
+        "zh-cn": "Home"
+      },
+      "type": "boolean",
+      "role": "sensor",
+      "read": true,
+      "write": false,
+      "def": false
+    },
+    "native": {},
+    "_id": "fakeroku.0.TV.keys.Home"
+  },
+  "fakeroku.0.TV.keys.Info": {
+    "type": "state",
+    "common": {
+      "name": {
+        "en": "Info",
+        "de": "Info",
+        "ru": "Info",
+        "pt": "Info",
+        "nl": "Info",
+        "fr": "Info",
+        "it": "Info",
+        "es": "Info",
+        "pl": "Info",
+        "uk": "Info",
+        "zh-cn": "Info"
+      },
+      "type": "boolean",
+      "role": "sensor",
+      "read": true,
+      "write": false,
+      "def": false
+    },
+    "native": {},
+    "_id": "fakeroku.0.TV.keys.Info"
+  },
+  "fakeroku.0.TV.keys.InputAV1": {
+    "type": "state",
+    "common": {
+      "name": {
+        "en": "InputAV1",
+        "de": "InputAV1",
+        "ru": "InputAV1",
+        "pt": "InputAV1",
+        "nl": "InputAV1",
+        "fr": "InputAV1",
+        "it": "InputAV1",
+        "es": "InputAV1",
+        "pl": "InputAV1",
+        "uk": "InputAV1",
+        "zh-cn": "InputAV1"
+      },
+      "type": "boolean",
+      "role": "sensor",
+      "read": true,
+      "write": false,
+      "def": false
+    },
+    "native": {},
+    "_id": "fakeroku.0.TV.keys.InputAV1"
+  },
+  "fakeroku.0.TV.keys.InputHDMI1": {
+    "type": "state",
+    "common": {
+      "name": {
+        "en": "InputHDMI1",
+        "de": "InputHDMI1",
+        "ru": "InputHDMI1",
+        "pt": "InputHDMI1",
+        "nl": "InputHDMI1",
+        "fr": "InputHDMI1",
+        "it": "InputHDMI1",
+        "es": "InputHDMI1",
+        "pl": "InputHDMI1",
+        "uk": "InputHDMI1",
+        "zh-cn": "InputHDMI1"
+      },
+      "type": "boolean",
+      "role": "sensor",
+      "read": true,
+      "write": false,
+      "def": false
+    },
+    "native": {},
+    "_id": "fakeroku.0.TV.keys.InputHDMI1"
+  },
+  "fakeroku.0.TV.keys.InputHDMI2": {
+    "type": "state",
+    "common": {
+      "name": {
+        "en": "InputHDMI2",
+        "de": "InputHDMI2",
+        "ru": "InputHDMI2",
+        "pt": "InputHDMI2",
+        "nl": "InputHDMI2",
+        "fr": "InputHDMI2",
+        "it": "InputHDMI2",
+        "es": "InputHDMI2",
+        "pl": "InputHDMI2",
+        "uk": "InputHDMI2",
+        "zh-cn": "InputHDMI2"
+      },
+      "type": "boolean",
+      "role": "sensor",
+      "read": true,
+      "write": false,
+      "def": false
+    },
+    "native": {},
+    "_id": "fakeroku.0.TV.keys.InputHDMI2"
+  },
+  "fakeroku.0.TV.keys.InputHDMI3": {
+    "type": "state",
+    "common": {
+      "name": {
+        "en": "InputHDMI3",
+        "de": "InputHDMI3",
+        "ru": "InputHDMI3",
+        "pt": "InputHDMI3",
+        "nl": "InputHDMI3",
+        "fr": "InputHDMI3",
+        "it": "InputHDMI3",
+        "es": "InputHDMI3",
+        "pl": "InputHDMI3",
+        "uk": "InputHDMI3",
+        "zh-cn": "InputHDMI3"
+      },
+      "type": "boolean",
+      "role": "sensor",
+      "read": true,
+      "write": false,
+      "def": false
+    },
+    "native": {},
+    "_id": "fakeroku.0.TV.keys.InputHDMI3"
+  },
+  "fakeroku.0.TV.keys.InputHDMI4": {
+    "type": "state",
+    "common": {
+      "name": {
+        "en": "InputHDMI4",
+        "de": "InputHDMI4",
+        "ru": "InputHDMI4",
+        "pt": "InputHDMI4",
+        "nl": "InputHDMI4",
+        "fr": "InputHDMI4",
+        "it": "InputHDMI4",
+        "es": "InputHDMI4",
+        "pl": "InputHDMI4",
+        "uk": "InputHDMI4",
+        "zh-cn": "InputHDMI4"
+      },
+      "type": "boolean",
+      "role": "sensor",
+      "read": true,
+      "write": false,
+      "def": false
+    },
+    "native": {},
+    "_id": "fakeroku.0.TV.keys.InputHDMI4"
+  },
+  "fakeroku.0.TV.keys.InstantReplay": {
+    "type": "state",
+    "common": {
+      "name": {
+        "en": "InstantReplay",
+        "de": "InstantReplay",
+        "ru": "InstantReplay",
+        "pt": "InstantReplay",
+        "nl": "InstantReplay",
+        "fr": "InstantReplay",
+        "it": "InstantReplay",
+        "es": "InstantReplay",
+        "pl": "InstantReplay",
+        "uk": "InstantReplay",
+        "zh-cn": "InstantReplay"
+      },
+      "type": "boolean",
+      "role": "sensor",
+      "read": true,
+      "write": false,
+      "def": false
+    },
+    "native": {},
+    "_id": "fakeroku.0.TV.keys.InstantReplay"
+  },
+  "fakeroku.0.TV.keys.Left": {
+    "type": "state",
+    "common": {
+      "name": {
+        "en": "Left",
+        "de": "Left",
+        "ru": "Left",
+        "pt": "Left",
+        "nl": "Left",
+        "fr": "Left",
+        "it": "Left",
+        "es": "Left",
+        "pl": "Left",
+        "uk": "Left",
+        "zh-cn": "Left"
+      },
+      "type": "boolean",
+      "role": "sensor",
+      "read": true,
+      "write": false,
+      "def": false
+    },
+    "native": {},
+    "_id": "fakeroku.0.TV.keys.Left"
+  },
+  "fakeroku.0.TV.keys.Play": {
+    "type": "state",
+    "common": {
+      "name": {
+        "en": "Play",
+        "de": "Play",
+        "ru": "Play",
+        "pt": "Play",
+        "nl": "Play",
+        "fr": "Play",
+        "it": "Play",
+        "es": "Play",
+        "pl": "Play",
+        "uk": "Play",
+        "zh-cn": "Play"
+      },
+      "type": "boolean",
+      "role": "sensor",
+      "read": true,
+      "write": false,
+      "def": false
+    },
+    "native": {},
+    "_id": "fakeroku.0.TV.keys.Play"
+  },
+  "fakeroku.0.TV.keys.PowerOff": {
+    "type": "state",
+    "common": {
+      "name": {
+        "en": "PowerOff",
+        "de": "PowerOff",
+        "ru": "PowerOff",
+        "pt": "PowerOff",
+        "nl": "PowerOff",
+        "fr": "PowerOff",
+        "it": "PowerOff",
+        "es": "PowerOff",
+        "pl": "PowerOff",
+        "uk": "PowerOff",
+        "zh-cn": "PowerOff"
+      },
+      "type": "boolean",
+      "role": "sensor",
+      "read": true,
+      "write": false,
+      "def": false
+    },
+    "native": {},
+    "_id": "fakeroku.0.TV.keys.PowerOff"
+  },
+  "fakeroku.0.TV.keys.Rev": {
+    "type": "state",
+    "common": {
+      "name": {
+        "en": "Rev",
+        "de": "Rev",
+        "ru": "Rev",
+        "pt": "Rev",
+        "nl": "Rev",
+        "fr": "Rev",
+        "it": "Rev",
+        "es": "Rev",
+        "pl": "Rev",
+        "uk": "Rev",
+        "zh-cn": "Rev"
+      },
+      "type": "boolean",
+      "role": "sensor",
+      "read": true,
+      "write": false,
+      "def": false
+    },
+    "native": {},
+    "_id": "fakeroku.0.TV.keys.Rev"
+  },
+  "fakeroku.0.TV.keys.Right": {
+    "type": "state",
+    "common": {
+      "name": {
+        "en": "Right",
+        "de": "Right",
+        "ru": "Right",
+        "pt": "Right",
+        "nl": "Right",
+        "fr": "Right",
+        "it": "Right",
+        "es": "Right",
+        "pl": "Right",
+        "uk": "Right",
+        "zh-cn": "Right"
+      },
+      "type": "boolean",
+      "role": "sensor",
+      "read": true,
+      "write": false,
+      "def": false
+    },
+    "native": {},
+    "_id": "fakeroku.0.TV.keys.Right"
+  },
+  "fakeroku.0.TV.keys.Search": {
+    "type": "state",
+    "common": {
+      "name": {
+        "en": "Search",
+        "de": "Search",
+        "ru": "Search",
+        "pt": "Search",
+        "nl": "Search",
+        "fr": "Search",
+        "it": "Search",
+        "es": "Search",
+        "pl": "Search",
+        "uk": "Search",
+        "zh-cn": "Search"
+      },
+      "type": "boolean",
+      "role": "sensor",
+      "read": true,
+      "write": false,
+      "def": false
+    },
+    "native": {},
+    "_id": "fakeroku.0.TV.keys.Search"
+  },
+  "fakeroku.0.TV.keys.Select": {
+    "type": "state",
+    "common": {
+      "name": {
+        "en": "Select",
+        "de": "Select",
+        "ru": "Select",
+        "pt": "Select",
+        "nl": "Select",
+        "fr": "Select",
+        "it": "Select",
+        "es": "Select",
+        "pl": "Select",
+        "uk": "Select",
+        "zh-cn": "Select"
+      },
+      "type": "boolean",
+      "role": "sensor",
+      "read": true,
+      "write": false,
+      "def": false
+    },
+    "native": {},
+    "_id": "fakeroku.0.TV.keys.Select"
+  },
+  "fakeroku.0.TV.keys.Up": {
+    "type": "state",
+    "common": {
+      "name": {
+        "en": "Up",
+        "de": "Up",
+        "ru": "Up",
+        "pt": "Up",
+        "nl": "Up",
+        "fr": "Up",
+        "it": "Up",
+        "es": "Up",
+        "pl": "Up",
+        "uk": "Up",
+        "zh-cn": "Up"
+      },
+      "type": "boolean",
+      "role": "sensor",
+      "read": true,
+      "write": false,
+      "def": false
+    },
+    "native": {},
+    "_id": "fakeroku.0.TV.keys.Up"
+  },
+  "fakeroku.0.TV.keys.VolumeDown": {
+    "type": "state",
+    "common": {
+      "name": {
+        "en": "VolumeDown",
+        "de": "VolumeDown",
+        "ru": "VolumeDown",
+        "pt": "VolumeDown",
+        "nl": "VolumeDown",
+        "fr": "VolumeDown",
+        "it": "VolumeDown",
+        "es": "VolumeDown",
+        "pl": "VolumeDown",
+        "uk": "VolumeDown",
+        "zh-cn": "VolumeDown"
+      },
+      "type": "boolean",
+      "role": "sensor",
+      "read": true,
+      "write": false,
+      "def": false
+    },
+    "native": {},
+    "_id": "fakeroku.0.TV.keys.VolumeDown"
+  },
+  "fakeroku.0.TV.keys.VolumeMute": {
+    "type": "state",
+    "common": {
+      "name": {
+        "en": "VolumeMute",
+        "de": "VolumeMute",
+        "ru": "VolumeMute",
+        "pt": "VolumeMute",
+        "nl": "VolumeMute",
+        "fr": "VolumeMute",
+        "it": "VolumeMute",
+        "es": "VolumeMute",
+        "pl": "VolumeMute",
+        "uk": "VolumeMute",
+        "zh-cn": "VolumeMute"
+      },
+      "type": "boolean",
+      "role": "sensor",
+      "read": true,
+      "write": false,
+      "def": false
+    },
+    "native": {},
+    "_id": "fakeroku.0.TV.keys.VolumeMute"
+  },
+  "fakeroku.0.TV.keys.VolumeUp": {
+    "type": "state",
+    "common": {
+      "name": {
+        "en": "VolumeUp",
+        "de": "VolumeUp",
+        "ru": "VolumeUp",
+        "pt": "VolumeUp",
+        "nl": "VolumeUp",
+        "fr": "VolumeUp",
+        "it": "VolumeUp",
+        "es": "VolumeUp",
+        "pl": "VolumeUp",
+        "uk": "VolumeUp",
+        "zh-cn": "VolumeUp"
+      },
+      "type": "boolean",
+      "role": "sensor",
+      "read": true,
+      "write": false,
+      "def": false
+    },
+    "native": {},
+    "_id": "fakeroku.0.TV.keys.VolumeUp"
+  }
+}

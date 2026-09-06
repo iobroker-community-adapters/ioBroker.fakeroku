@@ -21,7 +21,8 @@ __export(device_info_exports, {
   DEFAULT_APPS: () => DEFAULT_APPS,
   buildAppsXml: () => buildAppsXml,
   buildDescXml: () => buildDescXml,
-  buildDeviceInfoXml: () => buildDeviceInfoXml
+  buildDeviceInfoXml: () => buildDeviceInfoXml,
+  buildScpdXml: () => buildScpdXml
 });
 module.exports = __toCommonJS(device_info_exports);
 const SOFTWARE_VERSION = "15.0.0";
@@ -111,11 +112,20 @@ function buildAppsXml(apps) {
 ${entries}
 </apps>`;
 }
+function buildScpdXml() {
+  return `<?xml version="1.0" encoding="UTF-8" ?>
+<scpd xmlns="urn:schemas-upnp-org:service-1-0">
+  <specVersion><major>1</major><minor>0</minor></specVersion>
+  <actionList/>
+  <serviceStateTable/>
+</scpd>`;
+}
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
   DEFAULT_APPS,
   buildAppsXml,
   buildDescXml,
-  buildDeviceInfoXml
+  buildDeviceInfoXml,
+  buildScpdXml
 });
 //# sourceMappingURL=device-info.js.map

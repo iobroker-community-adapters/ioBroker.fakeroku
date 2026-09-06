@@ -24,6 +24,7 @@ __export(detect_ip_exports, {
   ipv6Prefix64: () => ipv6Prefix64,
   listLocalIPv6Prefixes: () => listLocalIPv6Prefixes,
   listNonInternalIPv4s: () => listNonInternalIPv4s,
+  pickMembershipIPv4s: () => pickMembershipIPv4s,
   pickPrimaryIPv4: () => pickPrimaryIPv4
 });
 module.exports = __toCommonJS(detect_ip_exports);
@@ -54,8 +55,13 @@ function pickPrimaryIPv4(interfaces) {
 function detectPrimaryIPv4() {
   return pickPrimaryIPv4((0, import_node_os.networkInterfaces)());
 }
+function pickMembershipIPv4s(interfaces) {
+  const addresses = listNonInternalIPv4s(interfaces);
+  const real = addresses.filter((address) => !isContainerBridge(address));
+  return real.length > 0 ? real : addresses;
+}
 function detectLocalIPv4s() {
-  return listNonInternalIPv4s((0, import_node_os.networkInterfaces)());
+  return pickMembershipIPv4s((0, import_node_os.networkInterfaces)());
 }
 function expandIPv6(address) {
   const bare = address.toLowerCase().split("%")[0];
@@ -104,6 +110,7 @@ function detectLocalIPv6Prefixes() {
   ipv6Prefix64,
   listLocalIPv6Prefixes,
   listNonInternalIPv4s,
+  pickMembershipIPv4s,
   pickPrimaryIPv4
 });
 //# sourceMappingURL=detect-ip.js.map

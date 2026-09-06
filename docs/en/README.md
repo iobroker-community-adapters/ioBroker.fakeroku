@@ -96,7 +96,8 @@ on({ id: "fakeroku.0.Living_room.command" }, obj => {
 ```
 
 The key datapoints are reset to `false` every time the adapter starts, so a key that
-was left pressed when ioBroker stopped cannot block your rule afterwards.
+was left pressed when ioBroker stopped cannot block your rule afterwards. A key release
+is never dropped, not even while the adapter is shedding a flood of commands.
 
 ## Ports the adapter uses
 
@@ -107,6 +108,9 @@ was left pressed when ioBroker stopped cannot block your rule afterwards.
 
 Only devices on your own local network are answered. A request from the internet is
 refused, and a discovery search from outside is ignored.
+
+When you stop the instance, the emulated Rokus announce their departure, so a remote
+drops them from its list instead of sending key presses into the void for another hour.
 
 ## Troubleshooting
 
@@ -126,6 +130,9 @@ card under **Network interface** and restart the instance.
 At least one configured Roku could not start. The log names the device and its port —
 almost always the port is already used by something else (including another emulated
 Roku with the same port). Give it a free port.
+The adapter keeps trying such a device once a minute and says so in the log when it
+comes up, so a port that was still held by the previous process after a restart sorts
+itself out without you doing anything.
 
 **I press a button and nothing happens in ioBroker.**
 Set the instance log level to `debug` for a moment. Every received command is logged

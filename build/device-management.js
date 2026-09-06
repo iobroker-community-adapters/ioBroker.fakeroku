@@ -20,26 +20,19 @@ var device_management_exports = {};
 __export(device_management_exports, {
   FakerokuDeviceManagement: () => FakerokuDeviceManagement,
   buildDeviceForm: () => buildDeviceForm,
-  cleanDevice: () => cleanDevice,
-  findClash: () => findClash,
-  nextFreePort: () => nextFreePort
+  cleanDevice: () => cleanDevice
 });
 module.exports = __toCommonJS(device_management_exports);
 var import_dm_utils = require("@iobroker/dm-utils");
 var import_constants = require("./lib/constants");
+var import_device_config = require("./lib/device-config");
 var import_device_identity = require("./lib/device-identity");
 var import_i18n = require("./lib/i18n");
 var import_pure_helpers = require("./lib/pure-helpers");
-function nextFreePort(usedPorts) {
-  const taken = new Set(usedPorts);
-  let port = import_constants.DEFAULT_ECP_PORT;
-  while (taken.has(port)) {
-    port++;
-  }
-  return port;
-}
+const ID_EXPRESSION = "(data.name||'').trim().replace(/[^A-Za-z0-9\\-_]/g,'_')";
 function buildDeviceForm(usedNames, usedPorts) {
   const nameList = JSON.stringify(usedNames.map((n) => n.trim().toLowerCase()));
+  const idList = JSON.stringify([...import_constants.RESERVED_IDS, ...usedNames.map((n) => (0, import_pure_helpers.sanitizeId)(n.trim()))]);
   const portList = JSON.stringify([...usedPorts]);
   return {
     type: "panel",
@@ -47,8 +40,8 @@ function buildDeviceForm(usedNames, usedPorts) {
       name: {
         type: "text",
         label: (0, import_i18n.t)("deviceName"),
-        validator: `!${nameList}.includes((data.name||'').trim().toLowerCase())`,
-        validatorErrorText: (0, import_i18n.t)("deviceNameInUse"),
+        validator: `${ID_EXPRESSION}.length>0 && !${nameList}.includes((data.name||'').trim().toLowerCase()) && !${idList}.includes(${ID_EXPRESSION})`,
+        validatorErrorText: (0, import_i18n.t)("deviceNameRejected"),
         validatorNoSaveOnError: true,
         sm: 12,
         md: 6
@@ -82,61 +75,59 @@ function buildDeviceForm(usedNames, usedPorts) {
 }
 function cleanDevice(raw) {
   const name = typeof raw.name === "string" ? raw.name.trim() : "";
-  const port = Number(raw.port) || import_constants.DEFAULT_ECP_PORT;
-  const type = raw.type === "tv" ? "tv" : "player";
-  return { name, port, type };
-}
-function findClash(devices, candidate, exceptIndex) {
-  const name = candidate.name.trim().toLowerCase();
-  const id = (0, import_pure_helpers.sanitizeId)(candidate.name.trim());
-  if (id === "" || import_constants.RESERVED_IDS.has(id)) {
-    return (0, import_i18n.t)("deviceNameInvalid");
-  }
-  for (let i = 0; i < devices.length; i++) {
-    if (i === exceptIndex) {
-      continue;
-    }
-    if (devices[i].name.trim().toLowerCase() === name) {
-      return (0, import_i18n.t)("deviceNameInUse");
-    }
-    if ((0, import_pure_helpers.sanitizeId)(devices[i].name.trim()) === id) {
-      return (0, import_i18n.t)("deviceNameInvalid");
-    }
-    if (Number(devices[i].port) === candidate.port) {
-      return (0, import_i18n.t)("devicePortInUse");
-    }
-  }
-  return null;
+  return { name, port: (0, import_device_config.normalizePort)(raw.port), type: (0, import_device_config.normalizeType)(raw.type) };
 }
 class FakerokuDeviceManagement extends import_dm_utils.DeviceManagement {
   get objId() {
     return `system.adapter.${this.adapter.namespace}`;
   }
   /**
-   * Read the device list from the live config object.
+   * Read the device list from the live config object, through the shared normaliser.
+   *
+   * Every row keeps BOTH names: the trimmed one the card shows and the next write stores,
+   * and the stored one the identity was resolved from. Nothing here re-derives an identity
+   * from the display name — that is what unpaired the remote before (lib/device-config.ts).
    *
    * @returns the configured devices (normalised), or an empty list
    */
   async readDevices() {
-    var _a;
+    var _a, _b;
     const obj = await this.adapter.getForeignObjectAsync(this.objId);
     const devices = (_a = obj == null ? void 0 : obj.native) == null ? void 0 : _a.devices;
-    if (!Array.isArray(devices)) {
-      return [];
-    }
-    return devices.filter((d) => typeof d === "object" && d !== null).map((d) => {
-      const clean = cleanDevice(d);
-      return typeof d.uuid === "string" && d.uuid ? { ...clean, uuid: d.uuid } : clean;
-    });
+    return (_b = (0, import_device_config.toDeviceRows)(devices)) != null ? _b : [];
   }
   /**
-   * Persist the device list. Writing `native.*` restarts the adapter, which
-   * re-creates the object trees and servers with the new devices.
+   * Persist the device list.
+   *
+   * ⚠️ The full array only replaces the stored one because the key is literally called
+   * `devices`: js-controller clears the old array before merging for exactly four names
+   * (`common.members`, `native.repositories`, `native.certificates`, `native.devices` —
+   * adapter.ts `_extendForeignObject`). Under any other name `extend(true, …)` would merge
+   * arrays element-wise, and deleting the second of two devices would leave both in place.
+   * Renaming this config key silently breaks deletion; `device-management.test.ts` pins it.
+   *
+   * Writing `native.*` restarts the adapter, which re-creates the object trees and servers.
    *
    * @param devices the full device list to store
    */
   async writeDevices(devices) {
     await this.adapter.extendForeignObjectAsync(this.objId, { native: { devices } });
+  }
+  /**
+   * The stored shape of a row the user did NOT touch: its name exactly as it was, the
+   * normalised port and type, and the identity resolved when the row was read.
+   *
+   * The name stays untouched on purpose. Writing the trimmed form would move that device's
+   * object id on the next start — a tree wandering, and every script pointing into it
+   * breaking, because someone edited a different card. Trimming happens where the user
+   * pressed save, nowhere else. Persisting the identity is safe by contrast: it is exactly
+   * the value the runtime is already advertising for that row, just no longer derived.
+   *
+   * @param row the normalised row
+   * @returns the row as it is persisted
+   */
+  static toStored(row) {
+    return { name: row.storedName, port: row.port, type: row.type, uuid: row.identity };
   }
   /**
    * Populate the manager with one card per configured device.
@@ -145,24 +136,33 @@ class FakerokuDeviceManagement extends import_dm_utils.DeviceManagement {
    */
   async loadDevices(context) {
     const devices = await this.readDevices();
-    devices.forEach((device, index) => context.addDevice(this.toDeviceInfo(device, index)));
+    for (const device of devices) {
+      context.addDevice(this.toDeviceInfo(device));
+    }
   }
   /**
    * Build one device card. The model (Player/TV) and the ECP port each get their
    * own line — the port via `identifier` (labelled in getInstanceInfo). No
    * manufacturer line: it is always "Roku" and tells the user nothing for an emulator.
-   * The row comes from readDevices(), so the port is already a number; only the name
-   * can still be empty (a row saved without one) and gets a numbered stand-in.
+   *
+   * The card is keyed by the device's SSDP identity, not by its list position: a position
+   * is only valid for as long as the view is fresh, so a second admin tab (or a list that
+   * changed underneath) would send edit/delete to a different device than the card clicked.
+   * Two hand-edited rows can share an identity; the first one wins, which is the same answer
+   * the runtime gives when two names map to one object id.
+   *
+   * The name needs no fallback: a row without a usable one never becomes a DeviceRow
+   * (lib/device-config.ts drops it), so `Roku <n>` was a branch nothing could reach —
+   * the mutation run of 1.6.0 found it by having no test that could fail on its removal.
    *
    * @param device the stored device
-   * @param index its list position — the (per-session stable) card id
    * @returns the card descriptor
    */
-  toDeviceInfo(device, index) {
+  toDeviceInfo(device) {
     const kind = device.type === "tv" ? "TV" : "Player";
     return {
-      id: String(index),
-      name: device.name || `Roku ${index + 1}`,
+      id: device.identity,
+      name: device.name,
       identifier: String(device.port),
       model: kind,
       actions: [
@@ -170,13 +170,13 @@ class FakerokuDeviceManagement extends import_dm_utils.DeviceManagement {
           id: "edit",
           icon: "edit",
           description: (0, import_i18n.t)("dmEdit"),
-          handler: async (id, context) => this.editDevice(Number(id), context)
+          handler: async (id, context) => this.editDevice(id, context)
         },
         {
           id: "delete",
           icon: "delete",
           description: (0, import_i18n.t)("dmDelete"),
-          handler: async (id, context) => this.deleteDevice(Number(id), context)
+          handler: async (id, context) => this.deleteDevice(id, context)
         }
       ]
     };
@@ -203,78 +203,82 @@ class FakerokuDeviceManagement extends import_dm_utils.DeviceManagement {
   async addDevice(context) {
     const devices = await this.readDevices();
     const usedNames = devices.map((d) => d.name);
-    const usedPorts = devices.map((d) => Number(d.port));
+    const usedPorts = devices.map((d) => d.port);
     const data = await context.showForm(buildDeviceForm(usedNames, usedPorts), {
       title: (0, import_i18n.t)("dmAdd"),
-      data: { type: "player", port: nextFreePort(usedPorts) }
+      data: { type: "player", port: (0, import_device_config.nextFreePort)(usedPorts) }
     });
     if (data && typeof data.name === "string" && data.name.trim()) {
       const clean = cleanDevice(data);
-      const clash = findClash(devices, clean, -1);
+      const clash = (0, import_device_config.findClash)(devices, clean, -1);
       if (clash) {
         await context.showMessage(clash);
         return { refresh: true };
       }
-      devices.push({ ...clean, uuid: (0, import_device_identity.deriveUuid)(clean.name) });
-      await this.writeDevices(devices);
+      const stored = devices.map((d) => FakerokuDeviceManagement.toStored(d));
+      stored.push({ ...clean, uuid: (0, import_device_identity.deriveUuid)(clean.name) });
+      await this.writeDevices(stored);
     }
     return { refresh: true };
   }
   /**
    * Edit a device via the pre-filled form. Its own name/port are excluded from
-   * the clash check, and its uuid is preserved so the pairing survives a rename.
+   * the clash check, and its identity is preserved so the pairing survives a rename.
    *
-   * A row that carries no uuid yet — the manifest's default device, or anything
-   * written before 0.8.0 — gets one derived from its PREVIOUS name, because that
-   * is the identity main.ts is advertising right now (it derives from the stored
-   * name and never writes the value back). Deriving from the NEW name here would
-   * change the SSDP identity on a plain rename and silently unpair the remote.
+   * The identity comes from the row as it was READ (lib/device-config.ts resolves it from
+   * the stored name), never derived here: deriving it from the name in the form would move
+   * the SSDP identity on a plain rename — and deriving it from the trimmed stored name would
+   * move it even when the user changed nothing at all.
    *
-   * @param index the device's list position
+   * @param cardId the card's id — the device's identity
    * @param context the action context
    * @returns a directive to reload the list
    */
-  async editDevice(index, context) {
+  async editDevice(cardId, context) {
     const devices = await this.readDevices();
+    const index = devices.findIndex((d) => d.identity === cardId);
     const current = devices[index];
     if (!current) {
       return { refresh: "devices" };
     }
     const usedNames = devices.filter((_, i) => i !== index).map((d) => d.name);
-    const usedPorts = devices.filter((_, i) => i !== index).map((d) => Number(d.port));
+    const usedPorts = devices.filter((_, i) => i !== index).map((d) => d.port);
     const data = await context.showForm(buildDeviceForm(usedNames, usedPorts), {
       title: (0, import_i18n.t)("dmEditTitle"),
-      data: { ...current }
+      data: { name: current.name, port: current.port, type: current.type }
     });
     if (data && typeof data.name === "string" && data.name.trim()) {
       const clean = cleanDevice(data);
-      const clash = findClash(devices, clean, index);
+      const clash = (0, import_device_config.findClash)(devices, clean, index);
       if (clash) {
         await context.showMessage(clash);
         return { refresh: "devices" };
       }
-      devices[index] = { ...clean, uuid: (0, import_device_identity.resolveDeviceUuid)(current) };
-      await this.writeDevices(devices);
+      const stored = devices.map((d) => FakerokuDeviceManagement.toStored(d));
+      stored[index] = { ...clean, uuid: current.identity };
+      await this.writeDevices(stored);
     }
     return { refresh: "devices" };
   }
   /**
    * Delete a device after confirmation.
    *
-   * @param index the device's list position
+   * @param cardId the card's id — the device's identity
    * @param context the action context
    * @returns a directive to reload the list
    */
-  async deleteDevice(index, context) {
+  async deleteDevice(cardId, context) {
     const devices = await this.readDevices();
+    const index = devices.findIndex((d) => d.identity === cardId);
     const target = devices[index];
     if (!target) {
       return { refresh: "devices" };
     }
-    const confirmed = await context.showConfirmation((0, import_i18n.t)("dmDeleteConfirm", target.name || ""));
+    const confirmed = await context.showConfirmation((0, import_i18n.t)("dmDeleteConfirm", target.name));
     if (confirmed) {
-      devices.splice(index, 1);
-      await this.writeDevices(devices);
+      const stored = devices.map((d) => FakerokuDeviceManagement.toStored(d));
+      stored.splice(index, 1);
+      await this.writeDevices(stored);
     }
     return { refresh: "devices" };
   }
@@ -283,8 +287,6 @@ class FakerokuDeviceManagement extends import_dm_utils.DeviceManagement {
 0 && (module.exports = {
   FakerokuDeviceManagement,
   buildDeviceForm,
-  cleanDevice,
-  findClash,
-  nextFreePort
+  cleanDevice
 });
 //# sourceMappingURL=device-management.js.map

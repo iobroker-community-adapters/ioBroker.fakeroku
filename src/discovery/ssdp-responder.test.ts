@@ -320,3 +320,146 @@ describe("RokuSsdpResponder", () => {
     expect(() => r.stop()).not.toThrow();
   });
 });
+
+describe("RokuSsdpResponder — the device set changes while it runs", () => {
+  beforeEach(() => {
+    dgramMock.sockets.length = 0;
+    Object.keys(dgramMock.fail).forEach(k => ((dgramMock.fail as Record<string, boolean>)[k] = false));
+    vi.clearAllMocks();
+  });
+
+  it("owns its list instead of aliasing the caller's array", async () => {
+    // The caller's array must not be able to change what is announced behind the
+    // responder's back; addDevice/removeDevice are the only doors.
+    const devices = [{ uuid: "aaa", port: 8060 }];
+    const r = new RokuSsdpResponder({ ...baseCfg, devices, bindIp: undefined, membershipInterfaces: [] });
+    await r.start();
+    devices.push({ uuid: "bbb", port: 8061 });
+    r.announce();
+    expect(dgramMock.sockets[0].sent).toHaveLength(1);
+  });
+
+  it("announces a device that joined later", async () => {
+    const r = new RokuSsdpResponder({
+      ...baseCfg,
+      devices: [{ uuid: "aaa", port: 8060 }],
+      bindIp: undefined,
+      membershipInterfaces: [],
+    });
+    await r.start();
+    r.addDevice({ uuid: "bbb", port: 8061 });
+    r.announce();
+    const sent = dgramMock.sockets[0].sent.map(x => x.text).join("\n");
+    expect(sent).toContain("uuid:roku:ecp:bbb");
+  });
+
+  it("adds a device only once", async () => {
+    const r = new RokuSsdpResponder({
+      ...baseCfg,
+      devices: [{ uuid: "aaa", port: 8060 }],
+      bindIp: undefined,
+      membershipInterfaces: [],
+    });
+    await r.start();
+    r.addDevice({ uuid: "aaa", port: 8060 });
+    r.announce();
+    expect(dgramMock.sockets[0].sent).toHaveLength(1);
+  });
+
+  it("stops answering for a device whose server died", async () => {
+    // Otherwise discovery keeps pointing remotes at a port nobody serves.
+    const r = new RokuSsdpResponder({
+      ...baseCfg,
+      devices: [
+        { uuid: "aaa", port: 8060 },
+        { uuid: "bbb", port: 8061 },
+      ],
+      bindIp: undefined,
+      membershipInterfaces: [],
+    });
+    await r.start();
+    r.removeDevice("aaa");
+    dgramMock.sockets[0].emit("message", Buffer.from(MSEARCH), { address: "192.168.1.10", port: 1234 });
+    const sent = dgramMock.sockets[0].sent.map(x => x.text).join("\n");
+    expect(sent).toContain("uuid:roku:ecp:bbb");
+    expect(sent).not.toContain("uuid:roku:ecp:aaa");
+  });
+
+  it("removing an unknown device changes nothing", async () => {
+    const r = new RokuSsdpResponder({ ...baseCfg, bindIp: undefined, membershipInterfaces: [] });
+    await r.start();
+    r.removeDevice("nope");
+    r.announce();
+    expect(dgramMock.sockets[0].sent).toHaveLength(1);
+  });
+
+  it("mirrors the search target so a rootdevice sweep does not discard the answer", async () => {
+    const r = new RokuSsdpResponder({ ...baseCfg, bindIp: undefined, membershipInterfaces: [] });
+    await r.start();
+    dgramMock.sockets[0].emit("message", Buffer.from(MSEARCH.replace("ST: roku:ecp", "ST: upnp:rootdevice")), {
+      address: "192.168.1.10",
+      port: 1234,
+    });
+    expect(dgramMock.sockets[0].sent[0].text).toContain("ST: upnp:rootdevice");
+  });
+});
+
+describe("RokuSsdpResponder — the farewell", () => {
+  beforeEach(() => {
+    dgramMock.sockets.length = 0;
+    Object.keys(dgramMock.fail).forEach(k => ((dgramMock.fail as Record<string, boolean>)[k] = false));
+    vi.clearAllMocks();
+  });
+
+  it("withdraws every device from the multicast group", async () => {
+    const r = new RokuSsdpResponder({
+      ...baseCfg,
+      devices: [
+        { uuid: "aaa", port: 8060 },
+        { uuid: "bbb", port: 8061 },
+      ],
+      bindIp: undefined,
+      membershipInterfaces: [],
+    });
+    await r.start();
+
+    await r.byebye();
+
+    const s = dgramMock.sockets[0];
+    expect(s.sent).toHaveLength(2);
+    expect(s.sent.map(x => `${x.address}:${x.port}`)).toEqual(["239.255.255.250:1900", "239.255.255.250:1900"]);
+    expect(s.sent[0].text).toContain("ssdp:byebye");
+    expect(s.sent[0].text).toContain("uuid:roku:ecp:aaa");
+  });
+
+  it("resolves — never hangs teardown — when a send fails", async () => {
+    const r = new RokuSsdpResponder({ ...baseCfg, bindIp: undefined, membershipInterfaces: [] });
+    await r.start();
+    dgramMock.fail.send = true;
+
+    await expect(r.byebye()).resolves.toBeUndefined();
+    expect(noopLog.debug).toHaveBeenCalledWith(expect.stringContaining("byebye send failed"));
+  });
+
+  it("resolves even when the socket throws the moment it is used", async () => {
+    // dgram throws ERR_SOCKET_DGRAM_NOT_RUNNING synchronously on a socket that closed
+    // under us — teardown must not hang on that, and must not throw out of onUnload.
+    const r = new RokuSsdpResponder({ ...baseCfg, bindIp: undefined, membershipInterfaces: [] });
+    await r.start();
+    dgramMock.sockets[0].send = () => {
+      throw new Error("ERR_SOCKET_DGRAM_NOT_RUNNING");
+    };
+
+    await expect(r.byebye()).resolves.toBeUndefined();
+    expect(noopLog.debug).toHaveBeenCalledWith(expect.stringContaining("byebye send failed"));
+  });
+
+  it("resolves immediately when there is no socket or no device left", async () => {
+    const r = new RokuSsdpResponder({ ...baseCfg, bindIp: undefined, membershipInterfaces: [] });
+    await expect(r.byebye()).resolves.toBeUndefined();
+    await r.start();
+    r.removeDevice("abc123");
+    await expect(r.byebye()).resolves.toBeUndefined();
+    expect(dgramMock.sockets[0].sent).toHaveLength(0);
+  });
+});

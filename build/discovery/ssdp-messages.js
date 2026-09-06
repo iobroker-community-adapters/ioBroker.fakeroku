@@ -19,32 +19,45 @@ var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: tru
 var ssdp_messages_exports = {};
 __export(ssdp_messages_exports, {
   buildAliveNotify: () => buildAliveNotify,
+  buildByebyeNotify: () => buildByebyeNotify,
   buildSearchResponse: () => buildSearchResponse,
-  matchesRokuSearch: () => matchesRokuSearch
+  rokuSearchTarget: () => rokuSearchTarget
 });
 module.exports = __toCommonJS(ssdp_messages_exports);
 const SERVER_SIG = "Roku UPnP/1.0 MiniUPnPd/1.4";
 const MAX_AGE = 3600;
-function matchesRokuSearch(message) {
-  var _a;
+const ANSWERED_TARGETS = ["roku:ecp", "ssdp:all", "upnp:rootdevice"];
+function rokuSearchTarget(message) {
+  var _a, _b;
   if (!/^M-SEARCH \* HTTP\/1\.1/im.test(message)) {
-    return false;
+    return null;
   }
   if (!/^MAN:\s*"ssdp:discover"/im.test(message)) {
-    return false;
+    return null;
   }
   const st = (_a = message.match(/^ST:\s*(.+?)\s*$/im)) == null ? void 0 : _a[1];
-  return st === "roku:ecp" || st === "ssdp:all" || st === "upnp:rootdevice";
+  return (_b = ANSWERED_TARGETS.find((target) => target === st)) != null ? _b : null;
 }
-function buildSearchResponse(device, advertiseIp) {
+function buildSearchResponse(device, advertiseIp, target = "roku:ecp") {
   return [
     "HTTP/1.1 200 OK",
     `Cache-Control: max-age=${MAX_AGE}`,
-    "ST: roku:ecp",
+    `ST: ${target === "upnp:rootdevice" ? "upnp:rootdevice" : "roku:ecp"}`,
     `USN: uuid:roku:ecp:${device.uuid}`,
     "Ext: ",
     `Server: ${SERVER_SIG}`,
     `LOCATION: http://${advertiseIp}:${device.port}/`,
+    "",
+    ""
+  ].join("\r\n");
+}
+function buildByebyeNotify(device) {
+  return [
+    "NOTIFY * HTTP/1.1",
+    "Host: 239.255.255.250:1900",
+    "NT: roku:ecp",
+    "NTS: ssdp:byebye",
+    `USN: uuid:roku:ecp:${device.uuid}`,
     "",
     ""
   ].join("\r\n");
@@ -66,7 +79,8 @@ function buildAliveNotify(device, advertiseIp) {
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
   buildAliveNotify,
+  buildByebyeNotify,
   buildSearchResponse,
-  matchesRokuSearch
+  rokuSearchTarget
 });
 //# sourceMappingURL=ssdp-messages.js.map
