@@ -1,9 +1,9 @@
 {
   "common": {
     "name": "fakeroku",
-    "version": "1.5.0",
+    "version": "1.6.0",
     "news": {
-      "NEXT": {
+      "1.6.0": {
         "en": "Saving a device keeps its network identity, a busy ECP port is retried, a stopped instance unregisters its Rokus, and the adapter runs in compact mode.",
         "de": "Speichern behält die Netzkennung, ein belegter ECP-Anschluss wird erneut versucht, eine gestoppte Instanz meldet ihre Rokus ab, und der Adapter läuft im Compact-Modus.",
         "ru": "Сохранение сохраняет сетевой идентификатор, занятый порт ECP повторяется, остановленный экземпляр убирает свои Roku, адаптер работает в компактном режиме.",

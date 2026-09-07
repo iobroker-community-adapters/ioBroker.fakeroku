@@ -93,7 +93,7 @@ becomes `true` — or watch `.command` for the last button as text.
 	### **WORK IN PROGRESS**
 -->
 
-### **WORK IN PROGRESS**
+### 1.6.0 (2026-09-07)
 
 - (krobipd) Fixed: saving a device in the admin could change its identity on the network, so a paired Harmony or Sofabaton lost it.
 - (krobipd) Fixed: with the device list open twice, editing or deleting a card could hit a different emulated Roku than the one clicked.
@@ -133,13 +133,6 @@ becomes `true` — or watch `.command` for the last button as text.
 - (krobipd) Changed: the instance now reports "not connected" while a configured Roku is missing — a device whose port is taken no longer hides behind the ones that did start.
 - (krobipd) Improved: shutdown now waits for its last write to land before reporting done, so the connection state cannot be lost on a slow or busy system.
 - (krobipd) New: optional error reporting via Sentry — only active if you enabled diagnostics in ioBroker, and it transmits no personal data.
-
-### 1.1.0 (2026-08-10) — stable
-- (krobipd) Several emulated Rokus are now independent at start-up: if one is set to a port already in use, the others still start instead of the whole instance failing.
-- (krobipd) The adapter keeps serving already-paired remotes, and reports its status correctly, even when network discovery cannot start or later drops out.
-- (krobipd) Discovery now covers every network interface on a host that has more than one, so a remote on any of your local networks can find the emulated Rokus.
-- (krobipd) The device dialog now refuses a name that would clash with another device or a reserved name, preventing a naming conflict.
-- (krobipd) The adapter description now reads correctly in the non-English and non-German admin languages.
 
 [Older changelogs can be found there](CHANGELOG_OLD.md)
 
