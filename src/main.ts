@@ -486,7 +486,9 @@ export class Fakeroku extends utils.Adapter {
           // (E1010 — not in its role list); sensor is the gate-conformant fit.
           // The name is the ECP key identifier and identical in every language, but
           // it still has to BE a translation object (tRaw), never a bare string.
-          // No desc: the key name already says everything there is to say.
+          // No desc: the key name already says everything there is to say. The
+          // decision itself is recorded in test/self-explaining.json, where the
+          // object-inventory gate reads it — silence has to be a decision, not a gap.
           common: { name: tRaw(key), type: "boolean", role: "sensor", read: true, write: false, def: false },
           native: {},
         }),
