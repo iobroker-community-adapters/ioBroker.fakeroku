@@ -1,8 +1,21 @@
 {
   "common": {
     "name": "fakeroku",
-    "version": "1.6.0",
+    "version": "1.6.1",
     "news": {
+      "1.6.1": {
+        "en": "Installing straight from GitHub is no longer offered: the adapter is built before publishing, so it is installed from the ioBroker repository instead.",
+        "de": "Die Installation direkt von GitHub wird nicht mehr angeboten: Der Adapter wird vor der Veröffentlichung gebaut und kommt daher aus dem ioBroker-Repository.",
+        "ru": "Установка напрямую с GitHub больше не предлагается: адаптер собирается перед публикацией и поэтому устанавливается из репозитория ioBroker.",
+        "pt": "A instalação diretamente do GitHub deixou de ser oferecida: o adaptador é compilado antes da publicação e por isso é instalado a partir do repositório ioBroker.",
+        "nl": "Installeren rechtstreeks vanaf GitHub wordt niet meer aangeboden: de adapter wordt vóór publicatie gebouwd en komt daarom uit de ioBroker-repository.",
+        "fr": "L’installation directe depuis GitHub n’est plus proposée : l’adaptateur est compilé avant publication et s’installe donc depuis le dépôt ioBroker.",
+        "it": "L’installazione diretta da GitHub non è più proposta: l’adattatore viene compilato prima della pubblicazione e quindi si installa dal repository ioBroker.",
+        "es": "La instalación directa desde GitHub ya no se ofrece: el adaptador se compila antes de publicarse y por eso se instala desde el repositorio de ioBroker.",
+        "pl": "Instalacja bezpośrednio z GitHuba nie jest już oferowana: adapter jest budowany przed publikacją, dlatego instaluje się go z repozytorium ioBroker.",
+        "uk": "Встановлення безпосередньо з GitHub більше не пропонується: адаптер збирається перед публікацією, тому встановлюється з репозиторію ioBroker.",
+        "zh-cn": "不再提供直接从 GitHub 安装：适配器在发布前完成构建，因此请从 ioBroker 仓库安装。"
+      },
       "1.6.0": {
         "en": "Saving a device keeps its network identity, a busy ECP port is retried, a stopped instance unregisters its Rokus, and the adapter runs in compact mode.",
         "de": "Speichern behält die Netzkennung, ein belegter ECP-Anschluss wird erneut versucht, eine gestoppte Instanz meldet ihre Rokus ab, und der Adapter läuft im Compact-Modus.",
@@ -80,19 +93,6 @@
         "pl": "Solidniej: zajęty port jednego Roku nie zatrzymuje już pozostałych, a wykrywanie obejmuje teraz każdy interfejs sieciowy, nawet jeśli jest ich kilka.",
         "uk": "Надійніше: зайнятий порт одного Roku більше не зупиняє інші, а виявлення тепер охоплює кожен мережевий інтерфейс, навіть якщо їх кілька.",
         "zh-cn": "更稳健：某个 Roku 的端口被占用不再导致其他设备无法启动，且发现现在覆盖每个网络接口，即使有多个网卡。"
-      },
-      "1.0.0": {
-        "en": "Version 1.0.0 marks the rewrite as stable. On update, a one-time notice explains the remote-key data points are now boolean instead of text, so check scripts and visualizations that read them.",
-        "de": "Version 1.0.0 macht den Neubau zur stabilen Version. Beim Update erklärt ein einmaliger Hinweis, dass die Tasten jetzt boolean statt Text sind — prüfe Skripte und Visualisierungen.",
-        "ru": "Версия 1.0.0 делает переработку стабильной. При обновлении однократное уведомление поясняет, что кнопки теперь boolean вместо текста — проверьте скрипты и визуализации.",
-        "pt": "A versão 1.0.0 torna a reescrita estável. Ao atualizar, um aviso único explica que as teclas agora são boolean em vez de texto — verifique scripts e visualizações.",
-        "nl": "Versie 1.0.0 maakt de herbouw stabiel. Bij het updaten legt een eenmalige melding uit dat de knoppen nu boolean zijn in plaats van tekst — controleer scripts en visualisaties.",
-        "fr": "La version 1.0.0 stabilise la réécriture. À la mise à jour, un avis unique explique que les touches sont désormais boolean au lieu de texte — vérifiez scripts et visualisations.",
-        "it": "La versione 1.0.0 rende stabile la riscrittura. All'aggiornamento, un avviso una tantum spiega che i tasti ora sono boolean invece di testo — controlla script e visualizzazioni.",
-        "es": "La versión 1.0.0 estabiliza la reescritura. Al actualizar, un aviso único explica que las teclas ahora son boolean en vez de texto — revisa scripts y visualizaciones.",
-        "pl": "Wersja 1.0.0 stabilizuje przebudowę. Przy aktualizacji jednorazowe powiadomienie wyjaśnia, że przyciski są teraz boolean zamiast tekstu — sprawdź skrypty i wizualizacje.",
-        "uk": "Версія 1.0.0 робить переробку стабільною. Під час оновлення одноразове сповіщення пояснює, що кнопки тепер boolean замість тексту — перевірте скрипти та візуалізації.",
-        "zh-cn": "版本 1.0.0 将重写标记为稳定版。更新时一次性提示会说明按键现在为 boolean 而非文本——请检查读取它们的脚本和可视化。"
       }
     },
     "titleLang": {
@@ -221,7 +221,8 @@
       "sentry": {
         "dsn": "https://66f27ceff38c1ce1e6cdcc3095ba06d3@o4511524771266560.ingest.de.sentry.io/4511524773560400"
       }
-    }
+    },
+    "nogit": true
   },
   "native": {
     "networkInterface": "0.0.0.0",

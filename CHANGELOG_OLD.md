@@ -1,5 +1,10 @@
 # Older changes
 
+## 1.2.0 (2026-08-27)
+- (krobipd) Changed: the instance now reports "not connected" while a configured Roku is missing — a device whose port is taken no longer hides behind the ones that did start.
+- (krobipd) Improved: shutdown now waits for its last write to land before reporting done, so the connection state cannot be lost on a slow or busy system.
+- (krobipd) New: optional error reporting via Sentry — only active if you enabled diagnostics in ioBroker, and it transmits no personal data.
+
 ## 1.1.0 (2026-08-10) — stable
 - (krobipd) Several emulated Rokus are now independent at start-up: if one is set to a port already in use, the others still start instead of the whole instance failing.
 - (krobipd) The adapter keeps serving already-paired remotes, and reports its status correctly, even when network discovery cannot start or later drops out.

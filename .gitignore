@@ -33,3 +33,6 @@ coverage/
 .claude/dev-history.md
 .remember/
 CLAUDE.local.md
+
+# Build output is not versioned: the CI builds before test and publish (common.nogit)
+build/

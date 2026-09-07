@@ -39,6 +39,8 @@ For details and how to disable it, see the [Sentry plugin documentation](https:/
 - js-controller >= 7.2.2
 - admin >= 8.0.11
 
+> The adapter CANNOT be installed via GitHub: The adapter must be installed via the ioBroker repository (stable or latest).
+
 ## Ports
 
 - **TCP 8060 (listening, one per emulated Roku, configurable)** — the Roku control protocol (ECP): the remote sends its key presses here and reads the actual port from the discovery announcement.
@@ -93,6 +95,10 @@ becomes `true` — or watch `.command` for the last button as text.
 	### **WORK IN PROGRESS**
 -->
 
+### 1.6.1 (2026-09-07)
+
+- (krobipd) Changed: installing straight from GitHub is no longer offered — the adapter is built before publishing, so it is installed from the ioBroker repository instead.
+
 ### 1.6.0 (2026-09-07)
 
 - (krobipd) Fixed: saving a device in the admin could change its identity on the network, so a paired Harmony or Sofabaton lost it.
@@ -128,11 +134,6 @@ becomes `true` — or watch `.command` for the last button as text.
 - (krobipd) Improved: discovery answers only searches from your own network, and the device dialog in the admin keeps working after the device list was edited by hand.
 - (krobipd) Improved: the emulated Roku reports Roku OS 15.0 (was 14.1), and the command-type datapoint lists its possible values so the admin shows them as labels.
 - (krobipd) New: a misbehaving device on your network can no longer flood ioBroker — more than 25 commands per second per emulated Roku are dropped and reported in the log.
-
-### 1.2.0 (2026-08-27)
-- (krobipd) Changed: the instance now reports "not connected" while a configured Roku is missing — a device whose port is taken no longer hides behind the ones that did start.
-- (krobipd) Improved: shutdown now waits for its last write to land before reporting done, so the connection state cannot be lost on a slow or busy system.
-- (krobipd) New: optional error reporting via Sentry — only active if you enabled diagnostics in ioBroker, and it transmits no personal data.
 
 [Older changelogs can be found there](CHANGELOG_OLD.md)
 
