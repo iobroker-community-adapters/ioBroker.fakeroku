@@ -5,7 +5,10 @@ export default [
   {
     languageOptions: {
       parserOptions: {
-        projectService: { allowDefaultProject: ["*.mjs", "vitest.config.mts", "test/standards/*.test.ts"] },
+        // `test/standards/*.test.ts` is NOT listed here: the root tsconfig includes
+        // `test/**/*.ts` (the ioBroker standard), so the file is a real project member.
+        // Listing it in both places is a parsing error.
+        projectService: { allowDefaultProject: ["*.mjs", "vitest.config.mts"] },
         tsconfigRootDir: import.meta.dirname,
       },
     },
