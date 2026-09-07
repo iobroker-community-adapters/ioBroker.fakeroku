@@ -121,25 +121,12 @@ describe("io-package.json manifest", () => {
 //   1. every language file carries exactly the keys en.json has,
 //   2. no language file leaves a key empty,
 //   3. no i18n key is dead,
-//   4. every datapoint in the generated inventory has a description or a recorded
-//      reason for having none — an invented sentence is worse than none, but the
-//      judgement has to be WRITTEN somewhere, not implied by absence,
-//   5. the inventory really covers every key of every device type.
+//   4. the inventory really covers every key of every device type.
+// The description decision itself — every datapoint either explained or declared
+// self-explaining WITH a reason — lives in test/self-explaining.json since
+// 2026-09-07, where check-object-inventory.py judges it for the whole fleet. It
+// used to be a hand-kept list in this file, which no gate ever read.
 // ---------------------------------------------------------------------------
-
-/**
- * Datapoints that carry NO description, each with the reason it needs none. A datapoint
- * whose name already says everything gets no invented sentence — but the judgement is
- * recorded here, so "no description" is always a decision and never an oversight.
- */
-const SELF_EXPLAINING: { pattern: RegExp; reason: string }[] = [
-  {
-    pattern: /\.keys\.[A-Za-z0-9_]+$/,
-    reason:
-      "The name IS the remote key (Home, VolumeUp, InputHDMI1) — the ECP identifier the " +
-      "controller sends. A description could only repeat it in worse words.",
-  },
-];
 
 describe("naming catalogue", () => {
   const i18nDir = join(root, "admin", "i18n");
@@ -191,38 +178,11 @@ describe("naming catalogue", () => {
   });
 });
 
-describe("datapoint descriptions", () => {
+describe("object inventory", () => {
   const inventoryFile = join(root, "test", "objects.inventory.json");
-  const inventory = JSON.parse(readFileSync(inventoryFile, "utf8")) as Record<
-    string,
-    { type: string; common?: { desc?: unknown; name?: unknown } }
-  >;
+  const inventory = JSON.parse(readFileSync(inventoryFile, "utf8")) as Record<string, unknown>;
 
-  it("every datapoint has a description or a recorded reason for having none", () => {
-    const undecided = Object.entries(inventory)
-      .filter(([id, obj]) => {
-        if (obj.type !== "state" || obj.common?.desc !== undefined) {
-          return false; // containers carry a name; a description would have nothing to add
-        }
-        return !SELF_EXPLAINING.some(entry => entry.pattern.test(id));
-      })
-      .map(([id]) => id);
-    expect(undecided, "datapoints with neither a description nor a recorded reason").toEqual([]);
-  });
-
-  it("every self-explaining rule still matches a datapoint that has no description", () => {
-    // Guards the other direction: a rule left behind after descriptions WERE added would
-    // quietly excuse datapoints that no longer need excusing.
-    const stale = SELF_EXPLAINING.filter(
-      entry =>
-        !Object.entries(inventory).some(
-          ([id, obj]) => entry.pattern.test(id) && obj.type === "state" && obj.common?.desc === undefined,
-        ),
-    ).map(entry => String(entry.pattern));
-    expect(stale, "self-explaining rules that no longer excuse anything").toEqual([]);
-  });
-
-  it("the inventory covers every key of every device type", () => {
+  it("covers every key of every device type", () => {
     // The gate can only judge what the inventory contains. A fixture that stopped
     // covering the TV would shrink the inventory and quietly narrow the check.
     const ids = Object.keys(inventory);

@@ -1,0 +1,3 @@
+{
+  "*.keys.*": "The name IS the remote key (Home, VolumeUp, InputHDMI1) — the ECP identifier the controller sends. The emulator performs nothing behind it, so a description could only repeat the name or describe a real Roku's reaction this adapter never has. The keys channel carries the pulse-and-read-only explanation for the whole subtree."
+}
