@@ -11,7 +11,13 @@ const LANGS = ["en", "de", "ru", "pt", "nl", "fr", "it", "es", "pl", "uk", "zh-c
  */
 describe("io-package.json manifest", () => {
   const io = JSON.parse(readFileSync(join(root, "io-package.json"), "utf8")) as {
-    common?: { icon?: string; extIcon?: string; supportedMessages?: Record<string, boolean> };
+    common?: {
+      icon?: string;
+      extIcon?: string;
+      supportedMessages?: Record<string, boolean>;
+      compact?: boolean;
+      singletonHost?: boolean;
+    };
     instanceObjects?: { _id: string; common?: { name?: unknown; desc?: unknown } }[];
     native?: Record<string, unknown>;
   };
@@ -28,6 +34,33 @@ describe("io-package.json manifest", () => {
   // as `false`: an object without a truthy entry silently shuts the messagebox.
   it("declares no message the adapter does not serve, stopInstance above all", () => {
     expect(Object.keys(io.common?.supportedMessages ?? {})).toEqual(["deviceManager"]);
+  });
+
+  // Compact mode: the host may load several instances into ONE node process, which saves
+  // 40-80 MB and a startup per instance on small hardware. Declaring it costs nothing at
+  // runtime — the user still switches it on — but the adapter has to earn the claim, and
+  // the tests in main.test.ts ("two instances in one process") are where it is earned.
+  // The whole fleet declares it; fakeroku carried `false` from the adapter it took over.
+  it("declares compact mode, the way every adapter of the fleet does", () => {
+    expect(io.common?.compact).toBe(true);
+  });
+
+  // `singletonHost` tells the host only ONE instance may run per machine. The repo checker
+  // asks about it (S1084) because it is rarely warranted, and here it never was: a busy
+  // SSDP port 1900 degrades to "discovery off, already-paired remotes still work", so a
+  // second instance costs nothing. Setting it would forbid a perfectly good setup —
+  // two emulated Rokus with different ECP ports on one machine.
+  it("does not claim the whole host for itself", () => {
+    expect(io.common?.singletonHost).toBeUndefined();
+  });
+
+  // The compact interface itself: loaded as a module rather than as the entry point, main
+  // must EXPORT its constructor instead of starting an instance. Without that line the
+  // manifest above would be a lie the host only discovers at runtime.
+  it("exports its constructor when it is not the entry point", () => {
+    const main = readFileSync(join(root, "src/main.ts"), "utf8");
+    expect(main).toContain("if (require.main !== module)");
+    expect(main).toMatch(/module\.exports\s*=\s*\(options[^)]*\)\s*=>\s*new Fakeroku\(options\)/);
   });
 
   // The device list is stored under `native.devices`, and that name is load-bearing:

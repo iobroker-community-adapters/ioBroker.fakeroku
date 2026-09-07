@@ -121,6 +121,16 @@ Beim Stoppen der Instanz melden sich die emulierten Rokus im Netz ab. Die Fernbe
 nimmt sie damit sofort aus ihrer Liste, statt noch eine Stunde lang Tastendrücke ins
 Leere zu schicken.
 
+Du kannst mehrere Instanzen auf demselben Rechner betreiben — gib jeder eigene
+ECP-Anschlüsse. Die Geräteerkennung teilen sie sich: Wer zuerst startet, bekommt
+UDP 1900, die anderen laufen ohne sie weiter, und bereits gekoppelte Fernbedienungen
+kommen weiterhin durch.
+
+Der Adapter läuft außerdem im Compact-Modus von ioBroker, in dem sich mehrere Adapter
+einen Prozess teilen, statt dass jeder einen eigenen startet. Auf kleinen Rechnern
+spart das Speicher und Startzeit. Eingeschaltet wird er in den Instanz-Einstellungen;
+hier ist dafür nichts umzustellen.
+
 ## Fehlersuche
 
 **Die Fernbedienung findet kein Gerät.**

@@ -112,6 +112,14 @@ refused, and a discovery search from outside is ignored.
 When you stop the instance, the emulated Rokus announce their departure, so a remote
 drops them from its list instead of sending key presses into the void for another hour.
 
+You can run more than one instance on the same machine — give each one its own ECP
+ports. Discovery is shared: whichever instance starts first takes UDP 1900, and the
+others keep working without it, so remotes already paired with them still get through.
+
+The adapter also runs in ioBroker's compact mode, where several adapters share one
+process instead of each starting their own. On a small box that saves memory and
+startup time. You switch it on in the instance settings; nothing here needs changing.
+
 ## Troubleshooting
 
 **The remote does not find any device.**

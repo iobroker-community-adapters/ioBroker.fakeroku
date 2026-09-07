@@ -1543,6 +1543,87 @@ describe("Fakeroku — the farewell on shutdown", () => {
   });
 });
 
+describe("Fakeroku — two instances in one process (compact mode)", () => {
+  // The host may load several instances into ONE node process. Everything an instance owns
+  // then has to live on the instance, not in the module: a socket, a server, a timer or a
+  // map shared by accident would let one instance tear down the other's world. These tests
+  // are what `common.compact: true` in the manifest rests on.
+
+  it("keeps two running instances completely apart", async () => {
+    const a = setup({ devices: [{ name: "Wohnzimmer", port: 8060, type: "player" }] });
+    const b = setup({ devices: [{ name: "Kueche", port: 8061, type: "tv" }] });
+
+    await a.i.onReady();
+    await b.i.onReady();
+
+    // Each instance built its own server, its own advert and its own object tree.
+    expect(a.ecp).toHaveLength(1);
+    expect(b.ecp).toHaveLength(1);
+    expect((a.ecp[0].options.device as { port: number }).port).toBe(8060);
+    expect((b.ecp[0].options.device as { port: number }).port).toBe(8061);
+    expect([...a.i.objects.keys()].some(k => k.startsWith("Kueche"))).toBe(false);
+    expect([...b.i.objects.keys()].some(k => k.startsWith("Wohnzimmer"))).toBe(false);
+    // A TV carries more keys than a player — proof the two trees are really separate.
+    expect(b.i.deviceKeys.get("Kueche")!.size).toBeGreaterThan(a.i.deviceKeys.get("Wohnzimmer")!.size);
+  });
+
+  it("unloading one instance leaves the other running", async () => {
+    const a = setup({ devices: [{ name: "Wohnzimmer", port: 8060, type: "player" }] });
+    const b = setup({ devices: [{ name: "Kueche", port: 8061, type: "player" }] });
+    await a.i.onReady();
+    await b.i.onReady();
+
+    await new Promise<void>(resolve => a.i.onUnload(resolve));
+
+    // The one that stopped let go of everything …
+    expect(a.i.deviceKeys.size).toBe(0);
+    expect(a.i.running).toHaveLength(0);
+    expect(a.ecp[0].stop).toHaveBeenCalledTimes(1);
+    expect(a.ssdps[0].stop).toHaveBeenCalledTimes(1);
+    // … and the other one noticed nothing: in one shared process this is the whole game.
+    expect(b.i.deviceKeys.size).toBe(1);
+    expect(b.i.running).toHaveLength(1);
+    expect(b.ecp[0].stop).not.toHaveBeenCalled();
+    expect(b.ssdps[0].stop).not.toHaveBeenCalled();
+    expect(b.i.states.get("info.connection")).toEqual({ val: true, ack: true });
+  });
+
+  it("hands back a clean process once both are gone", async () => {
+    const a = setup();
+    const b = setup({ devices: [{ name: "Kueche", port: 8061, type: "player" }] });
+    await a.i.onReady();
+    await b.i.onReady();
+
+    await new Promise<void>(resolve => a.i.onUnload(resolve));
+    await new Promise<void>(resolve => b.i.onUnload(resolve));
+
+    for (const ctx of [a, b]) {
+      expect(ctx.i.deviceKeys.size).toBe(0);
+      expect(ctx.i.running).toHaveLength(0);
+      expect(ctx.i.pending).toHaveLength(0);
+      expect(ctx.i.pulseTimers.size).toBe(0);
+      expect(ctx.i.holdTimers.size).toBe(0);
+    }
+  });
+
+  it("gives a held key of one instance no reach into the other", async () => {
+    // The hold watchdog is a timer keyed by object id. Two instances run the same ids —
+    // if that map were shared, one instance's keypress would disarm the other's watchdog.
+    const a = setup();
+    const b = setup();
+    await a.i.onReady();
+    await b.i.onReady();
+
+    a.i.applyCommand("Wohnzimmer", { type: "keydown", key: "Home" });
+
+    expect(a.i.holdTimers.size).toBe(1);
+    expect(b.i.holdTimers.size).toBe(0);
+    // Same object id in both instances — held down in one, at rest in the other.
+    expect(a.i.states.get("Wohnzimmer.keys.Home")).toEqual({ val: true, ack: true });
+    expect(b.i.states.get("Wohnzimmer.keys.Home")).toEqual({ val: false, ack: true });
+  });
+});
+
 describe("Fakeroku — the paths that only a failing database reaches", () => {
   it("skips a device whose objects cannot be created and keeps the others", async () => {
     const ctx = setup({

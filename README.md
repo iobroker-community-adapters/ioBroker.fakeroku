@@ -103,6 +103,8 @@ becomes `true` — or watch `.command` for the last button as text.
 - (krobipd) Fixed: an emulated Roku whose server died is no longer offered for discovery.
 - (krobipd) Fixed: a configured port no server can bind falls back to 8060 instead of leaving the device unstarted.
 - (krobipd) Changed: the device dialog refuses a reserved or colliding name right away instead of reporting it after saving.
+- (krobipd) Changed: the adapter can now run in compact mode, sharing one process with other adapters instead of claiming its own.
+- (krobipd) Changed: more than one instance may run on the same machine again; only the ports have to differ.
 
 ### 1.5.0 (2026-09-03)
 

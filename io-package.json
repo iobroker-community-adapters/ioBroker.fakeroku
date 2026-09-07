@@ -4,17 +4,17 @@
     "version": "1.5.0",
     "news": {
       "NEXT": {
-        "en": "Saving a device no longer changes its network identity, a busy ECP port is retried, and a stopped instance takes its emulated Rokus out of the remote.",
-        "de": "Das Speichern eines Geräts ändert seine Netzkennung nicht mehr, ein belegter ECP-Anschluss wird erneut versucht, und eine gestoppte Instanz meldet ihre Rokus ab.",
-        "ru": "Сохранение устройства больше не меняет его сетевой идентификатор, занятый порт ECP повторяется, а остановленный экземпляр убирает свои Roku из пульта.",
-        "pt": "Guardar um dispositivo já não altera a sua identidade de rede, uma porta ECP ocupada é repetida e uma instância parada remove os seus Roku do comando.",
-        "nl": "Een apparaat opslaan verandert zijn netwerkidentiteit niet meer, een bezette ECP-poort wordt opnieuw geprobeerd en een gestopte instantie meldt zijn Roku's af.",
-        "fr": "Enregistrer un appareil ne change plus son identité réseau, un port ECP occupé est réessayé, et une instance arrêtée retire ses Roku de la télécommande.",
-        "it": "Salvare un dispositivo non ne cambia più l'identità di rete, una porta ECP occupata viene ritentata e un'istanza fermata rimuove i suoi Roku dal telecomando.",
-        "es": "Guardar un dispositivo ya no cambia su identidad de red, un puerto ECP ocupado se reintenta y una instancia detenida retira sus Roku del mando.",
-        "pl": "Zapis urządzenia nie zmienia już jego tożsamości sieciowej, zajęty port ECP jest ponawiany, a zatrzymana instancja usuwa swoje Roku z pilota.",
-        "uk": "Збереження пристрою більше не змінює його мережевий ідентифікатор, зайнятий порт ECP повторюється, а зупинений екземпляр прибирає свої Roku з пульта.",
-        "zh-cn": "保存设备不再改变其网络标识，被占用的 ECP 端口会重试，停止的实例会将其模拟 Roku 从遥控器中移除。"
+        "en": "Saving a device keeps its network identity, a busy ECP port is retried, a stopped instance unregisters its Rokus, and the adapter runs in compact mode.",
+        "de": "Speichern behält die Netzkennung, ein belegter ECP-Anschluss wird erneut versucht, eine gestoppte Instanz meldet ihre Rokus ab, und der Adapter läuft im Compact-Modus.",
+        "ru": "Сохранение сохраняет сетевой идентификатор, занятый порт ECP повторяется, остановленный экземпляр убирает свои Roku, адаптер работает в компактном режиме.",
+        "pt": "Guardar mantém a identidade de rede, uma porta ECP ocupada é repetida, uma instância parada remove os seus Roku e o adaptador corre em modo compacto.",
+        "nl": "Opslaan behoudt de netwerkidentiteit, een bezette ECP-poort wordt opnieuw geprobeerd, een gestopte instantie meldt zijn Roku's af en de adapter draait compact.",
+        "fr": "Enregistrer conserve l'identité réseau, un port ECP occupé est réessayé, une instance arrêtée retire ses Roku et l'adaptateur fonctionne en mode compact.",
+        "it": "Salvare mantiene l'identità di rete, una porta ECP occupata viene ritentata, un'istanza fermata rimuove i suoi Roku e l'adattatore funziona in modalità compatta.",
+        "es": "Guardar mantiene la identidad de red, un puerto ECP ocupado se reintenta, una instancia detenida retira sus Roku y el adaptador funciona en modo compacto.",
+        "pl": "Zapis zachowuje tożsamość sieciową, zajęty port ECP jest ponawiany, zatrzymana instancja usuwa swoje Roku, a adapter działa w trybie kompaktowym.",
+        "uk": "Збереження зберігає мережевий ідентифікатор, зайнятий порт ECP повторюється, зупинений екземпляр прибирає свої Roku, адаптер працює в компактному режимі.",
+        "zh-cn": "保存设备保留其网络标识，被占用的 ECP 端口会重试，停止的实例会注销其模拟 Roku，适配器支持精简模式。"
       },
       "1.5.0": {
         "en": "Deleting the last emulated Roku now removes its datapoints, a host running Docker no longer announces an unreachable address, and a failed device is reported.",
@@ -148,7 +148,7 @@
     },
     "loglevel": "info",
     "tier": 2,
-    "compact": false,
+    "compact": true,
     "connectionType": "local",
     "dataSource": "push",
     "type": "multimedia",
@@ -159,7 +159,6 @@
       "iobroker-community-adapters <iobroker-community-adapters@gmx.de>"
     ],
     "restartAdapters": [],
-    "singletonHost": true,
     "dependencies": [
       {
         "js-controller": ">=7.2.2"
