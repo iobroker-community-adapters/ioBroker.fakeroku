@@ -31,4 +31,5 @@ coverage/
 # Claude Code local files (not published)
 .claude/settings.local.json
 .claude/dev-history.md
+.remember/
 CLAUDE.local.md

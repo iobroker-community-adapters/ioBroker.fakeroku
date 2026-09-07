@@ -563,9 +563,17 @@ export class Fakeroku extends utils.Adapter {
    * it would store `null`. So an installation upgraded from <= 0.4.0 carries a dead
    * attribute on every key datapoint, and the adapter answers for its own datapoints.
    *
-   * Removing one needs a FULL write, which is why this is careful: the object goes back
-   * exactly as it was read, `common` included — that is where `common.custom` lives, the
-   * user's own history/chart configuration. Losing it would cost far more than the leftover.
+   * Removing one therefore takes the object away and puts it back: `delObject` followed by
+   * `extendObject`, the two methods the ioBroker standard blesses for this (a plain full
+   * write is discouraged — it overwrites whatever the user changed). Which is why this is
+   * careful: the object goes back exactly as it was read, `common` included — that is where
+   * `common.custom` lives, the user's own history/chart configuration. Losing it would cost
+   * far more than the leftover.
+   *
+   * Both halves fail safely. A delete that does not happen leaves the attribute where it
+   * was — the tree is exactly as before. A re-create that does not happen leaves the object
+   * gone until the next start, which creates it again from the configuration. Either way the
+   * reason is in the log.
    *
    * @param owned the adapter's objects, keyed relative to the namespace
    * @param deleted the ids the sweep just removed — no point writing to those
@@ -576,9 +584,14 @@ export class Fakeroku extends utils.Adapter {
   ): Promise<void> {
     const stale = planNativePrune(owned, deleted);
     for (const [id, obj] of stale) {
-      await this.setObject(id, { ...obj, native: {} } as ioBroker.SettableObject).catch((e: unknown) => {
+      try {
+        // Non-recursive: a channel or device carrying the leftover keeps its children,
+        // which are read and repaired on their own turn.
+        await this.delObjectAsync(id);
+        await this.extendObject(id, { ...obj, native: {} });
+      } catch (e: unknown) {
         this.log.debug(`cleanup: could not rewrite ${id}: ${errText(e)}`);
-      });
+      }
     }
     if (stale.length > 0) {
       this.log.debug(`Removed a stale native attribute from ${stale.length} object(s) of an earlier version.`);

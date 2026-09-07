@@ -91,11 +91,6 @@ vi.mock("@iobroker/adapter-core", () => {
       this.objects.set(key, nodeExtend(stored, structuredClone(obj)));
       return Promise.resolve();
     });
-    public setObject = vi.fn((id: string, obj: Record<string, unknown>) => {
-      // Full write — replaces the object, which is the only way to REMOVE an attribute.
-      this.objects.set(id.replace(`${this.namespace}.`, ""), structuredClone(obj));
-      return Promise.resolve();
-    });
     public getObjectAsync = vi.fn((id: string) => {
       const stored = this.objects.get(id.replace(`${this.namespace}.`, ""));
       return Promise.resolve(stored ? structuredClone(stored) : null);
@@ -193,8 +188,8 @@ function internalOf(adapter: Fakeroku): {
   holdTimers: Map<string, unknown>;
   setState: ReturnType<typeof vi.fn>;
   setStateChangedAsync: ReturnType<typeof vi.fn>;
-  setObject: ReturnType<typeof vi.fn>;
   extendObject: ReturnType<typeof vi.fn>;
+  delObjectAsync: ReturnType<typeof vi.fn>;
   makeEcpServer: unknown;
   makeSsdpResponder: unknown;
 } {
@@ -1253,7 +1248,7 @@ describe("Fakeroku start-up robustness", () => {
     await ctx.i.onReady();
     ctx.i.objects.set("Buero", { type: "device", common: { name: "Buero" }, native: {} });
     ctx.i.objects.set("Flur", { type: "device", common: { name: "Flur" }, native: {} });
-    const del = (ctx.i as unknown as { delObjectAsync: ReturnType<typeof vi.fn> }).delObjectAsync;
+    const del = ctx.i.delObjectAsync;
     const real = del.getMockImplementation() as (id: string, o?: unknown) => Promise<void>;
     del.mockImplementation(async (id: string, o?: unknown) => {
       if (id.endsWith("Buero")) {
@@ -1474,9 +1469,9 @@ describe("Fakeroku — the configured row is read once, for everyone", () => {
 describe("Fakeroku — leftovers of an older version inside an object", () => {
   it("removes a native attribute this version does not write, keeping the user's own common", async () => {
     // The pre-0.5.0 adapter wrote native.url on every key state. extendObject MERGES, so
-    // it survives every update — and writing null would store null, not remove it. Only a
-    // full write removes it, and that write must carry common.custom (the user's history
-    // configuration) back unchanged.
+    // it survives every update — and writing null would store null, not remove it. Only
+    // taking the object away and putting it back removes it, and what comes back must carry
+    // common.custom (the user's history configuration) unchanged.
     const ctx = setup();
     ctx.i.objects.set("Wohnzimmer.keys.Home", {
       type: "state",
@@ -1499,11 +1494,13 @@ describe("Fakeroku — leftovers of an older version inside an object", () => {
   it("leaves an object alone when its native is already empty", async () => {
     const ctx = setup();
     await ctx.i.onReady();
-    ctx.i.setObject.mockClear();
+    ctx.i.delObjectAsync.mockClear();
 
     await ctx.i.onReady();
 
-    expect(ctx.i.setObject).not.toHaveBeenCalled();
+    // Nothing to repair means nothing is taken away — an object that briefly vanishes on
+    // every start is exactly what this repair must not become.
+    expect(ctx.i.delObjectAsync).not.toHaveBeenCalled();
   });
 });
 
@@ -1573,11 +1570,13 @@ describe("Fakeroku — the paths that only a failing database reaches", () => {
   it("traces a rewrite it cannot perform instead of failing the start", async () => {
     const ctx = setup();
     ctx.i.objects.set("Wohnzimmer.keys.Home", { type: "state", common: {}, native: { url: "keys/Home" } });
-    ctx.i.setObject.mockImplementation(() => Promise.reject(new Error("read-only")));
+    ctx.i.delObjectAsync.mockImplementation(() => Promise.reject(new Error("read-only")));
 
     await ctx.i.onReady();
 
     expect(ctx.i.log.debug).toHaveBeenCalledWith(expect.stringContaining("could not rewrite"));
+    // The object survives the failed repair with its leftover — worse would be losing it.
+    expect(ctx.i.objects.get("Wohnzimmer.keys.Home")?.native).toEqual({ url: "keys/Home" });
     expect(ctx.i.states.get("info.connection")).toEqual({ val: true, ack: true });
   });
 
