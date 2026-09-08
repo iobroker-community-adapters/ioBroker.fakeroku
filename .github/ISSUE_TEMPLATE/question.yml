@@ -1,0 +1,22 @@
+name: Frage stellen / Ask a question
+description: Etwas zum Adapter ist unklar / Something about the adapter is unclear
+title: "[Frage] kurz beschreiben"
+labels: ["question"]
+body:
+  - type: textarea
+    id: question
+    attributes:
+      label: Deine Frage / Your question
+    validations:
+      required: true
+
+  - type: textarea
+    id: tried
+    attributes:
+      label: Was hast du schon versucht? (optional) / What have you tried already? (optional)
+
+  - type: input
+    id: adapter-version
+    attributes:
+      label: Adapter-Version (optional) / Adapter version (optional)
+      placeholder: "1.6.1"

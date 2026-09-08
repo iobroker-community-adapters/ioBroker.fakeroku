@@ -1,0 +1,75 @@
+name: Fehler melden / Report a bug
+description: Etwas funktioniert nicht wie erwartet / Something does not work as expected
+title: "[Fehler] kurz beschreiben"
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Danke, dass du dir die Zeit nimmst! Bitte schau kurz, ob es zu deinem Problem schon ein offenes Issue gibt.
+
+        Thanks for taking the time! Please have a quick look whether an issue for your problem already exists.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Was ist passiert? / What happened?
+      description: |
+        Was hast du erwartet, was passiert stattdessen? Ein, zwei Sätze reichen.
+
+        What did you expect, what happens instead? One or two sentences are enough.
+    validations:
+      required: true
+
+  - type: input
+    id: adapter-version
+    attributes:
+      label: Adapter-Version / Adapter version
+      placeholder: "1.6.1"
+    validations:
+      required: true
+
+  - type: input
+    id: jscontroller-version
+    attributes:
+      label: js-controller-Version / js-controller version
+      placeholder: "7.2.2"
+    validations:
+      required: true
+
+  - type: input
+    id: admin-version
+    attributes:
+      label: Admin-Version / Admin version
+      placeholder: "8.0.11"
+    validations:
+      required: true
+
+  - type: textarea
+    id: log
+    attributes:
+      label: Protokoll-Auszug (optional) / Log excerpt (optional)
+      description: |
+        Am hilfreichsten mit Protokollstufe `debug`. / Most useful with log level `debug`.
+      render: shell
+
+  - type: dropdown
+    id: installation
+    attributes:
+      label: Installationsart (optional) / Installation type (optional)
+      options:
+        - Linux (Debian, Ubuntu, Raspberry Pi OS ...)
+        - Docker
+        - Proxmox / LXC
+        - Windows
+        - macOS
+        - Andere / Other
+
+  - type: textarea
+    id: extras
+    attributes:
+      label: Sonstiges (optional) / Anything else (optional)
+      description: |
+        Bildschirmfotos, Gerätemodell, Besonderheiten deiner Installation.
+
+        Screenshots, device model, peculiarities of your setup.

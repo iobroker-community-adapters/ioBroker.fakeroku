@@ -1,0 +1,42 @@
+name: Funktionswunsch / Feature request
+description: Eine Idee für den Adapter vorschlagen / Suggest an idea for the adapter
+title: "[Wunsch] kurz beschreiben"
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Danke für deine Idee! Bitte schau kurz, ob es dazu schon ein offenes Issue gibt.
+
+        Thanks for your idea! Please have a quick look whether an issue for it already exists.
+
+  - type: textarea
+    id: what
+    attributes:
+      label: Was fehlt dir? / What are you missing?
+      description: |
+        Beschreibe die gewünschte Funktion aus deiner Sicht als Anwender.
+
+        Describe the desired feature from your point of view as a user.
+    validations:
+      required: true
+
+  - type: textarea
+    id: why
+    attributes:
+      label: Wozu brauchst du das? / What would you use it for?
+      description: |
+        Was möchtest du damit erreichen, was heute nicht geht?
+
+        What do you want to achieve that is not possible today?
+    validations:
+      required: true
+
+  - type: textarea
+    id: how
+    attributes:
+      label: Umsetzungsidee (optional) / Implementation idea (optional)
+      description: |
+        Falls du eine Vorstellung hast, wie es aussehen könnte.
+
+        In case you have an idea how it could look like.
