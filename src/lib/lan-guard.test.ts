@@ -27,6 +27,18 @@ describe("isLanClient", () => {
       expect(isLanClient(ip), ip).toBe(true);
     }
   });
+  it("accepts upper-case IPv6 locals by the rule alone — no rescue from the host's own /64 prefixes", () => {
+    // The lowercase step is the rule under test. On a host with its own fe80:: link-local
+    // address the global-prefix fallback would accept "FE80::1" anyway and hide a missing
+    // toLowerCase() — so the prefix list is injected empty (mutation N5c, 2026-09-08).
+    for (const ip of ["FE80::1", "FE80::A1B2:C3D4%en0", "FD12:3456:789A::1", "FC00::1"]) {
+      expect(
+        isLanClient(ip, () => []),
+        ip,
+      ).toBe(true);
+    }
+  });
+
   it("rejects global IPv6 and the ranges next to the local ones", () => {
     for (const ip of ["2001:db8::1", "fe00::1", "fec0::1", "ff02::1"]) {
       expect(isLanClient(ip), ip).toBe(false);
