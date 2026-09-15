@@ -1253,6 +1253,10 @@ describe("Fakeroku collaborator wiring", () => {
 
     expect(ctx.i.states.get("info.connection")?.val).toBe(false);
     expect(ctx.i.log.error).toHaveBeenCalledWith(expect.stringContaining('"Wohnzimmer" stopped answering'));
+    // And the dead server is CLOSED, not merely forgotten. Once it is out of the map
+    // nothing can reach it again — not even onUnload — so in compact mode its port would
+    // stay taken for the lifetime of the shared host process.
+    expect(ctx.ecp[0].stop).toHaveBeenCalledTimes(1);
   });
 
   it("survives a failing status write when a device dies", async () => {
@@ -1800,6 +1804,45 @@ describe("Fakeroku — the paths that only a failing database reaches", () => {
     // The object survives the failed repair with its leftover — worse would be losing it.
     expect(ctx.i.objects.get("Wohnzimmer.keys.Home")?.native).toEqual({ url: "keys/Home" });
     expect(ctx.i.states.get("info.connection")).toEqual({ val: true, ack: true });
+  });
+
+  it("a retry still binding when the host says stop registers nothing and writes nothing", async () => {
+    // The minute retry can be sitting in `await server.start()` when onUnload runs. Without
+    // the stopping flag the finished server lands in a map onUnload already emptied — nothing
+    // would ever close it — the queue refills, scheduleDeviceRetry arms a timer js-controller
+    // refuses during shutdown, and reportConnectionState writes info.connection TRUE after
+    // the closing FALSE. That last one is exactly what waiting for the final write prevents.
+    const ctx = setup({ devices: [{ name: "Kueche", port: 8061, type: "player" }] }, { failEcpPort: 8061 });
+    await ctx.i.onReady();
+    expect(ctx.i.pending).toHaveLength(1);
+
+    // A bind that has not settled yet, the way a slow start looks from here.
+    let release: () => void = () => {};
+    const late: FakeEcp = {
+      options: {},
+      stop: vi.fn(),
+      start: vi.fn(
+        () =>
+          new Promise<void>(res => {
+            release = res;
+          }),
+      ),
+    };
+    ctx.i.makeEcpServer = (options: Record<string, unknown>): FakeEcp => {
+      late.options = options;
+      return late;
+    };
+    const retry = ctx.i.retryPendingDevices();
+    ctx.i.setTimeout.mockClear();
+
+    ctx.i.onUnload(() => {});
+    release();
+    await retry;
+
+    expect(late.stop).toHaveBeenCalledTimes(1);
+    expect(ctx.i.states.get("info.connection")).toEqual({ val: false, ack: true });
+    expect(ctx.i.pending).toHaveLength(0);
+    expect(ctx.i.setTimeout).not.toHaveBeenCalled();
   });
 
   it("disarms the retry timer on unload", async () => {

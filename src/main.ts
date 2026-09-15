@@ -69,6 +69,14 @@ export class Fakeroku extends utils.Adapter {
   private pending: PendingDevice[] = [];
   /** The retry timer for {@link pending}, armed only while something is waiting. */
   private retryTimer: ioBroker.Timeout | undefined;
+
+  /**
+   * Set as the very first thing onUnload does. Everything that can still be in flight at
+   * that moment asks it before it writes or starts anything: the minute retry can be sitting
+   * in `await server.start()` when the host says stop, and would then register a server into
+   * an already-cleared map and write info.connection TRUE after the closing FALSE.
+   */
+  private stopping = false;
   /** How many configured devices are expected to listen — the target info.connection compares against. */
   private expectedDevices = 0;
   /** The interface to bind to, or undefined for "all" — kept for the retry after onReady returned. */
@@ -244,6 +252,12 @@ export class Fakeroku extends utils.Adapter {
         onFatalError: () => this.onEcpFatal(device),
       });
       await server.start();
+      // The host may have said stop while we were binding. Registering now would put the
+      // server into a map onUnload has already emptied — nothing would ever close it.
+      if (this.stopping) {
+        server.stop();
+        return false;
+      }
       this.ecpServers.set(device.deviceId, server);
       this.running.push(device.advert);
       this.ssdp?.addDevice(device.advert);
@@ -289,6 +303,9 @@ export class Fakeroku extends utils.Adapter {
    * leaving a dead device behind a red instance until someone restarts by hand.
    */
   private async retryPendingDevices(): Promise<void> {
+    if (this.stopping) {
+      return;
+    }
     const stillPending: PendingDevice[] = [];
     let recovered = false;
     for (const device of this.pending) {
@@ -297,6 +314,12 @@ export class Fakeroku extends utils.Adapter {
       } else {
         stillPending.push(device);
       }
+    }
+    if (this.stopping) {
+      // The host said stop while we were binding. Assigning the list back would re-fill the
+      // queue onUnload just emptied, and scheduleDeviceRetry would then arm a new timer —
+      // which js-controller refuses during shutdown, with a warning nobody can explain.
+      return;
     }
     this.pending = stillPending;
     if (recovered) {
@@ -334,6 +357,13 @@ export class Fakeroku extends utils.Adapter {
     this.ssdp = ssdp;
     this.startWithTimeout(ssdp.start(), SSDP_START_TIMEOUT_MS).then(
       () => {
+        // The bind resolved after the host asked us to stop: announcing now would put a
+        // device back into the network we just said goodbye to, and this.setInterval would
+        // refuse with "setInterval called, but adapter is shutting down".
+        if (this.stopping) {
+          ssdp.stop();
+          return;
+        }
         ssdp.announce();
         const timer = this.setInterval(() => this.ssdp?.announce(), SSDP_NOTIFY_INTERVAL_MS);
         if (timer) {
@@ -763,6 +793,11 @@ export class Fakeroku extends utils.Adapter {
     this.log.error(
       `Emulated Roku "${device.friendlyName}" stopped answering after a server error — restart the instance to bring it back.`,
     );
+    // Close it before forgetting it: once it is out of the map neither this path nor
+    // onUnload can ever reach it again, and in compact mode the port would stay taken for
+    // the lifetime of the whole host process. stop() is idempotent and safe on a dead
+    // server. The SSDP responder already does exactly this in its own fatal path.
+    this.ecpServers.get(device.deviceId)?.stop();
     this.ecpServers.delete(device.deviceId);
     const at = this.running.indexOf(device.advert);
     if (at >= 0) {
@@ -845,6 +880,9 @@ export class Fakeroku extends utils.Adapter {
    */
   private onUnload(callback: () => void): void {
     try {
+      // First of all, before any teardown: whatever is still in flight must not start or
+      // write anything from here on.
+      this.stopping = true;
       if (this.notifyTimer) {
         this.clearInterval(this.notifyTimer);
         this.notifyTimer = undefined;
