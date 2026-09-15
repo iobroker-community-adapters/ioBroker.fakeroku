@@ -20,6 +20,9 @@ export default [
   },
   {
     ignores: [
+      // The remember tool keeps a timestamp marker at .remember/tmp/last-ndc.ts; ESLint does
+      // not read .gitignore, so without this it lints that marker as TypeScript.
+      ".remember/**",
       ".dev-server/",
       ".vscode/",
       "*.test.js",
