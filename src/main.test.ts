@@ -192,6 +192,7 @@ vi.mock("node:os", async importOriginal => {
 
 import { I18n } from "@iobroker/adapter-core";
 import { join } from "node:path";
+import { FakerokuDeviceManagement } from "./device-management";
 import { Fakeroku } from "./main";
 import type { CommandEvent } from "./ecp/ecp-command";
 import { EcpHttpServer } from "./ecp/ecp-http-server";
@@ -246,6 +247,7 @@ function internalOf(adapter: Fakeroku): {
   extendObject: ReturnType<typeof vi.fn>;
   setForeignObject: ReturnType<typeof vi.fn>;
   delObjectAsync: ReturnType<typeof vi.fn>;
+  deviceManagement: unknown;
   makeEcpServer: unknown;
   makeSsdpResponder: unknown;
 } {
@@ -723,12 +725,17 @@ describe("Fakeroku onReady — key states are released at start-up", () => {
     // (and 27 fresh timestamps) on every single adapter start.
     const ctx = setup();
     ctx.i.states.set("Wohnzimmer.keys.Home", { val: false, ack: true });
+    ctx.i.states.set("Wohnzimmer.keys.Select", { val: true, ack: true });
+
     await ctx.i.onReady();
-    const written = ctx.i.setStateChangedAsync.mock.calls.filter(
-      (c: unknown[]) => (c[1] as { val: unknown }).val !== false,
-    );
-    expect(written).toHaveLength(0);
+
+    // Against the ids a write actually REACHED, not the calls: the reset only ever passes
+    // { val: false }, so filtering the calls for a value other than false can never find
+    // anything and the assertion would hold with the skipping removed.
+    expect(ctx.i.written).toContain("Wohnzimmer.keys.Select");
+    expect(ctx.i.written).not.toContain("Wohnzimmer.keys.Home");
     expect(ctx.i.states.get("Wohnzimmer.keys.Home")).toEqual({ val: false, ack: true });
+    expect(ctx.i.states.get("Wohnzimmer.keys.Select")).toEqual({ val: false, ack: true });
   });
 
   it("resets only the keys the device type actually carries", async () => {
@@ -1198,6 +1205,17 @@ describe("Fakeroku onUnload", () => {
 });
 
 describe("Fakeroku collaborator wiring", () => {
+  it("wires the device manager — the only thing that makes the admin's device list work", () => {
+    // Nothing else in the adapter ever reads this field — it exists purely for its
+    // constructor's side effect of registering the manager. Deleting the assignment
+    // outright is caught by the type check (TS2564, no definite assignment), but every
+    // variant that keeps the field satisfied is not: making it optional, assigning it
+    // lazily, or handing it something else. Then the admin's device list silently stops
+    // doing anything while lint, tsc and the rest of this suite stay green.
+    const i = internalOf(new Fakeroku());
+    expect(i.deviceManagement).toBeInstanceOf(FakerokuDeviceManagement);
+  });
+
   it("builds the real collaborators when nothing replaces the seams", () => {
     // The seams exist only for these tests. If they ever pointed at the wrong
     // class, every test here would still pass while production started nothing.
@@ -1492,6 +1510,26 @@ describe("Fakeroku — a device whose port was busy is retried", () => {
     expect(ctx.i.log.info).toHaveBeenCalledWith(expect.stringContaining("is listening on port 8061 again"));
     // Discovery never started (nothing was listening) — the recovery brings it up.
     expect(ctx.ssdps).toHaveLength(1);
+  });
+
+  it("re-arms after a retry that failed again — a busy port must not go quiet", async () => {
+    // Only reachable through the real callback. Calling retryPendingDevices() directly
+    // leaves retryTimer set from onReady, so scheduleDeviceRetry returns early and the
+    // re-arm is never exercised — the timer callback clearing retryTimer BEFORE calling is
+    // the whole mechanism. Without it a device whose second attempt fails is never tried
+    // again, and the only way back is restarting the instance by hand.
+    const ctx = setup({ devices: [{ name: "Kueche", port: 8061, type: "player" }] }, { failEcpPort: 8061 });
+    await ctx.i.onReady();
+    const scheduled = ctx.i.setTimeout.mock.calls.find(([, ms]) => ms === 60_000)?.[0] as () => void;
+    expect(scheduled, "a retry timer was armed").toBeTypeOf("function");
+    ctx.i.setTimeout.mockClear();
+
+    // The port is still busy — this attempt fails too.
+    scheduled();
+    await vi.waitFor(() => expect(ctx.i.setTimeout).toHaveBeenCalledWith(expect.any(Function), 60_000));
+
+    expect(ctx.i.pending.map(p => p.friendlyName)).toEqual(["Kueche"]);
+    expect(ctx.i.states.get("info.connection")).toEqual({ val: false, ack: true });
   });
 
   it("announces a device that joins an already running discovery", async () => {

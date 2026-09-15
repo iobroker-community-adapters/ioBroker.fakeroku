@@ -18,6 +18,10 @@ const dgramMock = vi.hoisted(() => {
     addMembership: (addr: string, iface?: string) => void;
     setMulticastInterface: (iface: string) => void;
     sent: Array<{ text: string; port: number; address: string }>;
+    /** What bind() was actually asked for — a wrong port or a bound address is invisible otherwise. */
+    boundTo: Array<{ port: unknown; address: unknown }>;
+    /** The multicast GROUP each join used, next to the interface it used. */
+    joinedGroups: unknown[];
     send: (...args: unknown[]) => void;
     close: () => void;
     emit: (ev: string, ...args: unknown[]) => void;
@@ -29,6 +33,8 @@ const dgramMock = vi.hoisted(() => {
     const s: FakeSocket = {
       options,
       membership: [],
+      joinedGroups: [],
+      boundTo: [],
       mcastIf: [],
       sent: [],
       closed: false,
@@ -42,7 +48,8 @@ const dgramMock = vi.hoisted(() => {
         s.handlers[ev] = (s.handlers[ev] ?? []).filter(h => h !== cb);
         return s;
       },
-      bind: (_port, cb) => {
+      bind: (port, cb) => {
+        s.boundTo.push({ port, address: typeof cb === "function" ? undefined : cb });
         if (fail.bind) {
           s.emit("error", new Error("EADDRINUSE"));
         } else if (typeof cb === "function") {
@@ -50,7 +57,8 @@ const dgramMock = vi.hoisted(() => {
         }
         return s;
       },
-      addMembership: (_addr, iface) => {
+      addMembership: (addr, iface) => {
+        s.joinedGroups.push(addr);
         if (fail.throwString) {
           // Deliberately not an Error: the responder must cope with a string throw.
           throw "EPERM-ish string" as unknown;
@@ -124,6 +132,9 @@ describe("RokuSsdpResponder", () => {
     await r.start();
     const s = dgramMock.sockets[0];
     expect(s.membership).toEqual(["10.0.0.9", "192.168.1.5"]);
+    // The GROUP, not only the interface: joining the wrong address would leave the socket
+    // bound and silent, and every assertion about the interface list would still hold.
+    expect(s.joinedGroups).toEqual(["239.255.255.250", "239.255.255.250"]);
     expect(s.mcastIf).toEqual([]);
   });
 
@@ -141,6 +152,10 @@ describe("RokuSsdpResponder", () => {
     const r = new RokuSsdpResponder({ ...baseCfg, bindIp: undefined, membershipInterfaces: [] });
     await r.start();
     expect(dgramMock.sockets[0].options).toEqual({ type: "udp4", reuseAddr: true });
+    // And it binds the standard port on ALL interfaces. Binding a concrete address here
+    // would silently drop multicast from every other interface of a multi-homed host;
+    // the egress pinning is setMulticastInterface's job, not the bind's.
+    expect(dgramMock.sockets[0].boundTo).toEqual([{ port: 1900, address: undefined }]);
   });
 
   it("with no interface known joins on the OS default", async () => {

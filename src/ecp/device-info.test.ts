@@ -1,11 +1,20 @@
-import { buildAppsXml, buildDescXml, buildDeviceInfoXml, DEFAULT_APPS } from "./device-info";
+import { buildAppsXml, buildDescXml, buildDeviceInfoXml, DEFAULT_APPS, SOFTWARE_VERSION } from "./device-info";
 
 const device = { uuid: "abc123", port: 8060 };
 
 describe("buildDeviceInfoXml", () => {
   const info = buildDeviceInfoXml(device, "Living Room", "player");
-  it("advertises a current Roku OS version (the pairing lever, not 7.5.0)", () => {
-    expect(info).toMatch(/<software-version>1[4-9]\.\d/);
+  it("advertises exactly the version the module declares, and never an older major", () => {
+    // Two separate rules, and the old `1[4-9]\.` regex got both wrong: it would go red on
+    // Roku OS 20 (a version we WANT to serve) and stay green on 14.0 (one we do not).
+    // What the XML serves must be the module's own constant — that is the regression a
+    // test can see. Whether the constant is still current is a release-time check against
+    // Roku's release notes, not something a unit test can know.
+    expect(info).toContain(`<software-version>${SOFTWARE_VERSION}</software-version>`);
+    // A floor with a reason: 15 is the major this adapter's pairing was proven against,
+    // and the value only ever moves forward. It catches a slip back to the 7.5.0 the
+    // pre-0.5.0 adapter advertised, which modern remotes refuse to pair with.
+    expect(Number(SOFTWARE_VERSION.split(".")[0])).toBeGreaterThanOrEqual(15);
   });
   it("carries the device identity as serial and udn", () => {
     expect(info).toContain("<serial-number>abc123</serial-number>");

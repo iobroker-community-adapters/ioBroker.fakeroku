@@ -14,7 +14,7 @@ import type { DeviceType } from "./state-model";
  * The build number is cosmetic — no controller is known to read it. (The official
  * Roku app is a different case: it uses ECP-2 and never reads device-info.)
  */
-const SOFTWARE_VERSION = "15.0.0";
+export const SOFTWARE_VERSION = "15.0.0";
 const SOFTWARE_BUILD = "4200";
 
 /** Per-device-type identity + capability flags advertised in device-info. */

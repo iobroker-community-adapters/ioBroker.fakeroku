@@ -1,6 +1,7 @@
 import * as http from "node:http";
 import * as net from "node:net";
 import type { CommandEvent } from "./ecp-command";
+import { SOFTWARE_VERSION } from "./device-info";
 import { EcpHttpServer } from "./ecp-http-server";
 
 /** A port the OS just had free — fixed numbers collide with whatever else runs on the machine. */
@@ -76,7 +77,7 @@ describe("EcpHttpServer", () => {
   it("serves device-info with a current version, as XML", async () => {
     const r = await request("GET", "/query/device-info");
     expect(r.status).toBe(200);
-    expect(r.body).toMatch(/<software-version>1[4-9]\./);
+    expect(r.body).toContain(`<software-version>${SOFTWARE_VERSION}</software-version>`);
     // A real Roku answers text/xml; a controller's XML parser may refuse a body
     // delivered without it.
     expect(r.headers["content-type"]).toMatch(/^text\/xml/);
@@ -107,12 +108,45 @@ describe("EcpHttpServer", () => {
     expect(r.headers["content-type"]).toMatch(/^text\/xml/);
   });
 
-  it("bounds the number of open connections one device accepts", () => {
+  it("bounds the number of open connections one device accepts", async () => {
     // Node bounds the two classic per-connection attacks itself, but not the NUMBER of
     // sockets: without a cap a LAN host can exhaust the process's file descriptors and
-    // take every emulated Roku down, not just this one.
-    const inner = (server as unknown as { server: { maxConnections: number } }).server;
-    expect(inner.maxConnections).toBe(32);
+    // take every emulated Roku down, not just this one. Reading the private field only
+    // proved that an assignment happened — this proves the socket is actually refused.
+    const held: net.Socket[] = [];
+    try {
+      await Promise.all(
+        Array.from(
+          { length: 32 },
+          () =>
+            new Promise<void>((resolve, reject) => {
+              const s = net.connect(PORT, "127.0.0.1", () => resolve());
+              s.on("error", reject);
+              held.push(s);
+            }),
+        ),
+      );
+
+      // One more than the cap: the server accepts the TCP connection and destroys it
+      // without ever answering. An unbounded server would reply with the XML.
+      const answer = await new Promise<string>(resolve => {
+        const extra = net.connect(PORT, "127.0.0.1");
+        let body = "";
+        extra.on("connect", () => extra.write("GET /query/device-info HTTP/1.1\r\nHost: x\r\n\r\n"));
+        extra.on("data", d => (body += d.toString()));
+        extra.on("close", () => resolve(body));
+        extra.on("error", () => resolve(""));
+      });
+      expect(answer).toBe("");
+
+      // And the cap is not a permanent lock-out: free one slot and the device answers again.
+      held.pop()?.destroy();
+      await vi.waitFor(async () => expect((await request("GET", "/query/device-info")).status).toBe(200));
+    } finally {
+      for (const s of held) {
+        s.destroy();
+      }
+    }
   });
   it("routes a keypress to onCommand and answers 200", async () => {
     commands.length = 0;
