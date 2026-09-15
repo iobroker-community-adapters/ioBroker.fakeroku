@@ -1377,6 +1377,66 @@ describe("Fakeroku — a key release is never dropped", () => {
     expect(ctx.i.states.get("Wohnzimmer.keys.Home")).toEqual({ val: false, ack: true });
   });
 
+  it("a keyup for a key nobody holds is rate-limited like any other command", async () => {
+    // The exemption exists for a key that is actually HELD. Asking only what the request
+    // looks like would let a remote sending nothing but keyup bypass the gate entirely —
+    // three writes each and, because the server logs only what was applied, a log line per
+    // request. Dropping them falsifies nothing: the key was never true.
+    const ctx = setup();
+    await ctx.i.onReady();
+    ctx.i.setState.mockClear();
+    const commandWrites = (): number => ctx.i.setState.mock.calls.filter(c => c[0] === "Wohnzimmer.command").length;
+
+    for (let n = 0; n < 60; n++) {
+      ctx.i.applyCommand("Wohnzimmer", { type: "keyup", key: "Home" });
+    }
+
+    expect(commandWrites()).toBe(25);
+    expect(ctx.i.applyCommand("Wohnzimmer", { type: "keyup", key: "Home" })).toBe(false);
+    expect(ctx.i.states.get("Wohnzimmer.keys.Home")).toEqual({ val: false, ack: true });
+  });
+
+  it("a keydown inside the pulse window keeps the key held when the pulse expires", async () => {
+    // ECP defines a keypress as pressing down AND releasing — a finished act, so a keydown
+    // arriving before the 50 ms pulse expires starts a new one and owns the key. The old
+    // pulse writing its release would end a hold that is still going on and leave the
+    // watchdog armed for a key that already reads false.
+    const ctx = setup();
+    await ctx.i.onReady();
+    ctx.i.setTimeout.mockClear();
+
+    ctx.i.applyCommand("Wohnzimmer", { type: "keypress", key: "Home" });
+    const pulse = ctx.i.setTimeout.mock.calls.at(-1)![0] as () => void;
+    ctx.i.applyCommand("Wohnzimmer", { type: "keydown", key: "Home" });
+
+    pulse();
+
+    expect(ctx.i.states.get("Wohnzimmer.keys.Home")).toEqual({ val: true, ack: true });
+    expect(ctx.i.holdTimers.has("Wohnzimmer.keys.Home")).toBe(true);
+    // The keyup still ends it — the hold is intact, not orphaned.
+    ctx.i.applyCommand("Wohnzimmer", { type: "keyup", key: "Home" });
+    expect(ctx.i.states.get("Wohnzimmer.keys.Home")).toEqual({ val: false, ack: true });
+  });
+
+  it("two overlapping pulses both still release — that overlap is deliberate", async () => {
+    // The fix above must not turn into "one pulse timer per key": two keypresses 10 ms
+    // apart are a real remote repeating itself, and both releasing is the behaviour this
+    // adapter chose to keep.
+    const ctx = setup();
+    await ctx.i.onReady();
+    ctx.i.setTimeout.mockClear();
+
+    ctx.i.applyCommand("Wohnzimmer", { type: "keypress", key: "Home" });
+    const first = ctx.i.setTimeout.mock.calls.at(-1)![0] as () => void;
+    ctx.i.applyCommand("Wohnzimmer", { type: "keypress", key: "Home" });
+    const second = ctx.i.setTimeout.mock.calls.at(-1)![0] as () => void;
+
+    first();
+    expect(ctx.i.states.get("Wohnzimmer.keys.Home")).toEqual({ val: false, ack: true });
+    second();
+    expect(ctx.i.states.get("Wohnzimmer.keys.Home")).toEqual({ val: false, ack: true });
+  });
+
   it("a keypress on a HELD key disarms the hold watchdog it replaces", async () => {
     // Otherwise the watchdog fires 30 s later and writes a release for a key that the
     // pulse already released — a phantom edge for every rule watching that key.

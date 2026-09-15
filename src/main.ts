@@ -629,11 +629,17 @@ export class Fakeroku extends utils.Adapter {
    */
   private applyCommand(deviceId: string, cmd: CommandEvent): boolean {
     const write = commandToStateWrite(cmd);
-    // A key RELEASE never passes through the rate gate. Dropping a keypress costs one
-    // event; dropping the keyup leaves the key true until the 30 s watchdog, so the flood
-    // protection would be the thing that falsifies the tree. It also costs one write
-    // instead of four, so it is not what the gate exists to stop.
-    const isRelease = write.holdKey?.value === false;
+    // The release of a key that is actually HELD never passes through the rate gate.
+    // Dropping a keypress costs one event; dropping the keyup of a held key leaves it true
+    // until the 30 s watchdog, so the flood protection would be the thing that falsifies
+    // the tree. It also costs one write instead of four, so it is not what the gate exists
+    // to stop.
+    // The exemption asks whether there is something to release, not what the request looks
+    // like: without the watchdog check a flood of keyup requests for a key nobody is holding
+    // would bypass the gate entirely - and since the server logs only what was applied, it
+    // would take a log line with it on every request.
+    const releaseOf = write.holdKey?.value === false ? `${deviceId}.keys.${write.holdKey.key}` : null;
+    const isRelease = releaseOf !== null && this.holdTimers.has(releaseOf);
     if (!isRelease && !this.admitCommand(deviceId)) {
       return false;
     }
@@ -652,7 +658,13 @@ export class Fakeroku extends utils.Adapter {
         if (timer) {
           this.pulseTimers.delete(timer);
         }
-        this.writeState(id, false);
+        // A keydown that arrived inside the pulse window owns the key now: ECP defines a
+        // keypress as pressing down AND releasing, so it is a finished act and a later
+        // keydown starts a new one. Writing the pulse's release here would end a hold that
+        // is still going on, while its watchdog stays armed. The keyup writes the release.
+        if (!this.holdTimers.has(id)) {
+          this.writeState(id, false);
+        }
       }, KEY_PULSE_MS);
       if (timer) {
         this.pulseTimers.add(timer);
