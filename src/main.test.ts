@@ -72,6 +72,9 @@ vi.mock("@iobroker/adapter-core", () => {
     public enums = new Map<string, Set<string>>();
     // The ids a write actually REACHED the store for. setStateChanged skips a value that is
     // already there, so counting CALLS cannot tell a real write from a skipped one.
+    // Both writers append here, setState included — so in a test that also applies a command
+    // this list carries the pulse writes as well. Assert on it for the start-up reset, or
+    // filter it; do not read "absent from this list" as "setStateChanged skipped it".
     public written: string[] = [];
     public on = vi.fn();
     public setState = vi.fn((id: string, state: unknown) => {
