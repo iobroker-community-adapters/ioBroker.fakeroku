@@ -95,7 +95,7 @@ becomes `true` — or watch `.command` for the last button as text.
 	### **WORK IN PROGRESS**
 -->
 
-### 1.6.1 (2026-09-07)
+### 1.6.1 (2026-09-07) — stable
 
 - (krobipd) Changed: installing straight from GitHub is no longer offered — the adapter is built before publishing, so it is installed from the ioBroker repository instead.
 
