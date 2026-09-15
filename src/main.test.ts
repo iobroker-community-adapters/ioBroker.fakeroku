@@ -211,6 +211,7 @@ interface FakeSsdp {
   start: ReturnType<typeof vi.fn>;
   stop: ReturnType<typeof vi.fn>;
   announce: ReturnType<typeof vi.fn>;
+  refreshAdvertise: ReturnType<typeof vi.fn>;
   addDevice: ReturnType<typeof vi.fn>;
   removeDevice: ReturnType<typeof vi.fn>;
   byebye: ReturnType<typeof vi.fn>;
@@ -308,6 +309,12 @@ function setup(
       options,
       stop: vi.fn(),
       announce: vi.fn(),
+      // Mirrors the real one: reports whether the advertised address actually changed.
+      refreshAdvertise: vi.fn((ip: string) => {
+        const changed = ip !== (options.advertiseIp as string);
+        options.advertiseIp = ip;
+        return changed;
+      }),
       addDevice: vi.fn(),
       removeDevice: vi.fn(),
       byebye: vi.fn(() => Promise.resolve()),
@@ -838,6 +845,56 @@ describe("Fakeroku onReady — discovery is an aid, not a precondition", () => {
     // Fire the interval the way the runtime would — it must announce again.
     (repeat![0] as () => void)();
     expect(ctx.ssdps[0].announce).toHaveBeenCalledTimes(2);
+  });
+
+  it("follows a changed host address on the NOTIFY tick instead of announcing a dead one", async () => {
+    // The advertised IP is baked into every LOCATION header and a remote caches it for the
+    // announced max-age of an hour. Frozen at the value found during onReady, a DHCP lease
+    // change left discovery pointing at an address nobody serves — in front of an instance
+    // that still reported itself connected.
+    osMock.interfaces = { eth0: [{ family: "IPv4", address: "192.168.1.5", internal: false }] };
+    const ctx = setup({ networkInterface: "" });
+    await ctx.i.onReady();
+    expect(ctx.ssdps[0].options.advertiseIp).toBe("192.168.1.5");
+    const tick = ctx.i.setInterval.mock.calls.at(-1)![0] as () => void;
+
+    osMock.interfaces = { eth0: [{ family: "IPv4", address: "192.168.1.77", internal: false }] };
+    tick();
+
+    expect(ctx.ssdps[0].refreshAdvertise).toHaveBeenCalledWith("192.168.1.77", ["192.168.1.77"]);
+    expect(ctx.i.log.info).toHaveBeenCalledWith(expect.stringContaining("now advertised on 192.168.1.77"));
+    // And the corrected address goes out with this very pass, not the next one.
+    expect(ctx.ssdps[0].announce).toHaveBeenCalled();
+  });
+
+  it("says nothing while the address stays put — the tick must not become log noise", async () => {
+    // Every five minutes, for the lifetime of the instance. A line per pass would bury
+    // everything else in the log of a host whose address never moves.
+    osMock.interfaces = { eth0: [{ family: "IPv4", address: "192.168.1.5", internal: false }] };
+    const ctx = setup({ networkInterface: "" });
+    await ctx.i.onReady();
+    const tick = ctx.i.setInterval.mock.calls.at(-1)![0] as () => void;
+    ctx.i.log.info.mockClear();
+
+    tick();
+    tick();
+
+    expect(ctx.i.log.info).not.toHaveBeenCalled();
+    expect(ctx.ssdps[0].announce).toHaveBeenCalledTimes(3); // the start plus both ticks
+  });
+
+  it("never overrides a network interface the user chose", async () => {
+    // A configured interface is a decision, not a guess: following the host's current
+    // address would silently undo it the first time the machine got a second address.
+    osMock.interfaces = { eth0: [{ family: "IPv4", address: "10.0.0.9", internal: false }] };
+    const ctx = setup({ networkInterface: "192.168.1.5" });
+    await ctx.i.onReady();
+    const tick = ctx.i.setInterval.mock.calls.at(-1)![0] as () => void;
+
+    tick();
+
+    expect(ctx.ssdps[0].refreshAdvertise).not.toHaveBeenCalled();
+    expect(ctx.ssdps[0].options.advertiseIp).toBe("192.168.1.5");
   });
 
   it("a runtime socket death stops announcing but keeps ECP alive", async () => {
@@ -1935,6 +1992,7 @@ describe("Fakeroku — the paths that only a failing database reaches", () => {
       options: {},
       stop: vi.fn(),
       announce: vi.fn(),
+      refreshAdvertise: vi.fn(() => false),
       addDevice: vi.fn(),
       removeDevice: vi.fn(),
       byebye: vi.fn(() => Promise.resolve()),

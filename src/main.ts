@@ -366,7 +366,7 @@ export class Fakeroku extends utils.Adapter {
           return;
         }
         ssdp.announce();
-        const timer = this.setInterval(() => this.ssdp?.announce(), SSDP_NOTIFY_INTERVAL_MS);
+        const timer = this.setInterval(() => this.announceTick(), SSDP_NOTIFY_INTERVAL_MS);
         if (timer) {
           this.notifyTimer = timer;
         }
@@ -383,6 +383,26 @@ export class Fakeroku extends utils.Adapter {
         }
       },
     );
+  }
+
+  /**
+   * One NOTIFY pass: follow a changed host address first, then announce.
+   *
+   * Only in the automatic case — a configured interface is the user's decision and does not
+   * move under us. Every five minutes is early enough: a controller caches the advertised
+   * address for the announced max-age of an hour, so the corrected one reaches it long
+   * before the old entry would even expire. Before this the announcement stayed frozen at
+   * the address found during onReady, and a DHCP lease change left the discovery pointing
+   * at an address nobody serves until someone restarted the instance by hand.
+   */
+  private announceTick(): void {
+    if (!this.bindIp) {
+      const current = detectPrimaryIPv4();
+      if (current && this.ssdp?.refreshAdvertise(current, detectLocalIPv4s())) {
+        this.log.info(`Host address changed — the emulated Rokus are now advertised on ${current}.`);
+      }
+    }
+    this.ssdp?.announce();
   }
 
   /**

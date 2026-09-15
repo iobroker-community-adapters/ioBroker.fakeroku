@@ -141,6 +141,40 @@ export class RokuSsdpResponder {
   }
 
   /**
+   * Follow a host address change while running — the automatic case only.
+   *
+   * The advertised IP is baked into every LOCATION header, and a controller caches it for
+   * the announced max-age (an hour). After a DHCP lease change or a move to another network
+   * the discovery would keep pointing at an address nobody serves, in front of an instance
+   * that looks perfectly healthy, until someone restarts it by hand.
+   *
+   * The group joins matter just as much: a membership was taken on the OLD interface
+   * address, so the socket stops hearing M-SEARCH on the new one. Only interfaces that are
+   * genuinely new are joined — re-joining one the socket already has throws EADDRINUSE and
+   * would put a warning in the log on every pass.
+   *
+   * @param advertiseIp the routable IP to announce from now on
+   * @param membershipInterfaces the interface IPs the socket should be in the group on
+   * @returns true if the advertised address actually changed
+   */
+  public refreshAdvertise(advertiseIp: string, membershipInterfaces: string[]): boolean {
+    if (advertiseIp === this.config.advertiseIp) {
+      return false;
+    }
+    this.config.advertiseIp = advertiseIp;
+    const known = new Set(this.config.membershipInterfaces);
+    this.config.membershipInterfaces = [...membershipInterfaces];
+    if (this.socket) {
+      for (const ip of membershipInterfaces) {
+        if (!known.has(ip)) {
+          this.tryJoin(this.socket, ip);
+        }
+      }
+    }
+    return true;
+  }
+
+  /**
    * Join the multicast group on each selected interface, or on the OS default when
    * none is known.
    *

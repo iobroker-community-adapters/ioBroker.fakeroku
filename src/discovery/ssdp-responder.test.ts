@@ -164,6 +164,40 @@ describe("RokuSsdpResponder", () => {
     expect(dgramMock.sockets[0].membership).toEqual([undefined]);
   });
 
+  it("refreshAdvertise moves the announced address and joins only the NEW interface", async () => {
+    // A membership was taken on the OLD interface address — the socket stops hearing
+    // M-SEARCH on the new one until it joins again. Re-joining one it already has throws
+    // EADDRINUSE, which tryJoin turns into a warning, so only genuinely new ones are joined.
+    const r = new RokuSsdpResponder({ ...baseCfg, bindIp: undefined, membershipInterfaces: ["10.0.0.9"] });
+    await r.start();
+    const s = dgramMock.sockets[0];
+    expect(s.membership).toEqual(["10.0.0.9"]);
+
+    // A multi-homed host that GAINED an address: one interface is already joined, one is
+    // new. Joining the list blindly would take 10.0.0.9 a second time — EADDRINUSE, which
+    // tryJoin turns into a warning on every pass.
+    expect(r.refreshAdvertise("10.0.0.77", ["10.0.0.9", "10.0.0.77"])).toBe(true);
+
+    expect(s.membership).toEqual(["10.0.0.9", "10.0.0.77"]);
+    expect(s.joinedGroups).toEqual(["239.255.255.250", "239.255.255.250"]);
+    // The new address is in the next answer, not only in the next NOTIFY.
+    s.emit("message", Buffer.from(MSEARCH), { address: "192.168.1.30", port: 1234 });
+    await vi.waitFor(() => expect(s.sent.length).toBeGreaterThan(0));
+    expect(s.sent.at(-1)!.text).toContain("10.0.0.77");
+  });
+
+  it("refreshAdvertise with the same address changes nothing and joins nothing", async () => {
+    // It runs every five minutes for the lifetime of the instance: a re-join per pass
+    // would put an EADDRINUSE warning in the log forever.
+    const r = new RokuSsdpResponder({ ...baseCfg, bindIp: undefined, membershipInterfaces: ["10.0.0.9"] });
+    await r.start();
+    const s = dgramMock.sockets[0];
+
+    expect(r.refreshAdvertise(baseCfg.advertiseIp, ["10.0.0.9", "10.0.0.5"])).toBe(false);
+
+    expect(s.membership).toEqual(["10.0.0.9"]);
+  });
+
   it("reports a runtime socket death exactly once and closes the socket", async () => {
     const fatal = vi.fn();
     const r = new RokuSsdpResponder({
