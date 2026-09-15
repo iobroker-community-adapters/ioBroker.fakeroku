@@ -1,0 +1,15 @@
+{
+  "_comment": "Adapter-specific declarations for the fleet tooling (Entwicklung/scripts). They live HERE so that a change in this adapter never touches the locked tooling. Readers: sync-iopackage-from-i18n.py (manifestI18n, release gate B03) and submit-stable.py (forumThread). Keys starting with an underscore are comments.",
+  "manifestI18n": {
+    "_comment": "instanceObjects id -> key in admin/i18n/<lang>.json. Every manifest object needs a `name` entry (an object without one is a structural error, and so is an entry whose object no longer exists); `desc` only where the name does not already say it - an empty desc beats an invented sentence.",
+    "_note": "Only the two standard objects; the device datapoints are created at runtime (main.ts, tName/tDesc/tRaw).",
+    "name": {
+      "info": "channelInfo",
+      "info.connection": "connectionStatus"
+    },
+    "desc": {
+      "info.connection": "connectionStatusDesc"
+    }
+  },
+  "forumThread": "https://forum.iobroker.net/topic/85188/test-adapter-fakeroku-1.1.0"
+}
