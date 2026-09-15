@@ -303,9 +303,10 @@ export class Fakeroku extends utils.Adapter {
    * leaving a dead device behind a red instance until someone restarts by hand.
    */
   private async retryPendingDevices(): Promise<void> {
-    if (this.stopping) {
-      return;
-    }
+    // No stopping check at the entry: onUnload sets the flag and empties the queue in the
+    // same synchronous block, so a call that arrives afterwards finds nothing to do, and a
+    // call already inside the loop is caught after the bind and again at the tail. A guard
+    // here could never fire — measured, it survived its own mutation needle.
     const stillPending: PendingDevice[] = [];
     let recovered = false;
     for (const device of this.pending) {

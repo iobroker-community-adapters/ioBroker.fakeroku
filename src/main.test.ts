@@ -1883,6 +1883,62 @@ describe("Fakeroku — the paths that only a failing database reaches", () => {
     expect(ctx.i.setTimeout).not.toHaveBeenCalled();
   });
 
+  it("a retry that fires after unload does nothing at all", async () => {
+    // The timer callback can already be queued when the host says stop — onUnload clears
+    // the handle, not a call that is already on its way. It must find an empty queue and
+    // leave without building a server into the map onUnload just emptied, and without
+    // reporting the instance green again after the shutdown wrote false.
+    const ctx = setup({ devices: [{ name: "Kueche", port: 8061, type: "player" }] }, { failEcpPort: 8061 });
+    await ctx.i.onReady();
+    ctx.i.onUnload(() => {});
+    const built = ctx.ecp.length;
+    ctx.freeEcpPort();
+
+    await ctx.i.retryPendingDevices();
+
+    expect(ctx.ecp).toHaveLength(built);
+    expect(ctx.i.states.get("info.connection")).toEqual({ val: false, ack: true });
+  });
+
+  it("a discovery bind that lands after unload neither announces nor arms an interval", async () => {
+    // startDiscovery does not await its own start: onReady returns while the bind is still
+    // open. If it resolves after the farewell went out, announcing would put the devices
+    // back into a network we just left, and this.setInterval would refuse the repeat timer
+    // with "setInterval called, but adapter is shutting down" — a warning nothing explains.
+    const ctx = setup();
+    let release: () => void = () => {};
+    const late: FakeSsdp = {
+      options: {},
+      stop: vi.fn(),
+      announce: vi.fn(),
+      addDevice: vi.fn(),
+      removeDevice: vi.fn(),
+      byebye: vi.fn(() => Promise.resolve()),
+      start: vi.fn(
+        () =>
+          new Promise<void>(res => {
+            release = res;
+          }),
+      ),
+    };
+    ctx.i.makeSsdpResponder = (options: Record<string, unknown>): FakeSsdp => {
+      late.options = options;
+      return late;
+    };
+    await ctx.i.onReady();
+    ctx.i.setInterval.mockClear();
+
+    ctx.i.onUnload(() => {});
+    release();
+    // Let the whole chain settle — startWithTimeout wraps the start, so the then-branch is
+    // several microtasks away. Waiting on start() would pass instantly: it was called during
+    // onReady, long before this.
+    await new Promise(resolve => setTimeout(resolve, 10));
+
+    expect(late.announce).not.toHaveBeenCalled();
+    expect(ctx.i.setInterval).not.toHaveBeenCalled();
+  });
+
   it("disarms the retry timer on unload", async () => {
     const ctx = setup({ devices: [{ name: "Kueche", port: 8061, type: "player" }] }, { failEcpPort: 8061 });
     await ctx.i.onReady();
