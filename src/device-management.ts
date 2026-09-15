@@ -7,6 +7,7 @@ import {
 } from "@iobroker/dm-utils";
 import { RESERVED_IDS } from "./lib/constants";
 import {
+  deviceObjectId,
   findClash,
   nextFreePort,
   normalizePort,
@@ -16,7 +17,6 @@ import {
 } from "./lib/device-config";
 import { deriveUuid } from "./lib/device-identity";
 import { t } from "./lib/i18n";
-import { sanitizeId } from "./lib/pure-helpers";
 
 /**
  * One emulated Roku as stored in the adapter's native.devices — the manifest's own
@@ -49,12 +49,18 @@ const ID_EXPRESSION = "(data.name||'').trim().replace(/[^A-Za-z0-9\\-_]/g,'_')";
  *
  * @param usedNames names taken by OTHER devices (the edited device is excluded)
  * @param usedPorts ports taken by OTHER devices
+ * @param usedIds object ids the OTHER devices occupy at runtime — from their STORED names,
+ *   which is not the same as sanitising what the list displays
  * @returns the jsonConfig panel schema for one device
  */
-export function buildDeviceForm(usedNames: readonly string[], usedPorts: readonly number[]): JsonFormSchema {
+export function buildDeviceForm(
+  usedNames: readonly string[],
+  usedPorts: readonly number[],
+  usedIds: readonly string[],
+): JsonFormSchema {
   const nameList = JSON.stringify(usedNames.map(n => n.trim().toLowerCase()));
   // Reserved ids first, then the object ids the other devices already occupy.
-  const idList = JSON.stringify([...RESERVED_IDS, ...usedNames.map(n => sanitizeId(n.trim()))]);
+  const idList = JSON.stringify([...RESERVED_IDS, ...usedIds]);
   const portList = JSON.stringify([...usedPorts]);
   return {
     type: "panel",
@@ -250,7 +256,8 @@ export class FakerokuDeviceManagement extends DeviceManagement {
     const devices = await this.readDevices();
     const usedNames = devices.map(d => d.name);
     const usedPorts = devices.map(d => d.port);
-    const data = await context.showForm(buildDeviceForm(usedNames, usedPorts), {
+    const usedIds = devices.map(deviceObjectId);
+    const data = await context.showForm(buildDeviceForm(usedNames, usedPorts, usedIds), {
       title: t("dmAdd"),
       data: { type: "player", port: nextFreePort(usedPorts) },
     });
@@ -290,7 +297,8 @@ export class FakerokuDeviceManagement extends DeviceManagement {
     }
     const usedNames = devices.filter((_, i) => i !== index).map(d => d.name);
     const usedPorts = devices.filter((_, i) => i !== index).map(d => d.port);
-    const data = await context.showForm(buildDeviceForm(usedNames, usedPorts), {
+    const usedIds = devices.filter((_, i) => i !== index).map(deviceObjectId);
+    const data = await context.showForm(buildDeviceForm(usedNames, usedPorts, usedIds), {
       title: t("dmEditTitle"),
       data: { name: current.name, port: current.port, type: current.type },
     });

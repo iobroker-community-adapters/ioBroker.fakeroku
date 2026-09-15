@@ -135,10 +135,12 @@ describe("nextFreePort", () => {
 });
 
 describe("findClash", () => {
-  const devices = [
-    { name: "Living room", port: 8060 },
-    { name: "Kitchen", port: 8061 },
-  ];
+  // Built the way production builds them, so the rows carry the STORED name next to the
+  // displayed one — the two differ exactly where this check used to look at the wrong one.
+  const devices = toDeviceRows([
+    { name: "Living room", port: 8060, type: "player" },
+    { name: "Kitchen", port: 8061, type: "player" },
+  ])!;
 
   it("flags a duplicate name case-insensitively", () => {
     expect(findClash(devices, { name: "living ROOM", port: 9000 }, -1)).toBe("deviceNameInUse");
@@ -164,5 +166,17 @@ describe("findClash", () => {
     // "Living room" and "Living*room" both sanitize to "Living_room" — distinct
     // names, same object tree. The plain-name check misses it; the id check catches it.
     expect(findClash(devices, { name: "Living*room", port: 9000 }, -1)).toBe("deviceNameInvalid");
+  });
+
+  it("judges the id of the STORED name, not of the name the list displays", () => {
+    // A hand-edited row " Roku " displays as "Roku" but occupies "Roku_" in the object tree,
+    // because the tree is built from the stored name. Comparing the displayed name let a new
+    // device literally called "Roku_" pass both the dialog and this check — and the start
+    // then skipped it as a duplicate object id, leaving info.connection false for good.
+    const stored = toDeviceRows([{ name: " Roku ", port: 8060, type: "player" }])!;
+    expect(deviceObjectId(stored[0])).toBe("_Roku_");
+    expect(findClash(stored, { name: "_Roku_", port: 9000 }, -1)).toBe("deviceNameInvalid");
+    // The displayed name is still free — that is a different question and stays answerable.
+    expect(findClash(stored, { name: "Kitchen", port: 9000 }, -1)).toBeNull();
   });
 });

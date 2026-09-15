@@ -158,7 +158,7 @@ export function nextFreePort(usedPorts: readonly number[]): number {
  * @returns a translated clash message, or null if free
  */
 export function findClash(
-  devices: readonly { name: string; port: number }[],
+  devices: readonly DeviceRow[],
   candidate: { name: string; port: number },
   exceptIndex: number,
 ): ioBroker.StringOrTranslated | null {
@@ -175,10 +175,14 @@ export function findClash(
     if (i === exceptIndex) {
       continue;
     }
-    if (devices[i].name.trim().toLowerCase() === name) {
+    if (devices[i].name.toLowerCase() === name) {
       return t("deviceNameInUse");
     }
-    if (sanitizeId(devices[i].name.trim()) === id) {
+    // deviceObjectId, not the displayed name: the tree is built from the STORED name, so a
+    // row saved as " Roku " occupies "Roku_" at runtime while its display name reads "Roku".
+    // Checking the display name would let a new "Roku_" through here and let the start skip
+    // it as a duplicate id — a device that never comes up and an instance that stays red.
+    if (deviceObjectId(devices[i]) === id) {
       return t("deviceNameInvalid");
     }
     if (Number(devices[i].port) === candidate.port) {

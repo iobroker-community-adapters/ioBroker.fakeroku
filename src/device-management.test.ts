@@ -6,6 +6,7 @@ import type { Mock } from "vitest";
 vi.mock("./lib/i18n", () => ({ t: (key: string, ...args: unknown[]) => (args.length ? { key, args } : key) }));
 
 import { FakerokuDeviceManagement, buildDeviceForm, cleanDevice } from "./device-management";
+import { deviceObjectId, toDeviceRows } from "./lib/device-config";
 import { deriveUuid, resolveDeviceUuid } from "./lib/device-identity";
 
 describe("cleanDevice", () => {
@@ -418,6 +419,21 @@ describe("FakerokuDeviceManagement", () => {
       expect(schema.items.port.validator).toContain("8060");
     });
 
+    it("feeds the dialog the object ids the RUNTIME will use, not ids of display names", async () => {
+      // The one place the dialog and the start have to agree. A row stored as " Roku "
+      // occupies "_Roku_" in the object tree; sanitising what the list DISPLAYS yields
+      // "Roku" and lets a device literally called "_Roku_" through. The start then skips
+      // it as a duplicate id and info.connection stays false with nothing pointing back
+      // at the dialog that accepted it.
+      const spaced = { name: " Roku ", port: 8062, type: "player" as const, uuid: "spaced-uuid" };
+      const i = make([living, spaced]);
+      const ctx = mockContext({ form: undefined });
+      await i.addDevice(ctx);
+      const schema = ctx.showForm.mock.calls[0][0] as FormSchema;
+      expect(schema.items.name.validator).toContain('"_Roku_"');
+      expect(schema.items.name.validator).not.toContain('"Roku"');
+    });
+
     it("does not clash a device with its own name and port", async () => {
       const i = make([living, kitchen]);
       const ctx = mockContext({ form: { name: "Kitchen", port: 8061, type: "tv" } });
@@ -502,14 +518,14 @@ function evaluateValidator(validator: string, data: Record<string, unknown>): bo
 
 describe("buildDeviceForm", () => {
   it("offers name, port and type plus the two hints", () => {
-    const form = buildDeviceForm([], []) as unknown as FormSchema;
+    const form = buildDeviceForm([], [], []) as unknown as FormSchema;
     expect(form.type).toBe("panel");
     expect(Object.keys(form.items)).toEqual(["name", "port", "type", "_portHint", "_typeHint"]);
     expect(form.items.type.default).toBe("player");
   });
 
   it("blocks saving on a clash instead of only colouring the field", () => {
-    const form = buildDeviceForm(["A"], [8060]) as unknown as FormSchema;
+    const form = buildDeviceForm(["A"], [8060], ["A"]) as unknown as FormSchema;
     // Without validatorNoSaveOnError the dialog shows the error AND still saves —
     // the duplicate then only fails in the backend check, after the round-trip.
     expect(form.items.name.validatorNoSaveOnError).toBe(true);
@@ -517,12 +533,12 @@ describe("buildDeviceForm", () => {
   });
 
   it("compares names trimmed and lower-cased, so a re-typed name still clashes", () => {
-    const form = buildDeviceForm(["  Living Room "], [8060]) as unknown as FormSchema;
+    const form = buildDeviceForm(["  Living Room "], [8060], []) as unknown as FormSchema;
     expect(form.items.name.validator).toContain('["living room"]');
   });
 
   it("keeps the validator valid code when a name carries quotes or backslashes", () => {
-    const form = buildDeviceForm(['Say "hi"', "back\\slash"], []) as unknown as FormSchema;
+    const form = buildDeviceForm(['Say "hi"', "back\\slash"], [], []) as unknown as FormSchema;
     const literal = form.items.name.validator!.match(/\[[^\]]*"say \\"hi\\""[^\]]*\]/)?.[0];
     expect(literal).toBeDefined();
     // The admin evaluates this string as JavaScript. An unescaped quote ends the array
@@ -531,7 +547,19 @@ describe("buildDeviceForm", () => {
   });
 
   describe("the name validator, evaluated the way the admin evaluates it", () => {
-    const form = buildDeviceForm(["  Living room ", "Kitchen"], [8060]) as unknown as FormSchema;
+    // Fed the way the manager feeds it: displayed names from the rows, object ids from
+    // deviceObjectId. The two are not the same function of the same string — one row here
+    // is stored with edge spaces, exactly the case that used to slip through.
+    const rows = toDeviceRows([
+      { name: "Living room", port: 8060, type: "player" },
+      { name: "Kitchen", port: 8061, type: "player" },
+      { name: " Roku ", port: 8062, type: "player" },
+    ])!;
+    const form = buildDeviceForm(
+      rows.map(r => r.name),
+      rows.map(r => r.port),
+      rows.map(deviceObjectId),
+    ) as unknown as FormSchema;
     const check = (name: unknown): boolean => evaluateValidator(form.items.name.validator!, { name });
 
     it("accepts a free name", () => {
@@ -556,6 +584,19 @@ describe("buildDeviceForm", () => {
       expect(check("Living*Room")).toBe(true);
     });
 
+    it("refuses the id of a row STORED with edge spaces, which its display name hides", () => {
+      // The row saved as " Roku " is listed as "Roku" but owns "_Roku_" in the object tree.
+      // Judging the displayed name let a device literally called "_Roku_" through here, and
+      // the start then skipped it as a duplicate id — the instance stayed red with no
+      // message pointing at the dialog that accepted it.
+      expect(deviceObjectId(rows[2])).toBe("_Roku_");
+      expect(check("_Roku_")).toBe(false);
+      // Its trimmed display name is refused too, but by the older name rule — the two
+      // questions are separate, and only the id one reaches the tree.
+      expect(check("Roku")).toBe(false);
+      expect(check("Roku2")).toBe(true);
+    });
+
     it("refuses a name that sanitizes to nothing at all", () => {
       expect(check("")).toBe(false);
       expect(check("   ")).toBe(false);
@@ -564,7 +605,7 @@ describe("buildDeviceForm", () => {
   });
 
   it("compares ports as numbers, so a typed '8060' is caught", () => {
-    const form = buildDeviceForm([], [8060]) as unknown as FormSchema;
+    const form = buildDeviceForm([], [8060], []) as unknown as FormSchema;
     expect(form.items.port.validator).toBe("![8060].includes(Number(data.port))");
     expect(evaluateValidator(form.items.port.validator!, { port: "8060" })).toBe(false);
     expect(evaluateValidator(form.items.port.validator!, { port: 8061 })).toBe(true);
