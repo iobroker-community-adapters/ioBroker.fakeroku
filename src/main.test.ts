@@ -66,10 +66,19 @@ vi.mock("@iobroker/adapter-core", () => {
     public config: Record<string, unknown> = {};
     public objects = new Map<string, Record<string, unknown>>();
     public states = new Map<string, { val: unknown; ack: boolean }>();
+    // Enum membership, the way js-controller stores it: enum id -> the FULL state ids in it.
+    // The double needs it because delObject strips an id from every enum it belongs to, which
+    // is how a user's room/function assignment disappears without anything saying so.
+    public enums = new Map<string, Set<string>>();
+    // The ids a write actually REACHED the store for. setStateChanged skips a value that is
+    // already there, so counting CALLS cannot tell a real write from a skipped one.
+    public written: string[] = [];
     public on = vi.fn();
     public setState = vi.fn((id: string, state: unknown) => {
       const s = state as { val?: unknown; ack?: boolean };
-      this.states.set(id.replace(`${this.namespace}.`, ""), { val: s?.val, ack: s?.ack === true });
+      const key = id.replace(`${this.namespace}.`, "");
+      this.states.set(key, { val: s?.val, ack: s?.ack === true });
+      this.written.push(key);
       return Promise.resolve();
     });
     // Writes only where the value actually differs — the js-controller contract the
@@ -79,6 +88,7 @@ vi.mock("@iobroker/adapter-core", () => {
       const key = id.replace(`${this.namespace}.`, "");
       if (this.states.get(key)?.val !== s?.val) {
         this.states.set(key, { val: s?.val, ack: s?.ack === true });
+        this.written.push(key);
       }
       return Promise.resolve();
     });
@@ -88,7 +98,37 @@ vi.mock("@iobroker/adapter-core", () => {
     public extendObject = vi.fn((id: string, obj: Record<string, unknown>) => {
       const key = id.replace(`${this.namespace}.`, "");
       const stored = structuredClone(this.objects.get(key) ?? {});
-      this.objects.set(key, nodeExtend(stored, structuredClone(obj)));
+      const merged = nodeExtend(stored, structuredClone(obj));
+      this.objects.set(key, merged);
+      this.seedDefault(key, merged);
+      return Promise.resolve();
+    });
+
+    /**
+     * Seed `common.def` into the state — but ONLY where the state does not exist yet.
+     * js-controller does this in `_setObjectWithDefaultValue` on every object write, which
+     * is why re-creating the tree on every start costs nothing: an existing value is never
+     * overwritten by a definition. It also decides what an object that was DELETED and put
+     * back looks like afterwards — the value is not merely gone, it is back at its default.
+     *
+     * @param key the object id relative to the namespace
+     * @param obj the object as it is now stored
+     */
+    private seedDefault(key: string, obj: Record<string, unknown>): void {
+      const common = obj.common as { def?: unknown } | undefined;
+      if (obj.type === "state" && common?.def !== undefined && !this.states.has(key)) {
+        this.states.set(key, { val: common.def, ack: true });
+      }
+    }
+
+    // A full write: the stored object becomes exactly what was handed in. Unlike delObject it
+    // touches NEITHER the state value NOR the enum membership — that asymmetry is the whole
+    // reason an object can be rewritten in place without costing the user anything.
+    public setForeignObject = vi.fn((id: string, obj: Record<string, unknown>) => {
+      const key = id.replace(`${this.namespace}.`, "");
+      const stored = structuredClone(obj);
+      this.objects.set(key, stored);
+      this.seedDefault(key, stored);
       return Promise.resolve();
     });
     public getObjectAsync = vi.fn((id: string) => {
@@ -98,7 +138,10 @@ vi.mock("@iobroker/adapter-core", () => {
     public getAdapterObjectsAsync = vi.fn(() => {
       const out: Record<string, unknown> = {};
       for (const [k, v] of this.objects) {
-        out[`${this.namespace}.${k}`] = v;
+        // Clone, like getObjectAsync next door: js-controller hands out a copy. Handing out
+        // the LIVE reference would make an in-place mutation that never reaches the database
+        // look like a success in every test that reads the dump back.
+        out[`${this.namespace}.${k}`] = structuredClone(v);
       }
       return Promise.resolve(out);
     });
@@ -106,6 +149,16 @@ vi.mock("@iobroker/adapter-core", () => {
       const key = id.replace(`${this.namespace}.`, "");
       for (const k of [...this.objects.keys()]) {
         if (k === key || (opts?.recursive && k.startsWith(`${key}.`))) {
+          // js-controller deletes far more than the object. For a state it also drops the
+          // VALUE (delForeignState) and strips the id from every enum it belongs to — the
+          // user's room and function assignment. A double that only forgets the object
+          // describes a world in which deleting and re-creating an object is free.
+          if (this.objects.get(k)?.type === "state") {
+            this.states.delete(k);
+            for (const members of this.enums.values()) {
+              members.delete(`${this.namespace}.${k}`);
+            }
+          }
           this.objects.delete(k);
         }
       }
@@ -173,6 +226,8 @@ function internalOf(adapter: Fakeroku): {
   startWithTimeout(p: Promise<void>, ms: number): Promise<void>;
   objects: Map<string, Record<string, unknown>>;
   states: Map<string, { val: unknown; ack: boolean }>;
+  enums: Map<string, Set<string>>;
+  written: string[];
   config: Record<string, unknown>;
   log: Record<"debug" | "info" | "warn" | "error", ReturnType<typeof vi.fn>>;
   setTimeout: ReturnType<typeof vi.fn>;
@@ -189,6 +244,7 @@ function internalOf(adapter: Fakeroku): {
   setState: ReturnType<typeof vi.fn>;
   setStateChangedAsync: ReturnType<typeof vi.fn>;
   extendObject: ReturnType<typeof vi.fn>;
+  setForeignObject: ReturnType<typeof vi.fn>;
   delObjectAsync: ReturnType<typeof vi.fn>;
   makeEcpServer: unknown;
   makeSsdpResponder: unknown;
@@ -1165,7 +1221,9 @@ describe("Fakeroku collaborator wiring", () => {
     // A shared or mis-captured deviceId here makes every remote control the first
     // Roku — the classic loop-variable capture bug, invisible with one device.
     expect(ctx.i.states.get("Kueche.command")).toEqual({ val: "Home", ack: true });
-    expect(ctx.i.states.has("Wohnzimmer.command")).toBe(false);
+    // Not "has no state": creating the object seeds common.def, so the other device's
+    // command exists and sits at its empty default. Untouched is the rule, not absent.
+    expect(ctx.i.states.get("Wohnzimmer.command")).toEqual({ val: "", ack: true });
   });
 
   it("hooks the responder's fatal callback to the announce shutdown", async () => {
@@ -1491,6 +1549,29 @@ describe("Fakeroku — leftovers of an older version inside an object", () => {
     expect(ctx.i.log.debug).toHaveBeenCalledWith(expect.stringContaining("stale native attribute"));
   });
 
+  it("rewrites the object in place, so the value and the enum membership survive", async () => {
+    // delObject does not merely forget the object: for a state js-controller ALSO drops the
+    // value (delForeignState) and strips the id from every enum it belongs to. Repairing a
+    // leftover that way costs the user the last recorded command and the room the datapoint
+    // was sorted into — a repair must never cost more than the leftover it removes.
+    const ctx = setup();
+    ctx.i.objects.set("Wohnzimmer.command", {
+      type: "state",
+      common: { name: "Command", type: "string", def: "", custom: { "history.0": { enabled: true } } },
+      native: { url: "keys/Home" },
+    });
+    ctx.i.states.set("Wohnzimmer.command", { val: "Home", ack: true });
+    ctx.i.enums.set("enum.rooms.wohnzimmer", new Set(["fakeroku.0.Wohnzimmer.command"]));
+
+    await ctx.i.onReady();
+
+    const obj = ctx.i.objects.get("Wohnzimmer.command")!;
+    expect(obj.native).toEqual({});
+    expect((obj.common as { custom: unknown }).custom).toEqual({ "history.0": { enabled: true } });
+    expect(ctx.i.states.get("Wohnzimmer.command")).toEqual({ val: "Home", ack: true });
+    expect(ctx.i.enums.get("enum.rooms.wohnzimmer")).toEqual(new Set(["fakeroku.0.Wohnzimmer.command"]));
+  });
+
   it("leaves an object alone when its native is already empty", async () => {
     const ctx = setup();
     await ctx.i.onReady();
@@ -1651,7 +1732,7 @@ describe("Fakeroku — the paths that only a failing database reaches", () => {
   it("traces a rewrite it cannot perform instead of failing the start", async () => {
     const ctx = setup();
     ctx.i.objects.set("Wohnzimmer.keys.Home", { type: "state", common: {}, native: { url: "keys/Home" } });
-    ctx.i.delObjectAsync.mockImplementation(() => Promise.reject(new Error("read-only")));
+    ctx.i.setForeignObject.mockImplementation(() => Promise.reject(new Error("read-only")));
 
     await ctx.i.onReady();
 

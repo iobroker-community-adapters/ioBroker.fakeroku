@@ -565,17 +565,21 @@ export class Fakeroku extends utils.Adapter {
    * it would store `null`. So an installation upgraded from <= 0.4.0 carries a dead
    * attribute on every key datapoint, and the adapter answers for its own datapoints.
    *
-   * Removing one therefore takes the object away and puts it back: `delObject` followed by
-   * `extendObject`, the two methods the ioBroker standard blesses for this (a plain full
-   * write is discouraged — it overwrites whatever the user changed). Which is why this is
-   * careful: the object goes back exactly as it was read, `common` included — that is where
-   * `common.custom` lives, the user's own history/chart configuration. Losing it would cost
-   * far more than the leftover.
+   * Removing one therefore rewrites the object in a single `setForeignObject`, handing back
+   * exactly what was read with `native` emptied — `common` included, because that is where
+   * `common.custom` lives, the user's own history/chart configuration.
    *
-   * Both halves fail safely. A delete that does not happen leaves the attribute where it
-   * was — the tree is exactly as before. A re-create that does not happen leaves the object
-   * gone until the next start, which creates it again from the configuration. Either way the
-   * reason is in the log.
+   * It used to be a `delObject` followed by an `extendObject`. That pair replaces an object,
+   * but it is the wrong tool here: `delObject` on a state ALSO deletes the state's value and
+   * removes its id from every enum it belongs to. Repairing a dead attribute that way cost
+   * the user the recorded value and the room the datapoint was sorted into — and the
+   * re-created object came back carrying `common.def` as its value, which reads like data
+   * rather than like a loss. `setForeignObject` touches neither. (The discouraged call is
+   * `setObject`, repochecker S5054, and only because a blind full write overwrites what the
+   * user changed; writing back what was just read does not.)
+   *
+   * The write fails safely: if it does not happen, the attribute stays where it was and the
+   * tree is exactly as before. The reason is in the log.
    *
    * @param owned the adapter's objects, keyed relative to the namespace
    * @param deleted the ids the sweep just removed — no point writing to those
@@ -589,8 +593,20 @@ export class Fakeroku extends utils.Adapter {
       try {
         // Non-recursive: a channel or device carrying the leftover keeps its children,
         // which are read and repaired on their own turn.
-        await this.delObjectAsync(id);
-        await this.extendObject(id, { ...obj, native: {} });
+        // One write, never a delete plus a re-create: from/ts/user are left out so the
+        // controller stamps the write freshly — it only adopts them when they are absent.
+        const { from: _from, ts: _ts, user: _user, ...keep } = obj;
+        // The cast only collapses the union: ioBroker.Object spans every object kind
+        // (instance, host, enum, ...), while a write accepts device/channel/state/folder.
+        // The shape is the one just read back, so nothing is asserted away here.
+        await this.setForeignObject(`${this.namespace}.${id}`, {
+          ...keep,
+          native: {},
+        } as
+          | ioBroker.SettableDeviceObject
+          | ioBroker.SettableChannelObject
+          | ioBroker.SettableFolderObject
+          | ioBroker.SettableStateObject);
       } catch (e: unknown) {
         this.log.debug(`cleanup: could not rewrite ${id}: ${errText(e)}`);
       }
