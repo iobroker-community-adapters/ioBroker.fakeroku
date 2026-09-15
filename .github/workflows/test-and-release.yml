@@ -26,6 +26,10 @@ on:
       - ".gitattributes"
       - ".editorconfig"
       - "LICENSE"
+      # No job reads the Dependabot configuration; the pre-push guard rightly refuses a
+      # skip-CI marker for it, so the filter is the only thing that keeps a config
+      # change from running the full matrix (seven such runs on 2026-09-15).
+      - ".github/dependabot.yml"
   pull_request: {}
 
 # Cancel previous PR/branch runs when a new commit is pushed
