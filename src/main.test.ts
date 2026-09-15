@@ -1883,6 +1883,27 @@ describe("Fakeroku — the paths that only a failing database reaches", () => {
     expect(ctx.i.setTimeout).not.toHaveBeenCalled();
   });
 
+  it("names the missing address instead of logging a gap when the retry finds none", async () => {
+    // detectPrimaryIPv4 can come back empty on the retry path — the host lost its address
+    // in the meantime. The line then read "advertising on  (discovery off)", which looks
+    // like a truncated log line rather than the finding it is.
+    const ctx = setup(
+      { devices: [{ name: "Kueche", port: 8061, type: "player" }], networkInterface: "" },
+      {
+        failEcpPort: 8061,
+      },
+    );
+    osMock.interfaces = { eth0: [{ family: "IPv4", address: "192.168.1.5", internal: false }] };
+    await ctx.i.onReady();
+    // The address is gone by the time the retry runs.
+    osMock.interfaces = { lo: [{ family: "IPv4", address: "127.0.0.1", internal: true }] };
+    ctx.freeEcpPort();
+
+    await ctx.i.retryPendingDevices();
+
+    expect(ctx.i.log.info).toHaveBeenCalledWith(expect.stringContaining("advertising on no routable IPv4"));
+  });
+
   it("a retry that fires after unload does nothing at all", async () => {
     // The timer callback can already be queued when the host says stop — onUnload clears
     // the handle, not a call that is already on its way. It must find an empty queue and

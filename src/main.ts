@@ -400,7 +400,9 @@ export class Fakeroku extends utils.Adapter {
   private async reportConnectionState(advertiseIp: string): Promise<void> {
     const allStarted = this.running.length === this.expectedDevices;
     await this.setState("info.connection", { val: allStarted, ack: true });
-    const where = `advertising on ${advertiseIp}${this.ssdp ? "" : " (discovery off)"}`;
+    // The retry path can hand in an empty address (detectPrimaryIPv4 found nothing), and
+    // "advertising on  (discovery off)" reads like a truncated line rather than a finding.
+    const where = `advertising on ${advertiseIp || "no routable IPv4"}${this.ssdp ? "" : " (discovery off)"}`;
     if (allStarted) {
       this.log.info(`Emulating ${this.running.length} Roku device(s), ${where}`);
     } else {

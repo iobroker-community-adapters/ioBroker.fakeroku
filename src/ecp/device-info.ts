@@ -7,7 +7,7 @@ import type { DeviceType } from "./state-model";
  * version (HA forum #501046) — emulated_roku hardcodes 7.5.0 / "Roku 4" (2016) and
  * fails there, the old fakeroku had no device-info at all.
  *
- * Kept at the newest Roku OS major (checked 2026-09-01: Roku OS 15.0, released
+ * Kept at the newest Roku OS major (checked 2026-09-15: Roku OS 15.0, released
  * 2025-10-15 — support.roku.com release notes + Wikipedia "Roku OS"). The exact
  * threshold Sofabaton applies is documented nowhere (thread, Sofabaton docs and
  * their 2024-12 Roku notice name none); staying current is the only lever we have.
