@@ -25,7 +25,7 @@ classic Harmony hub.
 - Emulates one or more Roku devices on the LAN — the Roku control protocol (ECP) over HTTP plus SSDP discovery on port 1900.
 - Full Roku control surface including `/query/device-info` with a current Roku version, beyond what a classic Harmony hub needs.
 - Clean data model per device: a `command` datapoint plus fixed `keys.<Key>` states, all created up front.
-- Several emulated Rokus from a single instance; discovery bound to the chosen network interface; command handling restricted to the LAN and capped at 25 commands per second per emulated Roku, so a misbehaving device cannot flood ioBroker.
+- Several emulated Rokus from a single instance; discovery joins every routable network interface unless you pick one; command handling restricted to the LAN and capped at 25 commands per second per emulated Roku, so a misbehaving device cannot flood ioBroker. Releasing a key you are holding is never dropped by that cap.
 
 ## Sentry / Error reporting
 
@@ -57,7 +57,7 @@ For details and how to disable it, see the [Sentry plugin documentation](https:/
   and the dialog refuses a name or port already in use) and a **type**. You can
   emulate several Rokus from one instance — each needs its own port.
 - **Type** — *Player* (default) exposes the 16 standard navigation and playback keys;
-  *TV* additionally exposes volume, power, channel and input keys. Choose *TV* only if
+  *TV* additionally exposes volume, channel and input keys plus a power-off key. Choose *TV* only if
   you want those extra keys as ioBroker triggers.
 
 To add the emulated Roku to a Harmony hub, add a "Roku" device in the Harmony app
@@ -69,7 +69,7 @@ At instance level:
 
 | Datapoint | Type | Meaning |
 |---|---|---|
-| `info.connection` | boolean, read-only | `true` only while **every** configured Roku is actually listening. If one of them cannot start — usually because its port is already taken — the instance stays disconnected and the log names the device and the port. |
+| `info.connection` | boolean, read-only | `true` only while **every** configured Roku is actually listening. If one of them cannot start — usually because its port is already taken — the log names the device and the port, and the adapter retries that device every minute until it comes up. |
 
 For every emulated Roku (`fakeroku.0.<name>`):
 
@@ -77,7 +77,7 @@ For every emulated Roku (`fakeroku.0.<name>`):
 |---|---|---|
 | `.command` | string, read-only | The last command as plain text (`Home`, `Lit_a`, `launch:12`, `search:news`). One datapoint for everything — no object-per-character sprawl. |
 | `.commandType` | string, read-only | `keypress` / `keydown` / `keyup` / `launch` / `install` / `input` / `search`. |
-| `.keys.<Key>` | boolean, read-only | One state per remote key the device type exposes — a *Player* has the 16 navigation/playback keys, a *TV* adds Volume\*, Power, Channel\*, HDMI/AV inputs — all created up front. A keypress pulses it `true` for a moment; keydown/keyup hold it. |
+| `.keys.<Key>` | boolean, read-only | One state per remote key the device type exposes — a *Player* has the 16 navigation/playback keys, a *TV* adds Volume\*, PowerOff, Channel\*, HDMI/AV inputs — all created up front. A keypress pulses it `true` for a moment; keydown/keyup hold it. |
 
 Free keyboard input (`Lit_x`) and app launches show up in `.command` only — they do
 not get their own objects.
@@ -149,8 +149,8 @@ users it is simply a new version of the same adapter:
 - The **[ioBroker Community Adapters](https://github.com/iobroker-community-adapters)**
   team — notably [mcm1957](https://github.com/mcm1957) and
   [foxriver76](https://github.com/foxriver76) — maintained and modernized the adapter
-  from 2023 to 2026, releasing versions up to 0.5.1.
-- From **0.6.0** on, [krobi](https://github.com/krobipd) rewrote the adapter from the
+  from 2023 to 2026, releasing versions up to 0.4.0.
+- From **0.5.0** on, [krobi](https://github.com/krobipd) rewrote the adapter from the
   ground up in TypeScript and added the full ECP surface including `device-info`.
 
 ## Support

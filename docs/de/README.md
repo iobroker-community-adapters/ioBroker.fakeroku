@@ -10,9 +10,9 @@ Er ist das **Eingabe**-Gegenstück zum Logitech-Harmony-Adapter: Statt dass ioBr
 ein Gerät steuert, steuert ein Gerät den ioBroker.
 
 > **Die offizielle Roku-App funktioniert mit diesem Adapter nicht.** Sie spricht mit
-> echten Rokus über einen herstellereigenen, verschlüsselten Kanal, der sich nicht
-> nachbauen lässt. Nutze einen Harmony-Hub oder eine Sofabaton — die sprechen das
-> offene Protokoll, das dieser Adapter bedient.
+> echten Rokus über Rokus herstellereigenen, undokumentierten ECP-2-WebSocket-Kanal,
+> den dieser Emulator nicht nachbildet. Nutze einen Harmony-Hub oder eine Sofabaton —
+> die sprechen das offene Protokoll, das dieser Adapter bedient.
 
 ## Voraussetzungen
 
@@ -28,9 +28,9 @@ ein Gerät steuert, steuert ein Gerät den ioBroker.
 Adapter installieren und eine Instanz anlegen. Er läuft sofort: Die Instanz bringt
 bereits einen emulierten Roku mit, Name „Roku", Anschluss 8060.
 
-### 2. Netzwerkkarte wählen (meistens: nicht)
+### 2. Netzwerkschnittstelle wählen (meistens: nicht)
 
-Lass **Netzwerkkarte** auf „alle Schnittstellen". Der Adapter ermittelt dann selbst
+Lass **Netzwerkschnittstelle** auf „alle Schnittstellen". Der Adapter ermittelt dann selbst
 die erreichbare Adresse deines ioBroker-Rechners und kündigt diese an.
 
 Eine bestimmte Adresse wählst du nur, wenn dein ioBroker-Rechner in **mehreren
@@ -43,15 +43,15 @@ finden kann.
 
 - **Name** — erscheint als Gerätename auf der Fernbedienung und als Ordner im
   Objektbaum. Nimm etwas Wiedererkennbares, zum Beispiel den Raum.
-- **ECP-Anschluss** — der Netzwerk-Anschluss, auf dem dieser Roku antwortet. `8060`
-  ist der Anschluss eines echten Roku. Jeder emulierte Roku braucht **seinen eigenen**;
+- **ECP-Port** — der Netzwerk-Port, auf dem dieser Roku antwortet. `8060`
+  ist der Port eines echten Roku. Jeder emulierte Roku braucht **seinen eigenen**;
   der Dialog schlägt einen freien vor und weist einen bereits belegten ab.
 - **Typ**
   - **Player** (eine Streaming-Box) bietet die 16 üblichen Navigations- und
     Wiedergabetasten.
-  - **TV** bietet zusätzlich Lautstärke, Ein/Aus, Programm und Eingangswahl. Wähle
-    das nur, wenn du diese zusätzlichen Tasten wirklich als Auslöser in ioBroker
-    haben willst.
+  - **TV** bietet zusätzlich Lautstärke, Programm und Eingangswahl sowie eine
+    Ausschalt-Taste. Wähle das nur, wenn du diese zusätzlichen Tasten wirklich als
+    Auslöser in ioBroker haben willst.
 
 ### 4. Fernbedienung anlernen
 
@@ -68,9 +68,9 @@ diese Fernbedienungen, bevor sie ein Gerät annehmen.
 
 Auf Instanz-Ebene:
 
-| Datenpunkt        | Typ                 | Bedeutung                                                                                                                                                                                                                   |
-| ----------------- | ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `info.connection` | boolean, nur lesbar | Nur wahr, solange **jeder** konfigurierte Roku tatsächlich lauscht. Kann einer nicht starten — fast immer, weil sein Anschluss schon belegt ist — bleibt die Instanz getrennt, und das Protokoll nennt Gerät und Anschluss. |
+| Datenpunkt        | Typ                 | Bedeutung                                                                                                                                                                                                                                                 |
+| ----------------- | ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `info.connection` | boolean, nur lesbar | Nur wahr, solange **jeder** konfigurierte Roku tatsächlich lauscht. Kann einer nicht starten — fast immer, weil sein Port schon belegt ist —, nennt das Protokoll Gerät und Port, und der Adapter versucht dieses Gerät jede Minute erneut, bis es läuft. |
 
 Je emuliertem Roku, unterhalb von `fakeroku.0.<Name>`:
 
@@ -103,8 +103,9 @@ on({ id: "fakeroku.0.Wohnzimmer.command" }, obj => {
 
 Die Tasten-Datenpunkte werden bei jedem Adapterstart auf `false` zurückgesetzt. Eine
 Taste, die beim Stoppen von ioBroker gedrückt stehen geblieben ist, kann deine Regel
-danach also nicht blockieren. Das Loslassen einer Taste wird nie verworfen — auch dann
-nicht, wenn der Adapter gerade eine Befehlsflut abweist.
+danach also nicht blockieren. Das Loslassen einer Taste, die du tatsächlich hältst, wird
+nie verworfen — auch dann nicht, wenn der Adapter gerade eine Befehlsflut abweist; sonst
+wäre die Flutbremse das, was eine Taste hängen lässt.
 
 ## Genutzte Anschlüsse
 
@@ -118,13 +119,15 @@ Beantwortet werden nur Geräte aus deinem eigenen Heimnetz. Eine Anfrage aus dem
 Internet wird abgewiesen, eine Suche von außen ignoriert.
 
 Beim Stoppen der Instanz melden sich die emulierten Rokus im Netz ab. Die Fernbedienung
-nimmt sie damit sofort aus ihrer Liste, statt noch eine Stunde lang Tastendrücke ins
+kann sie damit aus ihrer Liste nehmen, statt noch eine Stunde lang Tastendrücke ins
 Leere zu schicken.
 
 Du kannst mehrere Instanzen auf demselben Rechner betreiben — gib jeder eigene
-ECP-Anschlüsse. Die Geräteerkennung teilen sie sich: Wer zuerst startet, bekommt
-UDP 1900, die anderen laufen ohne sie weiter, und bereits gekoppelte Fernbedienungen
-kommen weiterhin durch.
+ECP-Anschlüsse. UDP 1900 teilen sie sich: Der Adapter öffnet den Anschluss mit
+Adress-Wiederverwendung, jede Instanz empfängt die Suchanfragen also und antwortet für
+ihre eigenen Geräte. Nur wenn ein anderes Programm den Anschluss exklusiv hält, startet
+eine Instanz ohne Geräteerkennung — das steht dann im Protokoll, und bereits gekoppelte
+Fernbedienungen kommen weiterhin durch.
 
 Der Adapter läuft außerdem im Compact-Modus von ioBroker, in dem sich mehrere Adapter
 einen Prozess teilen, statt dass jeder einen eigenen startet. Auf kleinen Rechnern
@@ -136,7 +139,7 @@ hier ist dafür nichts umzustellen.
 **Die Fernbedienung findet kein Gerät.**
 Prüfe, ob Hub und ioBroker-Rechner im selben Netz sind und keine Firewall den
 UDP-Anschluss 1900 blockiert. Bei einem Rechner mit mehreren Netzwerkkarten die
-richtige unter **Netzwerkkarte** auswählen. Ist die Erkennung nicht verfügbar,
+richtige unter **Netzwerkschnittstelle** auswählen. Ist die Erkennung nicht verfügbar,
 schreibt der Adapter das ins Protokoll und arbeitet für bereits gekoppelte
 Fernbedienungen weiter.
 
@@ -144,7 +147,7 @@ Fernbedienungen weiter.
 Diese Adresse gehört zu einer Docker-Brücke auf dem Rechner, nicht zu deinem
 Heimnetz — keine Fernbedienung erreicht sie. Der Adapter bevorzugt von sich aus eine
 echte Netzwerkadresse; das taucht also nur auf, wenn der Rechner in dem Moment keine
-andere zu bieten hat. Wähle unter **Netzwerkkarte** die richtige aus und starte die
+andere zu bieten hat. Wähle unter **Netzwerkschnittstelle** die richtige aus und starte die
 Instanz neu.
 
 **Die Instanz bleibt „nicht verbunden".**
@@ -156,10 +159,17 @@ wenn es hochkommt — ein Anschluss, den der vorherige Prozess nach einem Neusta
 hielt, löst sich damit von allein.
 
 **Ich drücke eine Taste und in ioBroker passiert nichts.**
-Stelle die Protokollstufe der Instanz kurz auf `debug`. Jeder empfangene Befehl wird
-mit Tastenname und Absenderadresse protokolliert. Erscheint nichts, erreicht die
-Fernbedienung den Adapter nicht; erscheint etwas, ist der Befehl angekommen und das
-Problem liegt im Skript, das den Datenpunkt liest.
+Stelle die Protokollstufe der Instanz kurz auf `debug`. Jeder _angewendete_ Befehl wird
+mit Absenderadresse protokolliert, bei einer Taste mit ihrem Namen (bei `launch`,
+`input` und `search` steht stattdessen das Gestartete bzw. Getippte da). Erscheint die
+Zeile, ist der Befehl angekommen und das Problem liegt im Skript, das den Datenpunkt
+liest.
+
+Erscheint nichts, suche zuerst nach einer Warnung über mehr als 25 Befehle pro Sekunde:
+Befehle, die diese Bremse verwirft, werden nicht einzeln protokolliert — eine zu
+gesprächige Fernbedienung sieht also genauso aus wie eine, die den Adapter gar nicht
+erreicht. Ohne so eine Warnung kommt die Fernbedienung wirklich nicht durch: Netz und
+ECP-Anschluss prüfen.
 
 **Wiedergabe und Pause tun dasselbe.**
 Das ist das Roku-Protokoll, nicht der Adapter: Die Fernbedienung sendet für

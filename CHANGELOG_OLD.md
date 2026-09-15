@@ -16,6 +16,20 @@
 - (krobipd) First stable release — version 1.0.0 marks the complete rewrite as the mature, supported version of the adapter.
 - (krobipd) Upgrading from an older version now shows a one-time notice that the button data points changed from text to real boolean values, so scripts and visualizations can be checked.
 
+## 0.9.0 (2026-08-03)
+- (krobipd) Device cards drop the redundant "Roku" manufacturer line — an emulator's maker is always Roku, so a card now shows just the model (Player/TV) and the ECP port
+
+## 0.8.0 (2026-08-01)
+- (krobipd) Devices from the old fakeroku keep working after updating — the emulated Roku's identity and network binding are carried over, so a paired remote stays paired without re-pairing
+- (krobipd) Adding a device now pre-selects a free port and refuses a name or port already in use, so two Rokus can't collide; each device card shows the port on its own line
+
+## 0.7.1 (2026-07-31)
+- (krobipd) Fixed the device management from 0.7.0: your emulated Rokus now show up as cards again and the button to add a new one works — both were missing before
+
+## 0.7.0 (2026-07-31)
+- (krobipd) Each emulated Roku can now be a Player or a TV — a TV additionally exposes volume, power, channel and input keys, a Player the 16 standard keys
+- (krobipd) Devices are now managed as cards with add/edit/delete dialogs instead of a table, and the settings page gained a network section and support links
+
 ## 0.6.0 (2026-08-05)
 - (krobipd) Complete rewrite. The adapter now answers the full Roku control surface — including device-info with a current Roku version — so Logitech Harmony and Sofabaton remotes pair and work reliably.
 - (krobipd) Works out of the box: it detects the network address to advertise on its own, no manual interface picking.
@@ -27,31 +41,33 @@
 - (mcm1957) Dependencies have been updated
 
 ## 0.5.0 (2026-07-30)
-- Complete rewrite with the full Roku control surface, including `device-info` with a current Roku version — the part modern remotes check at pairing, beyond what a classic Harmony hub needs
-- New clean data model: a `command` datapoint plus fixed `keys.<Key>` states, all created up front instead of appearing only after the first keypress
-- Discovery binds to the chosen network interface, command handling is restricted to the local network
+- (krobipd) Complete rewrite with the full Roku control surface, including `device-info` with a current Roku version — the part modern remotes check at pairing, beyond what a classic Harmony hub needs
+- (krobipd) New clean data model: a `command` datapoint plus fixed `keys.<Key>` states, all created up front instead of appearing only after the first keypress
+- (krobipd) Discovery binds to the chosen network interface, command handling is restricted to the local network
 
 ## 0.4.0 (2026-03-07)
-- Adapter requires node.js >= 20, admin >= 7.7.22, js-controller >= 6.0.11
+- (mcm1957) Adapter requires node.js >= 20, admin >= 7.7.22, js-controller >= 6.0.11
 
 ## 0.3.0 (2024-06-11)
-* (mcm1957) Adapter requires node.js >= 18 and js-controller >= 5 now
-* (mcm1957) Dependencies have been updated
+- (mcm1957) Adapter requires node.js >= 18 and js-controller >= 5 now
+- (mcm1957) Dependencies have been updated
+
+## 0.2.3 (2024-06-11)
+- (mcm1957) Adapter requires node.js >= 18 and js-controller >= 5 now
+- (mcm1957) Dependencies have been updated
 
 ## 0.2.2 (2023-07-24)
-* (Apollon77) fixed issues with controller v5
+- (Apollon77) fixed issues with controller v5
 
 ## 0.2.1
-  (Pmant) fix jQuery error in admin
-  (ykuendig) add translations
-
-[Older changelogs can be found here](CHANGELOG_OLD.md)
+- (Pmant) fix jQuery error in admin
+- (ykuendig) add translations
 
 ## 0.2.0
-  (Pmant) run multiple fakeroku's in one instance
+- (Pmant) run multiple fakeroku's in one instance
 
 ## 0.1.1
-  (Pmant) fix package.json
+- (Pmant) fix package.json
 
 ## 0.1.0
-  (Pmant) initial release
+- (Pmant) initial release
