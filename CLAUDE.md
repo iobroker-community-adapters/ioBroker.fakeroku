@@ -4,7 +4,7 @@ Adapter-spezifischer Kontext. Globale Dev-Standards: `../CLAUDE.md` + `../CLAUDE
 
 ## Projekt
 
-Roku-Emulator im LAN: ein ECP/SSDP-Controller (Logitech Harmony, Sofabaton) findet einen emulierten Roku und löst über Tastendrücke Ereignisse in ioBroker aus — die **Eingabe-Seite**, Gegenstück zum harmony-Adapter (Ausgabe). Greenfield-Neubau ab **v0.5.0** des community-`fakeroku` (Pmant 2017, Community-Wartung bis 0.4.0); Übernahme durch krobi. Feld-/Protokoll-Details: `../../Ressourcen/rokuemu/`.
+Roku-Emulator im LAN: ein ECP/SSDP-Controller (Logitech Harmony, Sofabaton) findet einen emulierten Roku und löst über Tastendrücke Ereignisse in ioBroker aus — die **Eingabe-Seite**, Gegenstück zum harmony-Adapter (Ausgabe). Greenfield-Neubau ab **v0.5.0** des community-`fakeroku` (Pmant 2017, Community-Wartung bis 0.5.1), an Nutzer ausgeliefert ab **0.6.0** — 0.5.0 ist nie auf npm erschienen; Übernahme durch krobi. Feld-/Protokoll-Details: `../../Ressourcen/rokuemu/`.
 
 ## Architektur (`src/`)
 
@@ -63,4 +63,4 @@ Roku-Emulator im LAN: ein ECP/SSDP-Controller (Logitech Harmony, Sofabaton) find
 
 ## Versionshistorie
 
-- Changelog wird im README (`## Changelog`) + `CHANGELOG_OLD.md` + `io-package.json` `news` geführt, nicht hier dupliziert. **v0.5.0** = Greenfield-Neustart; die Vorgänger-Historie (Pmant 2017 → Community-Wartung bis 0.4.0) bleibt erhalten — s. README `## History`.
+- Changelog wird im README (`## Changelog`) + `CHANGELOG_OLD.md` + `io-package.json` `news` geführt, nicht hier dupliziert. **v0.5.0** = Greenfield-Neustart im Repo, veröffentlicht ab **0.6.0**; die Vorgänger-Historie (Pmant 2017 → Community-Wartung bis 0.5.1, mcm1957s letzte Veröffentlichung) bleibt erhalten — s. README `## History`.

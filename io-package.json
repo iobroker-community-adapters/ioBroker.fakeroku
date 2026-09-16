@@ -4,17 +4,17 @@
     "version": "1.6.1",
     "news": {
       "NEXT": {
-        "en": "Button datapoints keep their value and their room and function assignment, a held key is no longer released early, and a new host address is advertised at once.",
-        "de": "Tastendatenpunkte behalten ihren Wert und ihre Raum- und Funktionszuordnung, eine gehaltene Taste wird nicht mehr zu früh losgelassen, und eine neue Hostadresse wird sofort angekündigt.",
-        "ru": "Точки данных кнопок сохраняют значение и привязку к комнате и функции, удерживаемая кнопка больше не отпускается раньше времени, а новый адрес хоста объявляется сразу.",
-        "pt": "Os pontos de dados das teclas mantêm o seu valor e a atribuição de divisão e função, uma tecla mantida já não é libertada cedo demais e um novo endereço de host é anunciado de imediato.",
-        "nl": "Knopdatapunten behouden hun waarde en hun kamer- en functietoewijzing, een ingedrukt gehouden toets wordt niet meer te vroeg losgelaten en een nieuw hostadres wordt meteen aangekondigd.",
-        "fr": "Les points de données des touches gardent valeur et affectation de pièce et de fonction, une touche maintenue n'est plus relâchée trop tôt et une nouvelle adresse d'hôte est annoncée aussitôt.",
-        "it": "I punti dati dei tasti mantengono valore e assegnazione di stanza e funzione, un tasto tenuto premuto non viene più rilasciato troppo presto e un nuovo indirizzo host viene annunciato subito.",
-        "es": "Los puntos de datos de las teclas conservan su valor y su asignación de habitación y función, una tecla mantenida ya no se suelta antes de tiempo y una nueva dirección de host se anuncia enseguida.",
-        "pl": "Punkty danych przycisków zachowują swoją wartość oraz przypisanie do pomieszczenia i funkcji, przytrzymany przycisk nie jest już zwalniany za wcześnie, a nowy adres hosta jest ogłaszany od razu.",
-        "uk": "Точки даних кнопок зберігають значення та прив'язку до кімнати й функції, утримувана кнопка більше не відпускається зарано, а нова адреса хоста оголошується одразу.",
-        "zh-cn": "按键数据点保留其数值以及房间和功能分配，长按的按键不再被过早释放，主机的新地址会立即对外通告。"
+        "en": "Button datapoints keep their value and their room and function assignment, and remotes find the emulated Rokus again after a host IP change.",
+        "de": "Tastendatenpunkte behalten ihren Wert und ihre Raum- und Funktionszuordnung, und Fernbedienungen finden die emulierten Rokus nach einem IP-Wechsel wieder.",
+        "ru": "Точки данных кнопок сохраняют значение и привязку к комнате и функции, а пульты снова находят эмулируемые Roku после смены IP.",
+        "pt": "Os pontos de dados das teclas mantêm o seu valor e a atribuição de divisão e função, e os comandos voltam a encontrar os Roku emulados após uma mudança de IP.",
+        "nl": "Knopdatapunten behouden hun waarde en hun kamer- en functietoewijzing, en afstandsbedieningen vinden de geëmuleerde Roku's terug na een IP-wijziging.",
+        "fr": "Les points de données des touches gardent valeur et affectation de pièce et de fonction, et les télécommandes retrouvent les Roku émulés après un changement d'IP.",
+        "it": "I punti dati dei tasti mantengono valore e assegnazione di stanza e funzione, e i telecomandi ritrovano i Roku emulati dopo un cambio di IP.",
+        "es": "Los puntos de datos de las teclas conservan su valor y su asignación de habitación y función, y los mandos vuelven a encontrar los Roku emulados tras un cambio de IP.",
+        "pl": "Punkty danych przycisków zachowują swoją wartość oraz przypisanie do pomieszczenia i funkcji, a piloty ponownie znajdują emulowane Roku po zmianie IP.",
+        "uk": "Точки даних кнопок зберігають значення та прив'язку до кімнати й функції, а пульти знову знаходять емульовані Roku після зміни IP.",
+        "zh-cn": "按键数据点保留其数值以及房间和功能分配，主机更换 IP 后遥控器也能重新找到模拟的 Roku。"
       },
       "1.6.1": {
         "en": "Installing straight from GitHub is no longer offered: the adapter is built before publishing, so it is installed from the ioBroker repository instead.",

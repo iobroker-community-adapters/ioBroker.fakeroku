@@ -102,7 +102,7 @@ becomes `true` — or watch `.command` for the last button as text.
 - (krobipd) Fixed: stopping the instance no longer leaves it reported as connected.
 - (krobipd) Fixed: a key you hold right after a short press stays pressed instead of being released early.
 - (krobipd) Fixed: the device dialog now also refuses a name that would collide with an existing device in the object tree.
-- (krobipd) Improved: when the host gets a new IP address, the emulated Rokus are advertised on it right away instead of staying unreachable until a restart.
+- (krobipd) Improved: after the host gets a new IP address, remotes find the emulated Rokus again without restarting the instance.
 
 ### 1.6.1 (2026-09-07) — stable
 
