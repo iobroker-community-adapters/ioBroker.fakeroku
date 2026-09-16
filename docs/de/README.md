@@ -123,7 +123,7 @@ kann sie damit aus ihrer Liste nehmen, statt noch eine Stunde lang Tastendrücke
 Leere zu schicken.
 
 Du kannst mehrere Instanzen auf demselben Rechner betreiben — gib jeder eigene
-ECP-Anschlüsse. UDP 1900 teilen sie sich: Der Adapter öffnet den Anschluss mit
+ECP-Ports. UDP 1900 teilen sie sich: Der Adapter öffnet den Anschluss mit
 Adress-Wiederverwendung, jede Instanz empfängt die Suchanfragen also und antwortet für
 ihre eigenen Geräte. Nur wenn ein anderes Programm den Anschluss exklusiv hält, startet
 eine Instanz ohne Geräteerkennung — das steht dann im Protokoll, und bereits gekoppelte
@@ -169,7 +169,7 @@ Erscheint nichts, suche zuerst nach einer Warnung über mehr als 25 Befehle pro 
 Befehle, die diese Bremse verwirft, werden nicht einzeln protokolliert — eine zu
 gesprächige Fernbedienung sieht also genauso aus wie eine, die den Adapter gar nicht
 erreicht. Ohne so eine Warnung kommt die Fernbedienung wirklich nicht durch: Netz und
-ECP-Anschluss prüfen.
+ECP-Port prüfen.
 
 **Wiedergabe und Pause tun dasselbe.**
 Das ist das Roku-Protokoll, nicht der Adapter: Die Fernbedienung sendet für
