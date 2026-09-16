@@ -1,9 +1,9 @@
 {
   "common": {
     "name": "fakeroku",
-    "version": "1.6.1",
+    "version": "1.7.0",
     "news": {
-      "NEXT": {
+      "1.7.0": {
         "en": "Button datapoints keep their value and their room and function assignment, and the instance restarts once right after this update.",
         "de": "Tastendatenpunkte behalten ihren Wert und ihre Raum- und Funktionszuordnung, und die Instanz startet direkt nach diesem Update einmal neu.",
         "ru": "Точки данных кнопок сохраняют значение и привязку к комнате и функции, а экземпляр один раз перезапускается сразу после этого обновления.",
@@ -93,19 +93,6 @@
         "pl": "Uczciwy status: instancja zgłasza połączenie tylko wtedy, gdy działa każdy skonfigurowany Roku. Zatrzymanie czeka na ostatni zapis. Dodatkowo opcjonalne raportowanie błędów przez Sentry.",
         "uk": "Чесний статус: екземпляр повідомляє про з'єднання, лише поки працює кожен налаштований Roku. Зупинка чекає на останній запис. Крім того, необов'язкові звіти про помилки через Sentry.",
         "zh-cn": "诚实的状态：仅当每个已配置的 Roku 都在运行时，实例才报告已连接。停止时会等待最后一次写入完成。此外还提供可选的 Sentry 错误报告。"
-      },
-      "1.1.0": {
-        "en": "More robust: a busy port on one Roku no longer stops the others, and discovery now reaches every network interface even on hosts with several.",
-        "de": "Robuster: ein belegter Port an einem Roku stoppt die anderen nicht mehr, und die Erkennung erreicht jetzt jede Netzwerkkarte, auch bei mehreren.",
-        "ru": "Надёжнее: занятый порт одного Roku больше не останавливает остальные, а обнаружение теперь охватывает все сетевые интерфейсы, даже если их несколько.",
-        "pt": "Mais robusto: uma porta ocupada num Roku já não impede os outros, e a deteção abrange agora todas as interfaces de rede, mesmo com várias.",
-        "nl": "Robuuster: een bezette poort op één Roku stopt de andere niet meer, en detectie bereikt nu elke netwerkkaart, ook bij meerdere.",
-        "fr": "Plus robuste : un port occupé sur un Roku n'arrête plus les autres, et la découverte couvre désormais chaque interface réseau, même s'il y en a plusieurs.",
-        "it": "Più robusto: una porta occupata su un Roku non blocca più gli altri e il rilevamento copre ora ogni interfaccia di rete, anche se sono più di una.",
-        "es": "Más robusto: un puerto ocupado en un Roku ya no detiene a los demás, y la detección abarca ahora cada interfaz de red, incluso si hay varias.",
-        "pl": "Solidniej: zajęty port jednego Roku nie zatrzymuje już pozostałych, a wykrywanie obejmuje teraz każdy interfejs sieciowy, nawet jeśli jest ich kilka.",
-        "uk": "Надійніше: зайнятий порт одного Roku більше не зупиняє інші, а виявлення тепер охоплює кожен мережевий інтерфейс, навіть якщо їх кілька.",
-        "zh-cn": "更稳健：某个 Roku 的端口被占用不再导致其他设备无法启动，且发现现在覆盖每个网络接口，即使有多个网卡。"
       }
     },
     "titleLang": {

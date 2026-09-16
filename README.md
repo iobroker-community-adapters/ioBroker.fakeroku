@@ -95,7 +95,7 @@ becomes `true` — or watch `.command` for the last button as text.
 	### **WORK IN PROGRESS**
 -->
 
-### **WORK IN PROGRESS**
+### 1.7.0 (2026-09-16)
 
 - (krobipd) Fixed: button datapoints keep their value and their room and function assignment when the adapter starts.
 - (krobipd) Fixed: after an emulated Roku drops out, its port is free again instead of staying blocked until ioBroker restarts.
@@ -135,15 +135,6 @@ becomes `true` — or watch `.command` for the last button as text.
 - (krobipd) Changed: every datapoint now carries a translated name and, where useful, a short description — in all eleven languages, in existing installations as well.
 - (krobipd) Improved: a remote with a globally routable IPv6 address is accepted when it sits in the same network as the ioBroker host, not just on the reserved IPv6 ranges.
 - (krobipd) New: user documentation in English and German, shown in the ioBroker documentation portal.
-
-### 1.3.0 (2026-09-01)
-- (krobipd) Fixed: a malformed keyboard keypress from a remote (a bad %-escape in the URL) could crash the adapter.
-- (krobipd) Fixed: remotes on an IPv6-only local network were refused; link-local and unique-local IPv6 addresses now count as LAN.
-- (krobipd) Fixed: the adapter icon in the admin is now the same one shown on GitHub.
-- (krobipd) Changed: requires admin >= 8.0.11.
-- (krobipd) Improved: discovery answers only searches from your own network, and the device dialog in the admin keeps working after the device list was edited by hand.
-- (krobipd) Improved: the emulated Roku reports Roku OS 15.0 (was 14.1), and the command-type datapoint lists its possible values so the admin shows them as labels.
-- (krobipd) New: a misbehaving device on your network can no longer flood ioBroker — more than 25 commands per second per emulated Roku are dropped and reported in the log.
 
 [Older changelogs can be found there](CHANGELOG_OLD.md)
 
