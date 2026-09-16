@@ -149,8 +149,8 @@ users it is simply a new version of the same adapter:
 - The **[ioBroker Community Adapters](https://github.com/iobroker-community-adapters)**
   team — notably [mcm1957](https://github.com/mcm1957) and
   [foxriver76](https://github.com/foxriver76) — maintained and modernized the adapter
-  from 2023 to 2026, releasing versions up to 0.4.0.
-- From **0.5.0** on, [krobi](https://github.com/krobipd) rewrote the adapter from the
+  from 2023 to 2026, releasing versions up to 0.5.1.
+- From **0.6.0** on, [krobi](https://github.com/krobipd) rewrote the adapter from the
   ground up in TypeScript and added the full ECP surface including `device-info`.
 
 ## Support
