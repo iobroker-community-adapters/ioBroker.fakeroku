@@ -95,7 +95,7 @@ becomes `true` — or watch `.command` for the last button as text.
 	### **WORK IN PROGRESS**
 -->
 
-### **WORK IN PROGRESS**
+### 1.7.1 (2026-09-16)
 
 - (krobipd) Fixed: a second instance on the same host is possible again — an instance carried over from an older version still claimed the whole machine.
 
@@ -131,14 +131,6 @@ becomes `true` — or watch `.command` for the last button as text.
 - (krobipd) Fixed: deleting the last emulated Roku left all of its datapoints behind for good. They are now removed whenever the configuration says a device is gone.
 - (krobipd) Fixed: on a host running Docker the adapter could announce itself under a container address no remote can reach. A real network address is preferred now.
 - (krobipd) Fixed: an emulated Roku whose server died while running left the instance showing "connected". It now reports the failure and names the device.
-
-### 1.4.0 (2026-09-03)
-- (krobipd) Fixed: renaming an emulated Roku could change its identity on the network, so a paired Harmony or Sofabaton lost the device and had to be set up again.
-- (krobipd) Fixed: a remote key that was pressed when the adapter stopped stayed on for good. All key datapoints are now released at start-up, so the next press works again.
-- (krobipd) Fixed: a device named "info" entered by hand into the configuration replaced the instance's own status channel. The name is refused now and leftovers are removed.
-- (krobipd) Changed: every datapoint now carries a translated name and, where useful, a short description — in all eleven languages, in existing installations as well.
-- (krobipd) Improved: a remote with a globally routable IPv6 address is accepted when it sits in the same network as the ioBroker host, not just on the reserved IPv6 ranges.
-- (krobipd) New: user documentation in English and German, shown in the ioBroker documentation portal.
 
 [Older changelogs can be found there](CHANGELOG_OLD.md)
 
