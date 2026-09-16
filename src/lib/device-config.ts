@@ -179,8 +179,8 @@ export function findClash(
       return t("deviceNameInUse");
     }
     // deviceObjectId, not the displayed name: the tree is built from the STORED name, so a
-    // row saved as " Roku " occupies "Roku_" at runtime while its display name reads "Roku".
-    // Checking the display name would let a new "Roku_" through here and let the start skip
+    // row saved as " Roku " occupies "_Roku_" at runtime while its display name reads "Roku".
+    // Checking the display name would let a new "_Roku_" through here and let the start skip
     // it as a duplicate id — a device that never comes up and an instance that stays red.
     if (deviceObjectId(devices[i]) === id) {
       return t("deviceNameInvalid");
