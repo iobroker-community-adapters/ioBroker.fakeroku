@@ -11,5 +11,19 @@
       "info.connection": "connectionStatusDesc"
     }
   },
-  "forumThread": "https://forum.iobroker.net/topic/85188/test-adapter-fakeroku-1.1.0"
+  "forumThread": "https://forum.iobroker.net/topic/85188/test-adapter-fakeroku-1.1.0",
+  "_listenPorts": "Every port the adapter opens. `key` is a native key only for primary/secondary; for shared and perDevice it is a label. fakeroku has no primary port: each emulated Roku carries its own ECP port in native.devices[], and SSDP 1900 is shared on purpose (declaring it as native.port would warn every UPnP user on the host).",
+  "listenPorts": [
+    {
+      "key": "devices[].port",
+      "protocol": "tcp",
+      "role": "perDevice"
+    },
+    {
+      "key": "ssdp",
+      "protocol": "udp",
+      "role": "shared",
+      "fixed": 1900
+    }
+  ]
 }

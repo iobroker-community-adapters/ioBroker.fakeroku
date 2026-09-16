@@ -103,6 +103,7 @@ becomes `true` — or watch `.command` for the last button as text.
 - (krobipd) Fixed: a key you hold right after a short press stays pressed instead of being released early.
 - (krobipd) Fixed: the device dialog now also refuses a name that would collide with an existing device in the object tree.
 - (krobipd) Improved: after the host gets a new IP address, remotes find the emulated Rokus again without restarting the instance.
+- (krobipd) Improved: the admin now warns you when a port you enter is already used by another adapter on this host; the instance restarts once after this update.
 
 ### 1.6.1 (2026-09-07) — stable
 

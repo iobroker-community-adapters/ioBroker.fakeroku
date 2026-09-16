@@ -33,7 +33,12 @@ const COMPARED = ["name", "desc", "role", "type", "unit"];
  * so two runs produce a byte-identical inventory.
  */
 const FIXTURE_NATIVE = {
-  networkInterface: "0.0.0.0",
+  // The legacy listen-address keys are cleared, not just left out: changeAdapterConfig MERGES,
+  // and this environment never restarts the host — a leftover legacy key would make the adapter
+  // migrate its settings and abort the start, leaving an empty inventory instead of a red test.
+  networkInterface: null,
+  BIND: null,
+  bind: "0.0.0.0",
   devices: [
     { name: "Player", port: 18060, type: "player", uuid: "fixture0000000000000000000player" },
     { name: "TV", port: 18061, type: "tv", uuid: "fixture00000000000000000000000tv" },

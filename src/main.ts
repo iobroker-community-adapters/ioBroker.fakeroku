@@ -12,6 +12,7 @@ import { RESERVED_IDS } from "./lib/constants";
 import { deviceObjectId, toDeviceRows, type DeviceRow } from "./lib/device-config";
 import { detectLocalIPv4s, detectPrimaryIPv4 } from "./lib/detect-ip";
 import { errText } from "./lib/errors";
+import { migrateNativeKeys, type NativeKeyMigration } from "./lib/native-key-migration";
 import { tDesc, tName, tRaw } from "./lib/i18n";
 import { planNativePrune, planObjectCleanup } from "./lib/object-cleanup";
 import { RateGate } from "./lib/rate-gate";
@@ -30,6 +31,28 @@ const MAX_COMMANDS_PER_SECOND = 25;
 const RATE_WARN_INTERVAL_MS = 60_000;
 /** How long to wait before trying a device whose ECP port was busy at start-up again. */
 const DEVICE_RETRY_INTERVAL_MS = 60_000;
+
+/**
+ * The listen address moved to `bind` (fleet listen-port standard). Two keys can hold it: the
+ * adapter's own `networkInterface`, and `BIND` from the pre-0.5.0 adapter. Both are moved onto
+ * `bind`; the helper prefers the source that says something, so a concrete address beats a key
+ * left at "all interfaces". An empty legacy value becomes "0.0.0.0" — the admin's check skips an
+ * instance whose `bind` is falsy, so a migrated "" would be as invisible as no key at all.
+ */
+const BIND_KEY_MIGRATIONS: NativeKeyMigration[] = [
+  { from: "networkInterface", to: "bind", coerce: toBindAddress },
+  { from: "BIND", to: "bind", coerce: toBindAddress },
+];
+
+/**
+ * A legacy listen address in the form the admin can read.
+ *
+ * @param old the stored legacy value
+ * @returns the address, or "0.0.0.0" when it holds nothing usable
+ */
+function toBindAddress(old: unknown): string {
+  return typeof old === "string" && old.trim() ? old.trim() : "0.0.0.0";
+}
 
 /** An emulated Roku whose ECP server did not come up yet — its objects exist, only the server is missing. */
 interface PendingDevice {
@@ -117,6 +140,15 @@ export class Fakeroku extends utils.Adapter {
   /** Create each device's object tree, start its ECP server, then the shared SSDP responder. */
   private async onReady(): Promise<void> {
     try {
+      // The listen address lives under the fleet-standard key `bind` — the admin's port-conflict
+      // check reads `native.port` + `native.bind` and skips every instance without them. On an
+      // update js-controller ADDS the missing key with its manifest default and never deletes the
+      // old one, so the user's value has to be MOVED: a read fallback would always find the
+      // freshly injected default. The write restarts this instance, so nothing may start before it.
+      if (await migrateNativeKeys(this, BIND_KEY_MIGRATIONS)) {
+        return;
+      }
+
       await this.setState("info.connection", { val: false, ack: true });
       await I18n.init(join(this.adapterDir, "admin"), this);
       await this.refreshOwnObjects();
@@ -135,9 +167,7 @@ export class Fakeroku extends utils.Adapter {
       // detected primary IP so the adapter runs without configuration. js-controller
       // never rewrites an existing native default, so instances from before 0.5.1
       // still carry "" — both must take the auto path. A concrete IP is honoured as-is.
-      // Migration: a pre-0.5.0 instance has no `networkInterface`, only the old `BIND` —
-      // adopt it so a multi-homed host keeps the interface the user had configured.
-      const configuredIp = this.config.networkInterface || this.config.BIND;
+      const configuredIp = this.config.bind;
       this.bindIp = configuredIp && configuredIp !== "0.0.0.0" ? configuredIp : undefined;
       const advertiseIp = this.bindIp ?? detectPrimaryIPv4();
       if (!advertiseIp) {

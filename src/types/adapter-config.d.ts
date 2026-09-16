@@ -3,9 +3,11 @@
 declare global {
   namespace ioBroker {
     interface AdapterConfig {
-      /** Selected network-interface IP to bind SSDP/ECP to and advertise. */
-      networkInterface: string;
-      /** Legacy pre-0.5.0 field: the old adapter's bound IP. Adopted as `networkInterface` on migration when the new field is absent. */
+      /** Selected network-interface IP to bind SSDP/ECP to and advertise ("0.0.0.0" = all). */
+      bind: string;
+      /** Legacy key, moved to `bind` on the first start after the update (fleet listen-port standard). */
+      networkInterface?: string;
+      /** Legacy pre-0.5.0 key of the old adapter, moved to `bind` on the same start. */
       BIND?: string;
       /**
        * Emulated Roku devices. `type` defaults to "player" when absent (pre-0.7.0 configs).

@@ -76,6 +76,21 @@ vi.mock("@iobroker/adapter-core", () => {
     // this list carries the pulse writes as well. Assert on it for the start-up reset, or
     // filter it; do not read "absent from this list" as "setStateChanged skipped it".
     public written: string[] = [];
+    // The instance object's native settings. js-controller builds `config` from exactly this,
+    // so the key-migration reads and merges HERE — a double that kept only `config` would let a
+    // migration look successful while the stored settings never moved.
+    public instanceNative: Record<string, unknown> = {};
+    public getForeignObjectAsync = vi.fn((id: string) =>
+      Promise.resolve(id === `system.adapter.${this.namespace}` ? { native: this.instanceNative } : undefined),
+    );
+    // A merge, the way extendForeignObject works: a key set to null is STORED as null, not
+    // removed — that is what makes the old key falsy without a second write.
+    public extendForeignObjectAsync = vi.fn((id: string, obj: { native: Record<string, unknown> }) => {
+      if (id === `system.adapter.${this.namespace}`) {
+        Object.assign(this.instanceNative, obj.native);
+      }
+      return Promise.resolve(undefined);
+    });
     public on = vi.fn();
     public setState = vi.fn((id: string, state: unknown) => {
       const s = state as { val?: unknown; ack?: boolean };
@@ -283,9 +298,12 @@ function setup(
   const i = internalOf(adapter);
   i.config = {
     devices: [{ name: "Wohnzimmer", port: 8060, type: "player" }],
-    networkInterface: "192.168.1.5",
+    bind: "192.168.1.5",
     ...config,
   };
+  // Same content in the instance object: that is where js-controller keeps it and where the
+  // key-migration looks.
+  i.instanceNative = structuredClone(i.config);
 
   const ecp: FakeEcp[] = [];
   const ssdps: FakeSsdp[] = [];
@@ -774,7 +792,7 @@ describe("Fakeroku onReady — key states are released at start-up", () => {
 
 describe("Fakeroku onReady — network interface", () => {
   it("a configured interface pins both the bind and the announcement", async () => {
-    const ctx = setup({ networkInterface: "192.168.1.5" });
+    const ctx = setup({ bind: "192.168.1.5" });
     await ctx.i.onReady();
     expect(ctx.ecp[0].options.bindIp).toBe("192.168.1.5");
     expect(ctx.ssdps[0].options).toMatchObject({
@@ -791,7 +809,7 @@ describe("Fakeroku onReady — network interface", () => {
       wlan0: [{ family: "IPv4", address: "10.0.0.7", internal: false }],
     };
     for (const value of ["", "0.0.0.0"]) {
-      const ctx = setup({ networkInterface: value });
+      const ctx = setup({ bind: value });
       await ctx.i.onReady();
       expect(ctx.ecp[0].options.bindIp, value).toBeUndefined();
       expect(ctx.ssdps[0].options.advertiseIp, value).toBe("192.168.1.20");
@@ -801,15 +819,55 @@ describe("Fakeroku onReady — network interface", () => {
     }
   });
 
-  it("adopts the pre-0.5.0 BIND field when no interface is configured", async () => {
-    const ctx = setup({ networkInterface: undefined, BIND: "10.1.2.3" });
+  it("moves a pre-0.5.0 BIND address onto bind and restarts instead of starting", async () => {
+    const ctx = setup({ bind: "0.0.0.0", BIND: "10.1.2.3" });
     await ctx.i.onReady();
+    // The write to the own instance object restarts the instance — binding a port in a process
+    // about to go down would leave the port held by a dying process.
+    expect(ctx.ecp).toHaveLength(0);
+    expect(ctx.i.instanceNative.bind).toBe("10.1.2.3");
+    // Nulled, not deleted: a merge cannot remove a key, and null is what makes it falsy.
+    expect(ctx.i.instanceNative.BIND).toBeNull();
+    expect(ctx.i.log.info).toHaveBeenCalledWith(expect.stringContaining("restarts once"));
+  });
+
+  it("moves the old networkInterface key onto bind", async () => {
+    const ctx = setup({ bind: "0.0.0.0", networkInterface: "192.168.1.9" });
+    await ctx.i.onReady();
+    expect(ctx.ecp).toHaveLength(0);
+    expect(ctx.i.instanceNative.bind).toBe("192.168.1.9");
+    expect(ctx.i.instanceNative.networkInterface).toBeNull();
+  });
+
+  it("a concrete address wins over a legacy key left at all-interfaces", async () => {
+    const ctx = setup({ bind: "0.0.0.0", networkInterface: "0.0.0.0", BIND: "10.1.2.3" });
+    await ctx.i.onReady();
+    expect(ctx.i.instanceNative.bind).toBe("10.1.2.3");
+    expect(ctx.i.instanceNative.networkInterface).toBeNull();
+  });
+
+  it("an empty legacy address migrates to 0.0.0.0, never to an empty string", async () => {
+    const ctx = setup({ bind: "0.0.0.0", networkInterface: "" });
+    await ctx.i.onReady();
+    // The admin's port-conflict check skips an instance whose bind is falsy, so a migrated ""
+    // would leave the adapter exactly as invisible as the old key did.
+    expect(ctx.i.instanceNative.bind).toBe("0.0.0.0");
+    expect(ctx.i.instanceNative.networkInterface).toBeNull();
+  });
+
+  it("does not migrate again once the legacy keys are null — the restart happens ONCE", async () => {
+    const ctx = setup({ bind: "10.1.2.3" });
+    ctx.i.instanceNative.networkInterface = null;
+    ctx.i.instanceNative.BIND = null;
+    await ctx.i.onReady();
+    // A helper that asked hasOwnProperty would migrate on every start and restart for ever.
+    expect(ctx.i.extendForeignObjectAsync).not.toHaveBeenCalled();
     expect(ctx.ecp[0].options.bindIp).toBe("10.1.2.3");
   });
 
   it("stops with a hint when no routable address exists", async () => {
     osMock.interfaces = { lo: [{ family: "IPv4", address: "127.0.0.1", internal: true }] };
-    const ctx = setup({ networkInterface: "" });
+    const ctx = setup({ bind: "" });
     await ctx.i.onReady();
     expect(ctx.i.log.warn).toHaveBeenCalledWith(expect.stringContaining("No routable IPv4 address"));
     expect(ctx.ecp).toHaveLength(0);
@@ -853,7 +911,7 @@ describe("Fakeroku onReady — discovery is an aid, not a precondition", () => {
     // change left discovery pointing at an address nobody serves — in front of an instance
     // that still reported itself connected.
     osMock.interfaces = { eth0: [{ family: "IPv4", address: "192.168.1.5", internal: false }] };
-    const ctx = setup({ networkInterface: "" });
+    const ctx = setup({ bind: "" });
     await ctx.i.onReady();
     expect(ctx.ssdps[0].options.advertiseIp).toBe("192.168.1.5");
     const tick = ctx.i.setInterval.mock.calls.at(-1)![0] as () => void;
@@ -871,7 +929,7 @@ describe("Fakeroku onReady — discovery is an aid, not a precondition", () => {
     // Every five minutes, for the lifetime of the instance. A line per pass would bury
     // everything else in the log of a host whose address never moves.
     osMock.interfaces = { eth0: [{ family: "IPv4", address: "192.168.1.5", internal: false }] };
-    const ctx = setup({ networkInterface: "" });
+    const ctx = setup({ bind: "" });
     await ctx.i.onReady();
     const tick = ctx.i.setInterval.mock.calls.at(-1)![0] as () => void;
     ctx.i.log.info.mockClear();
@@ -887,7 +945,7 @@ describe("Fakeroku onReady — discovery is an aid, not a precondition", () => {
     // A configured interface is a decision, not a guess: following the host's current
     // address would silently undo it the first time the machine got a second address.
     osMock.interfaces = { eth0: [{ family: "IPv4", address: "10.0.0.9", internal: false }] };
-    const ctx = setup({ networkInterface: "192.168.1.5" });
+    const ctx = setup({ bind: "192.168.1.5" });
     await ctx.i.onReady();
     const tick = ctx.i.setInterval.mock.calls.at(-1)![0] as () => void;
 
@@ -1140,7 +1198,7 @@ describe("Fakeroku cleanup of stale objects", () => {
     // What belongs in the tree is decided by the configuration, not by the network:
     // a host that lost its address must not resurrect a device the user removed.
     osMock.interfaces = { lo: [{ family: "IPv4", address: "127.0.0.1", internal: true }] };
-    const ctx = setup({ networkInterface: "", devices: [] });
+    const ctx = setup({ bind: "", devices: [] });
     ctx.i.objects.set("Wohnzimmer", { type: "device" });
 
     await ctx.i.onReady();
@@ -1948,7 +2006,7 @@ describe("Fakeroku — the paths that only a failing database reaches", () => {
     // in the meantime. The line then read "advertising on  (discovery off)", which looks
     // like a truncated log line rather than the finding it is.
     const ctx = setup(
-      { devices: [{ name: "Kueche", port: 8061, type: "player" }], networkInterface: "" },
+      { devices: [{ name: "Kueche", port: 8061, type: "player" }], bind: "" },
       {
         failEcpPort: 8061,
       },

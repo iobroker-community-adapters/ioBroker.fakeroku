@@ -7,10 +7,10 @@
       "text": "headerNetwork",
       "size": 4
     },
-    "networkInterface": {
+    "bind": {
       "type": "ip",
-      "label": "networkInterface",
-      "tooltip": "networkInterfaceTooltip",
+      "label": "bind",
+      "tooltip": "bindTooltip",
       "listenOnAllPorts": true,
       "onlyIp4": true,
       "noInternal": true,
@@ -34,7 +34,10 @@
       "md": 12,
       "lg": 12,
       "xl": 12,
-      "style": { "fontSize": 14, "marginBottom": 8 }
+      "style": {
+        "fontSize": 14,
+        "marginBottom": 8
+      }
     },
     "_deviceManager": {
       "type": "deviceManager",
@@ -58,7 +61,10 @@
       "md": 12,
       "lg": 12,
       "xl": 12,
-      "style": { "fontSize": 14, "marginBottom": 16 }
+      "style": {
+        "fontSize": 14,
+        "marginBottom": 16
+      }
     },
     "_kofiLink": {
       "type": "staticLink",
