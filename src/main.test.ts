@@ -80,17 +80,28 @@ vi.mock("@iobroker/adapter-core", () => {
     // so the key-migration reads and merges HERE — a double that kept only `config` would let a
     // migration look successful while the stored settings never moved.
     public instanceNative: Record<string, unknown> = {};
+    // The instance object's `common`. js-controller never deletes a key the manifest dropped, so
+    // this is where a stale host claim survives an update — the double has to keep it separately
+    // or the repair would look successful against nothing.
+    public instanceCommon: Record<string, unknown> = {};
     public getForeignObjectAsync = vi.fn((id: string) =>
-      Promise.resolve(id === `system.adapter.${this.namespace}` ? { native: this.instanceNative } : undefined),
+      Promise.resolve(
+        id === `system.adapter.${this.namespace}`
+          ? { common: this.instanceCommon, native: this.instanceNative }
+          : undefined,
+      ),
     );
     // A merge, the way extendForeignObject works: a key set to null is STORED as null, not
     // removed — that is what makes the old key falsy without a second write.
-    public extendForeignObjectAsync = vi.fn((id: string, obj: { native: Record<string, unknown> }) => {
-      if (id === `system.adapter.${this.namespace}`) {
-        Object.assign(this.instanceNative, obj.native);
-      }
-      return Promise.resolve(undefined);
-    });
+    public extendForeignObjectAsync = vi.fn(
+      (id: string, obj: { common?: Record<string, unknown>; native?: Record<string, unknown> }) => {
+        if (id === `system.adapter.${this.namespace}`) {
+          Object.assign(this.instanceNative, obj.native ?? {});
+          Object.assign(this.instanceCommon, obj.common ?? {});
+        }
+        return Promise.resolve(undefined);
+      },
+    );
     public on = vi.fn();
     public setState = vi.fn((id: string, state: unknown) => {
       const s = state as { val?: unknown; ack?: boolean };
@@ -266,6 +277,7 @@ function internalOf(adapter: Fakeroku): {
   extendObject: ReturnType<typeof vi.fn>;
   setForeignObject: ReturnType<typeof vi.fn>;
   instanceNative: Record<string, unknown>;
+  instanceCommon: Record<string, unknown>;
   getForeignObjectAsync: ReturnType<typeof vi.fn>;
   extendForeignObjectAsync: ReturnType<typeof vi.fn>;
   delObjectAsync: ReturnType<typeof vi.fn>;
@@ -856,6 +868,37 @@ describe("Fakeroku onReady — network interface", () => {
     // would leave the adapter exactly as invisible as the old key did.
     expect(ctx.i.instanceNative.bind).toBe("0.0.0.0");
     expect(ctx.i.instanceNative.networkInterface).toBeNull();
+  });
+
+  it("drops the leftover host claim, so a second instance becomes possible at all", async () => {
+    const ctx = setup({ bind: "10.1.2.3" });
+    ctx.i.instanceNative.networkInterface = null;
+    ctx.i.instanceNative.BIND = null;
+    // singletonHost left the manifest in 1.6.0, but js-controller never deletes a key it wrote —
+    // every installation upgraded from an older version still claims the whole host.
+    ctx.i.instanceCommon.singletonHost = true;
+    await ctx.i.onReady();
+    expect(ctx.ecp).toHaveLength(0);
+    expect(ctx.i.instanceCommon.singletonHost).toBeNull();
+    expect(ctx.i.log.info).toHaveBeenCalledWith(expect.stringContaining("no longer claims the whole host"));
+  });
+
+  it("repairs the settings and the host claim in ONE write, not two restarts", async () => {
+    const ctx = setup({ bind: "0.0.0.0", networkInterface: "192.168.1.9" });
+    ctx.i.instanceCommon.singletonHost = true;
+    await ctx.i.onReady();
+    expect(ctx.i.extendForeignObjectAsync).toHaveBeenCalledTimes(1);
+    expect(ctx.i.instanceNative.bind).toBe("192.168.1.9");
+    expect(ctx.i.instanceCommon.singletonHost).toBeNull();
+  });
+
+  it("leaves a repaired host claim alone — no second restart", async () => {
+    const ctx = setup({ bind: "10.1.2.3" });
+    ctx.i.instanceNative.networkInterface = null;
+    ctx.i.instanceCommon.singletonHost = null;
+    await ctx.i.onReady();
+    expect(ctx.i.extendForeignObjectAsync).not.toHaveBeenCalled();
+    expect(ctx.ecp[0].options.bindIp).toBe("10.1.2.3");
   });
 
   it("does not migrate again once the legacy keys are null — the restart happens ONCE", async () => {

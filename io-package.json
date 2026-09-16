@@ -3,6 +3,19 @@
     "name": "fakeroku",
     "version": "1.7.0",
     "news": {
+      "NEXT": {
+        "en": "A second instance on the same host is possible again; an instance carried over from an older version still claimed the whole machine.",
+        "de": "Eine zweite Instanz auf demselben Rechner ist wieder möglich; eine aus einer älteren Version übernommene Instanz beanspruchte den ganzen Rechner.",
+        "ru": "Второй экземпляр на том же хосте снова возможен; экземпляр, перенесённый из более старой версии, занимал весь компьютер целиком.",
+        "pt": "Uma segunda instância no mesmo anfitrião volta a ser possível; uma instância vinda de uma versão mais antiga reclamava a máquina inteira.",
+        "nl": "Een tweede instantie op dezelfde host is weer mogelijk; een instantie uit een oudere versie claimde de hele machine.",
+        "fr": "Une deuxième instance sur le même hôte est de nouveau possible ; une instance venue d'une version plus ancienne réclamait toute la machine.",
+        "it": "Una seconda istanza sullo stesso host è di nuovo possibile; un'istanza proveniente da una versione precedente rivendicava l'intera macchina.",
+        "es": "Una segunda instancia en el mismo host vuelve a ser posible; una instancia procedente de una versión anterior reclamaba toda la máquina.",
+        "pl": "Druga instancja na tym samym hoście jest znów możliwa; instancja przeniesiona ze starszej wersji zajmowała całą maszynę.",
+        "uk": "Другий екземпляр на тому самому хості знову можливий; екземпляр, перенесений зі старішої версії, займав усю машину.",
+        "zh-cn": "同一主机上可以再次添加第二个实例；从旧版本沿用下来的实例会独占整台机器。"
+      },
       "1.7.0": {
         "en": "Button datapoints keep their value and their room and function assignment, and the instance restarts once right after this update.",
         "de": "Tastendatenpunkte behalten ihren Wert und ihre Raum- und Funktionszuordnung, und die Instanz startet direkt nach diesem Update einmal neu.",

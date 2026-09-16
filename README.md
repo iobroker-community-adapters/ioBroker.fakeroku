@@ -95,6 +95,10 @@ becomes `true` — or watch `.command` for the last button as text.
 	### **WORK IN PROGRESS**
 -->
 
+### **WORK IN PROGRESS**
+
+- (krobipd) Fixed: a second instance on the same host is possible again — an instance carried over from an older version still claimed the whole machine.
+
 ### 1.7.0 (2026-09-16)
 
 - (krobipd) Fixed: button datapoints keep their value and their room and function assignment when the adapter starts.

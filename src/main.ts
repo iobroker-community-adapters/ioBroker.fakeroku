@@ -12,7 +12,7 @@ import { RESERVED_IDS } from "./lib/constants";
 import { deviceObjectId, toDeviceRows, type DeviceRow } from "./lib/device-config";
 import { detectLocalIPv4s, detectPrimaryIPv4 } from "./lib/detect-ip";
 import { errText } from "./lib/errors";
-import { migrateNativeKeys, type NativeKeyMigration } from "./lib/native-key-migration";
+import { buildNativeKeyPatch, type NativeKeyMigration } from "./lib/native-key-migration";
 import { tDesc, tName, tRaw } from "./lib/i18n";
 import { planNativePrune, planObjectCleanup } from "./lib/object-cleanup";
 import { RateGate } from "./lib/rate-gate";
@@ -137,15 +137,66 @@ export class Fakeroku extends utils.Adapter {
     this.deviceManagement = new FakerokuDeviceManagement(this);
   }
 
+  /**
+   * One-shot repair of this instance's own object — the settings keys and the leftover host claim.
+   *
+   * js-controller only ever ADDS to an existing instance object: on an update it fills missing
+   * `native` keys with the manifest default, and a `common` key the manifest dropped stays behind
+   * for ever. Two changes therefore never reached an existing installation on their own:
+   * the listen address had to MOVE to `bind` (a read fallback finds the injected default, not the
+   * user's value), and `singletonHost` — gone from the manifest since 1.6.0 — still claims the
+   * whole host, so nobody could add a second instance although the release said they could.
+   *
+   * Both are written in ONE merge, so the host restarts the instance at most once; `null` is what
+   * removes a key, since a merge cannot delete.
+   *
+   * @returns true when the object was written — the caller aborts its start, the host restarts
+   */
+  private async repairInstanceObject(): Promise<boolean> {
+    const id = `system.adapter.${this.namespace}`;
+    let obj: { common?: Record<string, unknown>; native?: Record<string, unknown> } | null | undefined;
+    try {
+      obj = await this.getForeignObjectAsync(id);
+    } catch (err) {
+      this.log.warn(`Settings repair skipped — could not read ${id}: ${errText(err)}`);
+      return false;
+    }
+    if (!obj) {
+      return false;
+    }
+    const native = buildNativeKeyPatch(obj.native ?? {}, BIND_KEY_MIGRATIONS);
+    // `null` is the state AFTER a repair — treating it as present would rewrite on every start
+    // and restart the instance for ever.
+    const claim = obj.common?.singletonHost;
+    const dropsHostClaim = claim !== undefined && claim !== null;
+    if (!Object.keys(native).length && !dropsHostClaim) {
+      return false;
+    }
+    const summary = [
+      ...Object.keys(native)
+        .filter(k => native[k] !== null)
+        .map(k => `${k} = ${JSON.stringify(native[k])}`),
+      ...(dropsHostClaim ? ["the instance no longer claims the whole host"] : []),
+    ].join(", ");
+    try {
+      await this.extendForeignObjectAsync(id, {
+        ...(dropsHostClaim ? { common: { singletonHost: null } } : {}),
+        ...(Object.keys(native).length ? { native } : {}),
+      });
+    } catch (err) {
+      this.log.warn(`Settings repair could not be stored (${errText(err)}) — retrying on the next start`);
+      return false;
+    }
+    this.log.info(`Settings migrated to the standard keys (${summary}) — this instance restarts once`);
+    return true;
+  }
+
   /** Create each device's object tree, start its ECP server, then the shared SSDP responder. */
   private async onReady(): Promise<void> {
     try {
-      // The listen address lives under the fleet-standard key `bind` — the admin's port-conflict
-      // check reads `native.port` + `native.bind` and skips every instance without them. On an
-      // update js-controller ADDS the missing key with its manifest default and never deletes the
-      // old one, so the user's value has to be MOVED: a read fallback would always find the
-      // freshly injected default. The write restarts this instance, so nothing may start before it.
-      if (await migrateNativeKeys(this, BIND_KEY_MIGRATIONS)) {
+      // Repair what an update leaves behind in the instance object, before anything binds a port.
+      // The write restarts this instance, so nothing may start before it.
+      if (await this.repairInstanceObject()) {
         return;
       }
 
