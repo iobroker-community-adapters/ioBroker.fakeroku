@@ -265,6 +265,9 @@ function internalOf(adapter: Fakeroku): {
   setStateChangedAsync: ReturnType<typeof vi.fn>;
   extendObject: ReturnType<typeof vi.fn>;
   setForeignObject: ReturnType<typeof vi.fn>;
+  instanceNative: Record<string, unknown>;
+  getForeignObjectAsync: ReturnType<typeof vi.fn>;
+  extendForeignObjectAsync: ReturnType<typeof vi.fn>;
   delObjectAsync: ReturnType<typeof vi.fn>;
   deviceManagement: unknown;
   makeEcpServer: unknown;
