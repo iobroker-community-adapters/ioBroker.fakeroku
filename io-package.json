@@ -4,17 +4,17 @@
     "version": "1.7.1",
     "news": {
       "1.7.1": {
-        "en": "A second instance on the same host is possible again; an instance carried over from an older version still claimed the whole machine.",
-        "de": "Eine zweite Instanz auf demselben Rechner ist wieder möglich; eine aus einer älteren Version übernommene Instanz beanspruchte den ganzen Rechner.",
-        "ru": "Второй экземпляр на том же хосте снова возможен; экземпляр, перенесённый из более старой версии, занимал весь компьютер целиком.",
-        "pt": "Uma segunda instância no mesmo anfitrião volta a ser possível; uma instância vinda de uma versão mais antiga reclamava a máquina inteira.",
-        "nl": "Een tweede instantie op dezelfde host is weer mogelijk; een instantie uit een oudere versie claimde de hele machine.",
-        "fr": "Une deuxième instance sur le même hôte est de nouveau possible ; une instance venue d'une version plus ancienne réclamait toute la machine.",
-        "it": "Una seconda istanza sullo stesso host è di nuovo possibile; un'istanza proveniente da una versione precedente rivendicava l'intera macchina.",
-        "es": "Una segunda instancia en el mismo host vuelve a ser posible; una instancia procedente de una versión anterior reclamaba toda la máquina.",
-        "pl": "Druga instancja na tym samym hoście jest znów możliwa; instancja przeniesiona ze starszej wersji zajmowała całą maszynę.",
-        "uk": "Другий екземпляр на тому самому хості знову можливий; екземпляр, перенесений зі старішої версії, займав усю машину.",
-        "zh-cn": "同一主机上可以再次添加第二个实例；从旧版本沿用下来的实例会独占整台机器。"
+        "en": "The instance restarts once after this update to clear a setting left behind by an older version; nothing else changes for you.",
+        "de": "Die Instanz startet nach diesem Update einmal neu und räumt dabei eine Einstellung aus einer älteren Version weg; sonst ändert sich nichts.",
+        "ru": "После этого обновления экземпляр один раз перезапускается и убирает настройку, оставшуюся от более старой версии; больше ничего не меняется.",
+        "pt": "A instância reinicia uma vez após esta atualização e remove uma definição deixada por uma versão mais antiga; nada mais muda para si.",
+        "nl": "De instantie start na deze update eenmalig opnieuw en ruimt een instelling uit een oudere versie op; verder verandert er niets.",
+        "fr": "L'instance redémarre une fois après cette mise à jour et supprime un réglage laissé par une version plus ancienne ; rien d'autre ne change.",
+        "it": "L'istanza si riavvia una volta dopo questo aggiornamento e rimuove un'impostazione lasciata da una versione precedente; nient'altro cambia.",
+        "es": "La instancia se reinicia una vez tras esta actualización y elimina un ajuste que dejó una versión anterior; nada más cambia para ti.",
+        "pl": "Instancja uruchamia się raz ponownie po tej aktualizacji i usuwa ustawienie pozostawione przez starszą wersję; poza tym nic się nie zmienia.",
+        "uk": "Після цього оновлення екземпляр один раз перезапускається та прибирає налаштування, залишене старішою версією; більше нічого не змінюється.",
+        "zh-cn": "本次更新后实例会重启一次，清除旧版本遗留的一项设置；其他一切保持不变。"
       },
       "1.7.0": {
         "en": "Button datapoints keep their value and their room and function assignment, and the instance restarts once right after this update.",

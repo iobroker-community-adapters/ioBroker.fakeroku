@@ -97,7 +97,7 @@ becomes `true` — or watch `.command` for the last button as text.
 
 ### 1.7.1 (2026-09-16)
 
-- (krobipd) Fixed: a second instance on the same host is possible again — an instance carried over from an older version still claimed the whole machine.
+- (krobipd) Changed: the instance restarts once after this update to clear a setting left behind by an older version; nothing else changes for you.
 
 ### 1.7.0 (2026-09-16)
 
