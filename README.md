@@ -95,7 +95,7 @@ becomes `true` — or watch `.command` for the last button as text.
 	### **WORK IN PROGRESS**
 -->
 
-### 1.7.1 (2026-09-16)
+### 1.7.1 (2026-09-16) — stable
 
 - (krobipd) Fixed: a second instance on the same host is possible again — an instance carried over from an older version still claimed the whole machine.
 
