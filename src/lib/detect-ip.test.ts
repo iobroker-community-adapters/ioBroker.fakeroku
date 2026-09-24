@@ -122,6 +122,15 @@ describe("inNet", () => {
     virtual: false,
   };
 
+  it("a /0 network takes every address (the shift by 32 would otherwise keep only the own one)", () => {
+    expect(inNet("8.8.8.8", { ...lan, prefixLength: 0 })).toBe(true);
+  });
+
+  it("a malformed group outside the prefix still makes the address no address", () => {
+    // Only the first 64 bits are compared: without the check the broken group would pass.
+    expect(inNet("2003:e1:1f28:9a00:zzzz::1", v6net)).toBe(false);
+  });
+
   it("matches an IPv4 address by prefix length", () => {
     expect(inNet("192.168.1.200", lan)).toBe(true);
     expect(inNet("192.168.2.1", lan)).toBe(false);

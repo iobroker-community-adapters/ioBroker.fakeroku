@@ -158,6 +158,19 @@ describe("deviceObjectId", () => {
   });
 });
 
+describe("the object tree the rows are resolved against", () => {
+  it("counts only states below <device>.keys as keys — a state in another branch is no key", () => {
+    const tree = deviceTreeOf(["TV", "TV.info.PowerOn", "TV.keys.Home"], id => (id === "TV" ? "device" : "state"));
+    expect([...(tree.keys.get("TV") ?? [])]).toEqual(["Home"]);
+  });
+
+  it("never takes over an old tree whose id js-controller would refuse today", () => {
+    // Every object below such an id would fail to be created; the row starts under a clean id.
+    const tree = deviceTreeOf(["a*b"], () => "device");
+    expect(deviceObjectId(toDeviceRow({ name: "a*b", port: 8060, type: "player" }, tree)!)).toBe("a_b");
+  });
+});
+
 describe("isUsableObjectId", () => {
   it("allows what js-controller allows in one segment (7.2.2 FORBIDDEN_CHARS), no dot", () => {
     for (const id of ["Roku", "Küche", "Roku_(Wohnzimmer)", "a#b", "x-y_z"]) {

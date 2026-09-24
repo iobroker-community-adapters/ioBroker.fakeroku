@@ -2529,6 +2529,10 @@ describe("Fakeroku — every stop point of the start", () => {
     await ctx.i.onReady();
     expect(ctx.ssdps).toHaveLength(0);
     expect(ctx.i.log.error).not.toHaveBeenCalled();
+    // The orphan sweep reads the object tree a second time — it must not run once stopped.
+    expect(
+      (ctx.i as unknown as { getAdapterObjectsAsync: ReturnType<typeof vi.fn> }).getAdapterObjectsAsync,
+    ).toHaveBeenCalledTimes(1);
   });
 
   it("stops after the sweep, before discovery", async () => {
@@ -2543,6 +2547,8 @@ describe("Fakeroku — every stop point of the start", () => {
       });
     await ctx.i.onReady();
     expect(ctx.ssdps).toHaveLength(0);
+    // onUnload emptied the running list: going on would report "no device could be started".
+    expect(ctx.i.log.error).not.toHaveBeenCalled();
   });
 
   it("starts with an instance object that does not exist", async () => {
@@ -2591,5 +2597,163 @@ describe("Fakeroku — the late discovery start (all interfaces, no address at f
     ctx.i.setState.mockImplementationOnce(() => Promise.reject(new Error("states db gone")));
     fire();
     await vi.waitFor(() => expect(ctx.i.log.warn).toHaveBeenCalledWith(expect.stringContaining("states db gone")));
+  });
+});
+
+describe("Fakeroku — stop points that only one guard covers", () => {
+  it("a stop during the object read writes no new identity into the configuration", async () => {
+    const ctx = setup({ devices: [{ name: "Roku", port: 8060, type: "player" }] }, { fresh: true });
+    const read = ctx.i as unknown as { getAdapterObjectsAsync: ReturnType<typeof vi.fn> };
+    const real = read.getAdapterObjectsAsync.getMockImplementation() as () => Promise<unknown>;
+    read.getAdapterObjectsAsync.mockImplementationOnce(() => {
+      ctx.i.onUnload(() => {});
+      return real();
+    });
+    await ctx.i.onReady();
+    expect(ctx.i.extendForeignObjectAsync).not.toHaveBeenCalled();
+  });
+
+  it("a stop while the chosen address comes up neither warns nor sweeps an empty list", async () => {
+    osMock.interfaces = { lo: [{ family: "IPv4", address: "127.0.0.1", internal: true }] };
+    const ctx = setup({ bind: "192.168.1.5", devices: [] });
+    const ready = ctx.i.onReady();
+    await vi.waitFor(() => expect(ctx.i.setTimeout).toHaveBeenCalledWith(expect.any(Function), 10_000));
+    osMock.interfaces = {
+      eth0: [{ family: "IPv4", address: "192.168.1.5", internal: false, cidr: "192.168.1.5/24" }],
+    };
+    ctx.i.onUnload(() => {});
+    (ctx.i.setTimeout.mock.calls.at(-1)![0] as () => void)();
+    await ready;
+    expect(ctx.i.log.warn).not.toHaveBeenCalledWith(expect.stringContaining("No emulated Roku devices configured"));
+  });
+
+  it("a stop between two devices builds no tree for the second one", async () => {
+    const ctx = setup(
+      {
+        devices: [
+          { name: "Wohnzimmer", port: 8060, type: "player", uuid: "legacy-a" },
+          { name: "Kueche", port: 8061, type: "player", uuid: "legacy-b" },
+        ],
+      },
+      { fresh: true },
+    );
+    const real = ctx.i.extendObject.getMockImplementation() as (id: string, o: unknown) => Promise<void>;
+    ctx.i.extendObject.mockImplementation((id: string, o: unknown) => {
+      if (id === "Wohnzimmer.keys.Home") {
+        ctx.i.onUnload(() => {});
+      }
+      return real(id, o);
+    });
+    await ctx.i.onReady();
+    expect(ctx.i.objects.has("Kueche")).toBe(false);
+  });
+});
+
+describe("Fakeroku — waiting for the chosen address", () => {
+  it("says once that it waits, not every ten seconds", async () => {
+    osMock.interfaces = { lo: [{ family: "IPv4", address: "127.0.0.1", internal: true }] };
+    const ctx = setup({ bind: "192.168.1.5" });
+    const ready = ctx.i.onReady();
+    const waits = (): (() => void)[] =>
+      ctx.i.setTimeout.mock.calls.filter(([, ms]) => ms === 10_000).map(([fn]) => fn as () => void);
+    await vi.waitFor(() => expect(waits()).toHaveLength(1));
+    waits()[0]();
+    await vi.waitFor(() => expect(waits()).toHaveLength(2));
+    osMock.interfaces = {
+      eth0: [{ family: "IPv4", address: "192.168.1.5", internal: false, cidr: "192.168.1.5/24" }],
+    };
+    waits()[1]();
+    await ready;
+    const said = ctx.i.log.info.mock.calls.filter(([text]) =>
+      String(text).includes("Waiting for the network interface"),
+    );
+    expect(said).toHaveLength(1);
+    expect(ctx.ecp).toHaveLength(1);
+  });
+});
+
+describe("Fakeroku — one discovery, however it gets started", () => {
+  /**
+   * Two devices, the second one's port taken, and no address yet: discovery waits for an address
+   * and the second device waits for its port — two timers that may fire in either order.
+   *
+   * @returns the context and the two armed callbacks
+   */
+  async function twoTimers(): Promise<{ ctx: Ctx; discovery: () => void; retry: () => void }> {
+    osMock.interfaces = { lo: [{ family: "IPv4", address: "127.0.0.1", internal: true }] };
+    const ctx = setup(
+      {
+        bind: "",
+        devices: [
+          { name: "Wohnzimmer", port: 8060, type: "player" },
+          { name: "Kueche", port: 8061, type: "player" },
+        ],
+      },
+      { failEcpPort: 8061 },
+    );
+    await ctx.i.onReady();
+    // Discovery is armed first (no address), the device retry last (end of onReady).
+    const armed = ctx.i.setTimeout.mock.calls.filter(([, ms]) => ms === 60_000).map(([fn]) => fn as () => void);
+    expect(armed).toHaveLength(2);
+    osMock.interfaces = {
+      eth0: [{ family: "IPv4", address: "192.168.1.30", internal: false, cidr: "192.168.1.30/24" }],
+    };
+    ctx.freeEcpPort();
+    return { ctx, discovery: armed[0], retry: armed[1] };
+  }
+
+  it("the late device finds discovery running and starts no second one", async () => {
+    const { ctx, discovery, retry } = await twoTimers();
+    discovery();
+    await vi.waitFor(() => expect(ctx.ssdps).toHaveLength(1));
+    retry();
+    await vi.waitFor(() => expect(ctx.i.states.get("info.connection")?.val).toBe(true));
+    expect(ctx.ssdps).toHaveLength(1);
+  });
+
+  it("the address timer finds discovery started by the late device and starts no second one", async () => {
+    const { ctx, discovery, retry } = await twoTimers();
+    retry();
+    await vi.waitFor(() => expect(ctx.i.states.get("info.connection")?.val).toBe(true));
+    expect(ctx.ssdps).toHaveLength(1);
+    discovery();
+    await new Promise(r => setImmediate(r));
+    expect(ctx.ssdps).toHaveLength(1);
+  });
+});
+
+describe("Fakeroku — network interface rules without a single-interface shortcut", () => {
+  it("a chosen interface joins only that interface, not every one the host has", async () => {
+    osMock.interfaces = {
+      eth0: [{ family: "IPv4", address: "192.168.1.5", internal: false, cidr: "192.168.1.5/24" }],
+      wlan0: [{ family: "IPv4", address: "10.0.0.7", internal: false, cidr: "10.0.0.7/24" }],
+    };
+    const ctx = setup({ bind: "192.168.1.5" });
+    await ctx.i.onReady();
+    expect(ctx.ssdps[0].options.membershipInterfaces).toEqual([{ iface: "eth0", address: "192.168.1.5" }]);
+  });
+
+  it("a networkInterface key emptied to null does not beat the old adapter's BIND", async () => {
+    const ctx = setup({ bind: "0.0.0.0", networkInterface: null, BIND: "10.1.2.3" });
+    await ctx.i.onReady();
+    expect(ctx.i.instanceNative.bind).toBe("10.1.2.3");
+  });
+
+  it("a new device gets its own identity, an existing one next to it keeps the one it has", async () => {
+    const ctx = setup(
+      {
+        devices: [
+          { name: "Alt", port: 8060, type: "player" },
+          { name: "Neu", port: 8061, type: "player" },
+        ],
+      },
+      { fresh: true },
+    );
+    ctx.i.objects.set("Alt", { type: "device", common: { name: "Alt" }, native: {} });
+    await ctx.i.onReady();
+    const stored = ctx.i.instanceNative.devices as { name: string; uuid: string }[];
+    expect(stored[0].uuid).toBe(deriveUuid("Alt"));
+    expect(stored[1].uuid).toMatch(/^[0-9a-f]{32}$/);
+    expect(stored[1].uuid).not.toBe(deriveUuid("Neu"));
   });
 });

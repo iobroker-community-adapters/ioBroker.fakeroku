@@ -571,6 +571,64 @@ describe("RokuSsdpResponder", () => {
     expect(failed).toHaveLength(2);
   });
 
+  it("names the interfaces it joined in its start line — the first thing to read when nothing is found", async () => {
+    const log = recordingLog();
+    await new RokuSsdpResponder({
+      ...baseCfg,
+      logger: log,
+      bindIp: undefined,
+      membershipInterfaces: [m("10.0.0.9")],
+    }).start();
+    expect(log.debug).toHaveBeenCalledWith(expect.stringContaining("(join: if-10.0.0.9 10.0.0.9)"));
+    const quiet = recordingLog();
+    await new RokuSsdpResponder({ ...baseCfg, logger: quiet, bindIp: undefined, membershipInterfaces: [] }).start();
+    expect(quiet.debug).toHaveBeenCalledWith(expect.stringContaining("(join: default)"));
+  });
+
+  it("a chosen interface opens no sender for an interface that came up later", async () => {
+    const r = new RokuSsdpResponder({ ...baseCfg, bindIp: "10.0.0.9", membershipInterfaces: [m("10.0.0.9")] });
+    await r.start();
+    r.refreshAdvertise("10.0.0.9", [m("10.0.0.9"), m("192.168.50.2")]);
+    // Only the receiving socket: an announcement into another network would leave the chosen one.
+    expect(dgramMock.sockets).toHaveLength(1);
+  });
+
+  it("a refresh with the same interfaces opens no second sender", async () => {
+    const r = new RokuSsdpResponder({ ...baseCfg, bindIp: undefined, membershipInterfaces: [m("10.0.0.9")] });
+    await r.start();
+    r.refreshAdvertise(baseCfg.advertiseIp, [m("10.0.0.9")]);
+    r.refreshAdvertise(baseCfg.advertiseIp, [m("10.0.0.9")]);
+    expect(dgramMock.sockets).toHaveLength(2);
+  });
+
+  it("announces nothing once the receiving socket closed on its own, even with senders still open", async () => {
+    const r = new RokuSsdpResponder({ ...baseCfg, bindIp: undefined, membershipInterfaces: [m("10.0.0.9")] });
+    await r.start();
+    dgramMock.sockets[0].emit("close");
+    r.announce();
+    expect(dgramMock.sockets[1].sent).toEqual([]);
+  });
+
+  it("a targeted uuid search is answered by the device it names, not by every device", async () => {
+    const r = new RokuSsdpResponder({
+      ...baseCfg,
+      devices: [
+        { uuid: "aaa", port: 8060 },
+        { uuid: "bbb", port: 8061 },
+      ],
+      bindIp: undefined,
+      membershipInterfaces: [],
+    });
+    await r.start();
+    const s = dgramMock.sockets[0];
+    s.emit("message", Buffer.from(MSEARCH.replace("ST: roku:ecp", "ST: uuid:roku:ecp:bbb")), {
+      address: "10.0.0.50",
+      port: 41234,
+    });
+    expect(s.sent).toHaveLength(1);
+    expect(s.sent[0].text).toContain("USN: uuid:roku:ecp:bbb");
+  });
+
   it("logs a failed announce at debug, not warn", async () => {
     const r = new RokuSsdpResponder({ ...baseCfg, bindIp: undefined, membershipInterfaces: [] });
     await r.start();

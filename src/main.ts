@@ -577,9 +577,9 @@ export class Fakeroku extends utils.Adapter {
       this.scheduleDeviceRetry();
     } catch (e) {
       this.log.warn(`Retrying the waiting emulated Rokus failed: ${errText(e)}`);
-      if (!this.stopping) {
-        this.scheduleDeviceRetry();
-      }
+      // No stopping check: onUnload empties the queue, and scheduleDeviceRetry arms nothing for
+      // an empty one — measured, a guard here survived its own mutation needle.
+      this.scheduleDeviceRetry();
     }
   }
 

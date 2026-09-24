@@ -22,6 +22,8 @@ describe("buildDeviceInfoXml", () => {
   });
   it("escapes the friendly name", () => {
     expect(buildDeviceInfoXml(device, "A & B", "player")).toContain("A &amp; B");
+    // Every field that carries the name escapes it — Home Assistant parses the whole document.
+    expect(buildDeviceInfoXml(device, "A<&B", "player")).toContain("<user-device-name>A&lt;&amp;B</user-device-name>");
   });
   it("a player is not a TV and has no TV power/volume capability", () => {
     expect(info).toContain("<is-tv>false</is-tv>");
