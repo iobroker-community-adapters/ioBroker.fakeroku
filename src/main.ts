@@ -10,10 +10,18 @@ import { EcpHttpServer } from "./ecp/ecp-http-server";
 import { commandToStateWrite, type DeviceType, keysForType } from "./ecp/state-model";
 import { RESERVED_IDS } from "./lib/constants";
 import { deviceObjectId, toDeviceRows, type DeviceRow } from "./lib/device-config";
-import { detectLocalIPv4s, detectPrimaryIPv4 } from "./lib/detect-ip";
+import {
+  detectLocalIPv4s,
+  detectLocalNets,
+  detectPrimaryIPv4,
+  hasLocalAddress,
+  localAddressFor,
+  netsOfInterface,
+} from "./lib/detect-ip";
 import { errText } from "./lib/errors";
 import { migrateNativeKeys, type NativeKeyMigration } from "./lib/native-key-migration";
 import { tDesc, tName, tRaw } from "./lib/i18n";
+import { isLanClient } from "./lib/lan-guard";
 import { planNativePrune, planObjectCleanup } from "./lib/object-cleanup";
 import { RateGate } from "./lib/rate-gate";
 
@@ -31,6 +39,16 @@ const MAX_COMMANDS_PER_SECOND = 25;
 const RATE_WARN_INTERVAL_MS = 60_000;
 /** How long to wait before trying a device whose ECP port was busy at start-up again. */
 const DEVICE_RETRY_INTERVAL_MS = 60_000;
+/** How often a chosen interface address that is missing at start-up is looked for again. */
+const BIND_WAIT_STEP_MS = 10_000;
+/**
+ * How long a missing chosen address is waited for. Long enough for a host whose network comes up
+ * after ioBroker (Wi-Fi, DHCP, a restart after a power cut); after that the address is taken as
+ * gone, and serving on another one would leave the network the user chose.
+ */
+const BIND_WAIT_MAX_MS = 120_000;
+/** How often "all interfaces" looks for an address to start discovery with when it had none. */
+const DISCOVERY_RETRY_INTERVAL_MS = 60_000;
 
 /**
  * The listen address moved to `bind` (fleet listen-port standard). Which legacy key holds the
@@ -108,6 +126,8 @@ export class Fakeroku extends utils.Adapter {
   private pending: PendingDevice[] = [];
   /** The retry timer for {@link pending}, armed only while something is waiting. */
   private retryTimer: ioBroker.Timeout | undefined;
+  /** The timer that starts discovery once the host has an address ("all interfaces" only). */
+  private discoveryTimer: ioBroker.Timeout | undefined;
 
   /**
    * Set as the very first thing onUnload does. Everything that can still be in flight at
@@ -226,18 +246,27 @@ export class Fakeroku extends utils.Adapter {
       // rows, so an edit can never resolve a different identity than the one advertised.
       const configured = toDeviceRows(this.config.devices);
 
-      // Empty AND "0.0.0.0" both mean "auto": bind all interfaces, advertise the
-      // detected primary IP so the adapter runs without configuration. js-controller
-      // never rewrites an existing native default, so instances from before 0.5.1
-      // still carry "" — both must take the auto path. A concrete IP is honoured as-is.
+      // Empty AND "0.0.0.0" both mean "auto": bind all interfaces, answer every network with the
+      // host's own address in it. js-controller never rewrites an existing native default, so
+      // instances from before 0.5.1 still carry "" — both must take the auto path.
       const configuredIp = this.config.bind;
       this.bindIp = configuredIp && configuredIp !== "0.0.0.0" ? configuredIp : undefined;
-      const advertiseIp = this.bindIp ?? detectPrimaryIPv4();
-      if (!advertiseIp) {
-        this.log.warn("No routable IPv4 address found to advertise — set the network interface in the settings.");
-        // Sweep even here: what belongs in the tree is decided by the configuration,
-        // not by the network. A missing cable is no reason to keep a deleted device.
+
+      // A chosen interface is the user's decision: everything stays in its network. An address no
+      // interface carries cannot be served — and serving on another one would leave the network
+      // the user chose. It is waited for briefly (a host whose network comes up after ioBroker),
+      // then reported and nothing starts.
+      if (this.bindIp && !(await this.awaitBindAddress(this.bindIp))) {
+        if (this.stopping) {
+          return;
+        }
+        this.log.error(
+          `The network interface address ${this.bindIp} does not exist on this host — choose another network interface in the instance settings.`,
+        );
         await this.sweepOrphans(configured);
+        return;
+      }
+      if (this.stopping) {
         return;
       }
 
@@ -249,7 +278,13 @@ export class Fakeroku extends utils.Adapter {
 
       this.expectedDevices = configured.length;
       await this.startDevices(configured);
+      if (this.stopping) {
+        return;
+      }
       await this.sweepOrphans(configured);
+      if (this.stopping) {
+        return;
+      }
 
       if (this.running.length === 0 && this.pending.length === 0) {
         // Nothing is controllable and nothing is worth retrying — leave info.connection false.
@@ -257,8 +292,18 @@ export class Fakeroku extends utils.Adapter {
         return;
       }
 
+      const advertiseIp = this.bindIp ?? detectPrimaryIPv4();
       if (this.running.length > 0) {
-        this.startDiscovery(advertiseIp);
+        if (advertiseIp) {
+          this.startDiscovery(advertiseIp);
+        } else {
+          // The ECP servers listen on every interface and need no address; only discovery has
+          // nothing to announce yet. It starts as soon as the host has an address.
+          this.log.warn(
+            "No routable IPv4 address yet — the emulated Rokus are listening; discovery starts as soon as the host has an address.",
+          );
+          this.scheduleDiscoveryStart();
+        }
       }
       await this.reportConnectionState(advertiseIp);
       this.scheduleDeviceRetry();
@@ -266,6 +311,83 @@ export class Fakeroku extends utils.Adapter {
       this.log.error(`onReady failed: ${errText(e)}`);
     }
   }
+
+  /**
+   * Wait until an interface carries the chosen address — at most {@link BIND_WAIT_MAX_MS}, looking
+   * every {@link BIND_WAIT_STEP_MS}. Returns at once when the address is there (the normal case).
+   *
+   * @param address the chosen interface address
+   * @returns true once an interface carries it; false when it did not appear or the host said stop
+   */
+  private async awaitBindAddress(address: string): Promise<boolean> {
+    for (let waited = 0; ; waited += BIND_WAIT_STEP_MS) {
+      if (hasLocalAddress(address, detectLocalNets())) {
+        return true;
+      }
+      if (this.stopping || waited >= BIND_WAIT_MAX_MS) {
+        return false;
+      }
+      if (waited === 0) {
+        this.log.info(`Waiting for the network interface address ${address} to come up …`);
+      }
+      await new Promise<void>(resolve => {
+        // The managed timer refuses during shutdown and hands back nothing — then there is
+        // nothing to wait for.
+        if (!this.setTimeout(resolve, BIND_WAIT_STEP_MS)) {
+          resolve();
+        }
+      });
+    }
+  }
+
+  /**
+   * Look for an address to start discovery with, once a minute, until one is there ("all
+   * interfaces" with no routable IPv4 at start-up: the ECP servers already listen).
+   */
+  private scheduleDiscoveryStart(): void {
+    if (this.discoveryTimer) {
+      return;
+    }
+    const timer = this.setTimeout(() => {
+      this.discoveryTimer = undefined;
+      void this.tryStartDiscovery();
+    }, DISCOVERY_RETRY_INTERVAL_MS);
+    if (timer) {
+      this.discoveryTimer = timer;
+    }
+  }
+
+  /** One attempt of {@link scheduleDiscoveryStart}; dropped with `void`, so it catches its own failures. */
+  private async tryStartDiscovery(): Promise<void> {
+    try {
+      if (this.stopping || this.ssdp) {
+        return;
+      }
+      const advertiseIp = detectPrimaryIPv4();
+      if (!advertiseIp) {
+        this.scheduleDiscoveryStart();
+        return;
+      }
+      this.startDiscovery(advertiseIp);
+      await this.reportConnectionState(advertiseIp);
+    } catch (e) {
+      this.log.warn(`Starting discovery failed: ${errText(e)}`);
+    }
+  }
+
+  /**
+   * The trust boundary of both services: a client in one of the host's own networks — with a
+   * chosen interface only in that interface's network. Read fresh on every question, so an address
+   * change is followed instead of frozen at start-up.
+   *
+   * @param address the client address
+   * @returns true if the client may be answered
+   */
+  private readonly isOwnClient = (address: string | undefined): boolean =>
+    isLanClient(address, () => {
+      const nets = detectLocalNets();
+      return this.bindIp ? netsOfInterface(this.bindIp, nets) : nets;
+    });
 
   /**
    * Create the object tree and start the ECP server for every configured device.
@@ -343,6 +465,7 @@ export class Fakeroku extends utils.Adapter {
         logger: this.log,
         onCommand: cmd => this.applyCommand(device.deviceId, cmd),
         onFatalError: () => this.onEcpFatal(device),
+        isClientAllowed: this.isOwnClient,
       });
       await server.start();
       // The host may have said stop while we were binding. Registering now would put the
@@ -442,20 +565,28 @@ export class Fakeroku extends utils.Adapter {
    *
    * Discovery is only an aid; the ECP servers already make the adapter controllable, so a
    * busy port 1900 (or a stuck bind) degrades to "discovery off, already-paired remotes
-   * still work" instead of failing the whole start-up. In the auto case join every routable
-   * interface so a multi-homed host is discoverable on all its LANs; a chosen interface pins
-   * both membership and NOTIFY egress.
+   * still work" instead of failing the whole start-up. In the auto case join every real
+   * interface and answer each network with the host's own address in it, so a multi-homed
+   * host is discoverable — and reachable — on all its LANs; a chosen interface pins
+   * membership, NOTIFY egress and every answer to itself.
    *
    * @param advertiseIp the routable IP to announce
    */
   private startDiscovery(advertiseIp: string): void {
-    const membershipInterfaces = this.bindIp ? [this.bindIp] : detectLocalIPv4s();
+    const bindIp = this.bindIp;
+    const membershipInterfaces = bindIp
+      ? [{ iface: detectLocalNets().find(net => net.address === bindIp)?.iface ?? bindIp, address: bindIp }]
+      : detectLocalIPv4s();
     const ssdp = this.makeSsdpResponder({
       devices: [...this.running],
-      bindIp: this.bindIp,
+      bindIp,
       advertiseIp,
       membershipInterfaces,
       logger: this.log,
+      isClientAllowed: this.isOwnClient,
+      // "All interfaces": every search is answered with the host's address in the searcher's own
+      // network. A chosen interface answers with its address only (the responder uses bindIp).
+      advertiseFor: bindIp ? undefined : remote => localAddressFor(remote, detectLocalNets()),
       onFatalError: () => this.onSsdpFatal(),
     });
     this.ssdp = ssdp;
@@ -489,14 +620,13 @@ export class Fakeroku extends utils.Adapter {
   }
 
   /**
-   * One NOTIFY pass: follow a changed host address first, then announce.
+   * One NOTIFY pass: follow the host first, then announce.
    *
-   * Only in the automatic case — a configured interface is the user's decision and does not
-   * move under us. Every five minutes is early enough: a controller caches the advertised
-   * address for the announced max-age of an hour, so the corrected one reaches it long
-   * before the old entry would even expire. Before this the announcement stayed frozen at
-   * the address found during onReady, and a DHCP lease change left the discovery pointing
-   * at an address nobody serves until someone restarted the instance by hand.
+   * Only in the automatic case — a chosen interface is the user's decision and does not move under
+   * us. Every pass hands the responder the interfaces the host has NOW: one that came up since the
+   * start (a second network card, a VLAN) is joined and announced on, one that went away is
+   * dropped, and a changed fallback address (a DHCP lease change) is logged once. Every five
+   * minutes is early enough: a controller caches the announced address for its max-age of an hour.
    */
   private announceTick(): void {
     if (!this.bindIp) {
@@ -1016,6 +1146,10 @@ export class Fakeroku extends utils.Adapter {
       if (this.retryTimer) {
         this.clearTimeout(this.retryTimer);
         this.retryTimer = undefined;
+      }
+      if (this.discoveryTimer) {
+        this.clearTimeout(this.discoveryTimer);
+        this.discoveryTimer = undefined;
       }
       for (const t of this.pulseTimers) {
         this.clearTimeout(t);

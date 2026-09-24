@@ -191,15 +191,18 @@ describe("EcpHttpServer", () => {
     await request("POST", "/keypress/Home");
     expect(debugLogs.some(m => /ECP keypress Home from 127\.0\.0\.1/.test(m))).toBe(true);
   });
-  it("answers 403 to a non-LAN client and runs no command", () => {
+  it("answers 403 to a client outside the adapter's networks, runs no command and closes the connection", () => {
     // A real socket from a public address cannot be produced in-process, so the
     // handler is driven directly. This is the guard that keeps a port-forwarded
     // or VLAN-crossing request from pressing keys in someone's living room.
     commands.length = 0;
     debugLogs.length = 0;
+    const headers: Record<string, string> = {};
     const res = {
       statusCode: 0,
-      setHeader: (): void => {},
+      setHeader: (k: string, v: string): void => {
+        headers[k] = v;
+      },
       end: (): void => {},
     } as unknown as http.ServerResponse;
     const req = {
@@ -212,7 +215,10 @@ describe("EcpHttpServer", () => {
 
     expect(res.statusCode).toBe(403);
     expect(commands).toEqual([]);
-    expect(debugLogs.some(m => m.includes("non-LAN 8.8.8.8"))).toBe(true);
+    expect(debugLogs.some(m => m.includes("from 8.8.8.8 rejected (403)"))).toBe(true);
+    // Kept alive, an outside client could hold one of the 32 connection slots for as long as it
+    // keeps asking — and a remote that belongs here would be dropped at the limit.
+    expect(headers.Connection).toBe("close");
   });
 
   it("logs a device-info pairing probe at debug", async () => {
@@ -238,7 +244,7 @@ describe("EcpHttpServer", () => {
     // No remote address at all is not a LAN client — a missing peer must not be
     // treated as trusted.
     expect(res.statusCode).toBe(403);
-    expect(debugLogs.some(m => m.includes("non-LAN ?"))).toBe(true);
+    expect(debugLogs.some(m => m.includes("from ? rejected"))).toBe(true);
   });
 
   it("writes at most one non-LAN rejection per minute", () => {
@@ -269,7 +275,7 @@ describe("EcpHttpServer", () => {
       statuses.push(res.statusCode);
     }
     expect(statuses.every(s => s === 403)).toBe(true);
-    expect(debugLogs.filter(m => m.includes("non-LAN")).length).toBe(1);
+    expect(debugLogs.filter(m => m.includes("rejected (403)")).length).toBe(1);
   });
 
   it("treats a request without a method or url as a GET of the root description", () => {
@@ -539,5 +545,52 @@ describe("EcpHttpServer — a Roku TV", () => {
     });
     expect(r.status).toBe(200);
     expect(r.body).toBe("<tv-channels/>");
+  });
+});
+
+describe("EcpHttpServer — the trust boundary is the caller's", () => {
+  it("asks the check it is handed, not the default guard", () => {
+    // The adapter narrows the boundary to a chosen interface's network.
+    const seen: (string | undefined)[] = [];
+    const server = new EcpHttpServer({
+      device: { uuid: "x", port: 0 },
+      friendlyName: "X",
+      apps: [],
+      deviceType: "player",
+      bindIp: "127.0.0.1",
+      logger: noopLog,
+      onCommand: () => true,
+      isClientAllowed: a => {
+        seen.push(a);
+        return false;
+      },
+    });
+    const res = { statusCode: 0, setHeader: (): void => {}, end: (): void => {} } as unknown as http.ServerResponse;
+    (server as unknown as { handle(q: http.IncomingMessage, s: http.ServerResponse): void }).handle(
+      { socket: { remoteAddress: "127.0.0.1" }, method: "GET", url: "/" } as unknown as http.IncomingMessage,
+      res,
+    );
+    expect(seen).toEqual(["127.0.0.1"]);
+    expect(res.statusCode).toBe(403);
+  });
+
+  it("logs a connection dropped at the connection limit, at most once a minute", async () => {
+    const port = await freePort();
+    debugLogs.length = 0;
+    const server = new EcpHttpServer({
+      device: { uuid: "y", port },
+      friendlyName: "Y",
+      apps: [],
+      deviceType: "player",
+      bindIp: "127.0.0.1",
+      logger: noopLog,
+      onCommand: () => true,
+    });
+    await server.start();
+    const inner = (server as unknown as { server: http.Server }).server;
+    inner.emit("drop", { remoteAddress: "192.168.1.66" });
+    inner.emit("drop", { remoteAddress: "192.168.1.66" });
+    server.stop();
+    expect(debugLogs.filter(m => m.includes("dropped — 32 connections already open"))).toHaveLength(1);
   });
 });

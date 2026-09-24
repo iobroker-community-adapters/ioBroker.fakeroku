@@ -45,6 +45,11 @@ export interface EcpServerConfig {
    * responder, which has carried this callback since 1.1.0.
    */
   onFatalError?: (err: Error) => void;
+  /**
+   * Whether a client may talk to this Roku (default: {@link isLanClient} against all the host's
+   * networks). The adapter narrows it to the chosen interface's network.
+   */
+  isClientAllowed?: (address: string | undefined) => boolean;
 }
 
 /**
@@ -55,7 +60,7 @@ export interface EcpServerConfig {
  */
 const MAX_LOGGED_DETAIL = 120;
 
-/** How often at most the "rejected a non-LAN request" line is written. */
+/** How often at most the "rejected a request" and "connection limit reached" lines are written. */
 const NON_LAN_LOG_INTERVAL_MS = 60_000;
 
 /**
@@ -91,6 +96,8 @@ export class EcpHttpServer {
   private server: http.Server | undefined;
   /** When the non-LAN rejection was last logged — a scanner must not fill the log. */
   private nonLanLoggedAt = 0;
+  /** When a connection dropped at the connection limit was last logged. */
+  private dropLoggedAt = 0;
   /** Whether the fatal-error callback has already fired — it reports once, not per event. */
   private fatalReported = false;
 
@@ -103,6 +110,16 @@ export class EcpHttpServer {
   public async start(): Promise<void> {
     const server = http.createServer((req, res) => this.handle(req, res));
     server.maxConnections = MAX_CONNECTIONS;
+    // Node drops a connection past maxConnections without a word; the remote only sees a reset.
+    server.on("drop", data => {
+      const now = Date.now();
+      if (now - this.dropLoggedAt >= NON_LAN_LOG_INTERVAL_MS) {
+        this.dropLoggedAt = now;
+        this.config.logger.debug(
+          `ECP connection from ${data?.remoteAddress ?? "?"} dropped — ${MAX_CONNECTIONS} connections already open`,
+        );
+      }
+    });
     this.server = server;
     await new Promise<void>((resolve, reject) => {
       const onError = (err: Error): void => reject(err);
@@ -136,7 +153,8 @@ export class EcpHttpServer {
 
   private handle(req: http.IncomingMessage, res: http.ServerResponse): void {
     const peer = (req.socket.remoteAddress ?? "").replace(/^::ffff:/, "") || "?";
-    if (!isLanClient(req.socket.remoteAddress)) {
+    const allowed = this.config.isClientAllowed ?? ((a: string | undefined): boolean => isLanClient(a));
+    if (!allowed(req.socket.remoteAddress)) {
       // Debug (not warn): a stray WAN scanner must not spam the log, but when a
       // remote sits on the wrong subnet/VLAN this is the only trace of "why rejected".
       // Throttled: a scanner sends thousands of requests, and every one of them
@@ -144,9 +162,13 @@ export class EcpHttpServer {
       const now = Date.now();
       if (now - this.nonLanLoggedAt >= NON_LAN_LOG_INTERVAL_MS) {
         this.nonLanLoggedAt = now;
-        this.config.logger.debug(`ECP request from non-LAN ${peer} rejected (403)`);
+        this.config.logger.debug(`ECP request from ${peer} rejected (403) — not in the adapter's networks`);
       }
+      // Close the connection with the answer: kept alive, a client from outside could hold one of
+      // the 32 connection slots for as long as it keeps asking, and a remote that belongs here
+      // would be dropped at the limit.
       res.statusCode = 403;
+      res.setHeader("Connection", "close");
       res.end();
       return;
     }

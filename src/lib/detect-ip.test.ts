@@ -1,28 +1,42 @@
 import {
-  ipv6Prefix64,
-  listLocalIPv6Prefixes,
+  hasLocalAddress,
+  inNet,
+  listLocalNets,
   listNonInternalIPv4s,
+  localAddressFor,
+  netsOfInterface,
   pickMembershipIPv4s,
   pickPrimaryIPv4,
 } from "./detect-ip";
 
+/**
+ * One IPv4 entry the way os.networkInterfaces() reports it.
+ *
+ * @param address the address
+ * @param prefix the prefix length
+ * @param internal loopback or not
+ */
+function v4(address: string, prefix = 24, internal = false): never {
+  return { address, family: "IPv4", internal, cidr: `${address}/${prefix}` } as never;
+}
+
+/**
+ * One IPv6 entry the way os.networkInterfaces() reports it.
+ *
+ * @param address the address
+ * @param prefix the prefix length
+ */
+function v6(address: string, prefix = 64): never {
+  return { address, family: "IPv6", internal: false, cidr: `${address}/${prefix}` } as never;
+}
+
 describe("pickPrimaryIPv4", () => {
   it("returns the first non-internal IPv4 (skips loopback)", () => {
-    expect(
-      pickPrimaryIPv4({
-        lo: [{ address: "127.0.0.1", family: "IPv4", internal: true }],
-        eth0: [{ address: "10.47.88.2", family: "IPv4", internal: false }],
-      } as never),
-    ).toBe("10.47.88.2");
+    expect(pickPrimaryIPv4({ lo: [v4("127.0.0.1", 8, true)], eth0: [v4("10.47.88.2")] })).toBe("10.47.88.2");
   });
 
   it("skips internal addresses and IPv6", () => {
-    expect(
-      pickPrimaryIPv4({
-        lo: [{ address: "127.0.0.1", family: "IPv4", internal: true }],
-        eth0: [{ address: "fe80::1", family: "IPv6", internal: false }],
-      } as never),
-    ).toBe("");
+    expect(pickPrimaryIPv4({ lo: [v4("127.0.0.1", 8, true)], eth0: [v6("fe80::1")] })).toBe("");
   });
 
   it("returns empty string when there are no interfaces", () => {
@@ -30,174 +44,165 @@ describe("pickPrimaryIPv4", () => {
   });
 
   it("skips Docker's default bridges in favour of the real LAN address", () => {
-    // An ioBroker host commonly runs Docker, and docker0 can come first in the
-    // enumeration. Advertising 172.17.0.1 puts an unreachable address into every
-    // SSDP answer while the adapter looks perfectly healthy.
+    // docker0 can come first in the enumeration. Advertising 172.17.0.1 puts an unreachable
+    // address into every SSDP answer while the adapter looks perfectly healthy.
     expect(
       pickPrimaryIPv4({
-        docker0: [{ address: "172.17.0.1", family: "IPv4", internal: false }],
-        br_compose: [{ address: "172.18.0.1", family: "IPv4", internal: false }],
-        eth0: [{ address: "192.168.1.20", family: "IPv4", internal: false }],
-      } as never),
+        docker0: [v4("172.17.0.1", 16)],
+        br_compose: [v4("172.18.0.1", 16)],
+        eth0: [v4("192.168.1.20")],
+      }),
     ).toBe("192.168.1.20");
   });
 
-  it("still advertises a bridge address when the host has nothing else", () => {
-    // Inside a container that IS on the bridge network, that address is all there
-    // is — an empty answer would stop the adapter for no reason.
-    expect(
-      pickPrimaryIPv4({
-        eth0: [{ address: "172.17.0.5", family: "IPv4", internal: false }],
-      } as never),
-    ).toBe("172.17.0.5");
+  it("recognises every virtual bridge by its NAME, whatever address it got", () => {
+    // Docker's third compose network gets 172.19.0.0/16, the pools continue up to 172.31 and then
+    // into 192.168.0.0/16 (moby ipamutils) — an address rule cannot tell those from a real LAN.
+    for (const name of ["br-3f2a9c", "docker1", "veth12ab", "virbr0", "vboxnet0", "vEthernet (WSL)", "cni0"]) {
+      expect(pickPrimaryIPv4({ [name]: [v4("192.168.176.1", 20)], eth0: [v4("10.0.0.5")] }), name).toBe("10.0.0.5");
+    }
   });
 
-  it("keeps the rest of 172.16.0.0/12, which is ordinary private space", () => {
-    // Only 172.17/172.18 are Docker's defaults; 172.16.x.x and 172.20.x.x are
-    // perfectly normal LANs and must not be pushed to the back.
-    expect(
-      pickPrimaryIPv4({
-        eth0: [{ address: "172.16.5.4", family: "IPv4", internal: false }],
-        eth1: [{ address: "192.168.1.20", family: "IPv4", internal: false }],
-      } as never),
-    ).toBe("172.16.5.4");
+  it("still advertises a bridge address when the host has nothing else", () => {
+    // Inside a container that IS on the bridge network, that address is all there is.
+    expect(pickPrimaryIPv4({ eth0: [v4("172.17.0.5", 16)] })).toBe("172.17.0.5");
+  });
+
+  it("keeps a real interface in 172.16.0.0/12 — ordinary private space", () => {
+    expect(pickPrimaryIPv4({ eth0: [v4("172.16.5.4")], eth1: [v4("192.168.1.20")] })).toBe("172.16.5.4");
+    expect(pickPrimaryIPv4({ eth0: [v4("172.20.5.4")], eth1: [v4("192.168.1.20")] })).toBe("172.20.5.4");
   });
 });
 
 describe("listNonInternalIPv4s", () => {
   it("skips an interface the OS reports without addresses", () => {
-    // os.networkInterfaces() types every entry as possibly undefined and does hand
-    // one out for a down interface — iterating it directly throws at start-up.
-    expect(
-      listNonInternalIPv4s({
-        down0: undefined,
-        en0: [{ address: "192.168.1.5", family: "IPv4", internal: false }],
-      } as never),
-    ).toEqual(["192.168.1.5"]);
+    // os.networkInterfaces() types every entry as possibly undefined and does hand one out for
+    // a down interface — iterating it directly throws at start-up.
+    expect(listNonInternalIPv4s({ down0: undefined, en0: [v4("192.168.1.5")] })).toEqual(["192.168.1.5"]);
   });
 
   it("returns every non-internal IPv4 across interfaces, in enumeration order", () => {
     expect(
-      listNonInternalIPv4s({
-        lo: [{ address: "127.0.0.1", family: "IPv4", internal: true }],
-        eth0: [{ address: "10.47.88.2", family: "IPv4", internal: false }],
-        wlan0: [{ address: "192.168.1.5", family: "IPv4", internal: false }],
-      } as never),
+      listNonInternalIPv4s({ lo: [v4("127.0.0.1", 8, true)], eth0: [v4("10.47.88.2")], wlan0: [v4("192.168.1.5")] }),
     ).toEqual(["10.47.88.2", "192.168.1.5"]);
   });
-
-  it("skips loopback and IPv6", () => {
-    expect(
-      listNonInternalIPv4s({
-        lo: [{ address: "127.0.0.1", family: "IPv4", internal: true }],
-        eth0: [
-          { address: "fe80::1", family: "IPv6", internal: false },
-          { address: "10.0.0.9", family: "IPv4", internal: false },
-        ],
-      } as never),
-    ).toEqual(["10.0.0.9"]);
-  });
-
-  it("returns an empty list when nothing is routable", () => {
-    expect(listNonInternalIPv4s({ lo: [{ address: "127.0.0.1", family: "IPv4", internal: true }] } as never)).toEqual(
-      [],
-    );
-  });
 });
 
-describe("ipv6Prefix64", () => {
-  it("takes the first four groups, zero-padded", () => {
-    expect(ipv6Prefix64("2003:e1:1f28:9a00:1234:5678:9abc:def0")).toBe("2003:00e1:1f28:9a00");
+describe("listLocalNets", () => {
+  it("reads address, family and prefix of every non-internal entry", () => {
+    expect(listLocalNets({ lo: [v4("127.0.0.1", 8, true)], eth0: [v4("192.168.1.5"), v6("2003:e1::5")] })).toEqual([
+      { iface: "eth0", family: "IPv4", address: "192.168.1.5", prefixLength: 24, virtual: false },
+      { iface: "eth0", family: "IPv6", address: "2003:e1::5", prefixLength: 64, virtual: false },
+    ]);
   });
 
-  it("expands the :: shorthand in every position", () => {
-    expect(ipv6Prefix64("2003:e1:1f28:9a00::42")).toBe("2003:00e1:1f28:9a00");
-    expect(ipv6Prefix64("::1")).toBe("0000:0000:0000:0000");
-    expect(ipv6Prefix64("fe80::")).toBe("fe80:0000:0000:0000");
-  });
-
-  it("drops a zone suffix and normalises case", () => {
-    expect(ipv6Prefix64("FE80::1%eth0")).toBe("fe80:0000:0000:0000");
-  });
-
-  it("returns null for anything that is not a plain IPv6 address", () => {
-    expect(ipv6Prefix64("192.168.1.5")).toBeNull();
-    expect(ipv6Prefix64("::ffff:192.168.1.5")).toBeNull();
-    expect(ipv6Prefix64("2003:::1")).toBeNull();
-    // Two "::" in one address — the shorthand may appear at most once.
-    expect(ipv6Prefix64("2003::1::2")).toBeNull();
-    expect(ipv6Prefix64("2003:e1:1f28")).toBeNull();
-    expect(ipv6Prefix64("2003:e1:1f28:9a00:1:2:3:4:5")).toBeNull();
-    expect(ipv6Prefix64("2003:e1:zzzz:9a00::1")).toBeNull();
-    expect(ipv6Prefix64("")).toBeNull();
-  });
-});
-
-describe("listLocalIPv6Prefixes", () => {
-  it("collects the prefixes of the non-internal IPv6 addresses, de-duplicated", () => {
-    const prefixes = listLocalIPv6Prefixes({
-      lo: [{ address: "::1", family: "IPv6", internal: true } as never],
+  it("derives the prefix from the netmask when the OS gives no cidr", () => {
+    const nets = listLocalNets({
       eth0: [
-        { address: "192.168.1.5", family: "IPv4", internal: false } as never,
-        { address: "2003:e1:1f28:9a00::5", family: "IPv6", internal: false } as never,
-        // A second address in the same network (a temporary privacy address).
-        { address: "2003:e1:1f28:9a00:dead:beef:1:2", family: "IPv6", internal: false } as never,
-        { address: "fe80::1", family: "IPv6", internal: false } as never,
+        { address: "10.1.2.3", family: "IPv4", internal: false, netmask: "255.255.0.0" } as never,
+        { address: "fd00::1", family: "IPv6", internal: false, netmask: "ffff:ffff:ffff:ff00::" } as never,
       ],
     });
-    expect(prefixes).toEqual(["2003:00e1:1f28:9a00", "fe80:0000:0000:0000"]);
+    expect(nets.map(n => n.prefixLength)).toEqual([16, 56]);
   });
 
-  it("survives an interface entry the OS left empty", () => {
-    // os.networkInterfaces() types the entries as possibly undefined.
-    expect(listLocalIPv6Prefixes({ eth0: undefined, wlan0: [] })).toEqual([]);
-  });
-
-  it("skips an address it cannot parse instead of inventing a prefix", () => {
+  it("drops a zone suffix, and counts an entry without a prefix as the address alone", () => {
     expect(
-      listLocalIPv6Prefixes({
+      listLocalNets({
         eth0: [
-          { address: "2003::1::2", family: "IPv6", internal: false } as never,
-          { address: "2003:e1:1f28:9a00::5", family: "IPv6", internal: false } as never,
+          { address: "fe80::1%eth0", family: "IPv6", internal: false, cidr: "fe80::1/64" } as never,
+          { address: "10.0.0.1", family: "IPv4", internal: false } as never,
         ],
       }),
-    ).toEqual(["2003:00e1:1f28:9a00"]);
+    ).toEqual([
+      { iface: "eth0", family: "IPv6", address: "fe80::1", prefixLength: 64, virtual: false },
+      { iface: "eth0", family: "IPv4", address: "10.0.0.1", prefixLength: 32, virtual: false },
+    ]);
+  });
+});
+
+describe("inNet", () => {
+  const lan = { iface: "eth0", family: "IPv4" as const, address: "192.168.1.5", prefixLength: 24, virtual: false };
+  const v6net = {
+    iface: "eth0",
+    family: "IPv6" as const,
+    address: "2003:e1:1f28:9a00::5",
+    prefixLength: 64,
+    virtual: false,
+  };
+
+  it("matches an IPv4 address by prefix length", () => {
+    expect(inNet("192.168.1.200", lan)).toBe(true);
+    expect(inNet("192.168.2.1", lan)).toBe(false);
+    expect(inNet("10.0.0.1", { ...lan, address: "10.200.0.1", prefixLength: 8 })).toBe(true);
+    expect(inNet("anything", lan)).toBe(false);
   });
 
-  it("is empty on a host without IPv6", () => {
-    expect(
-      listLocalIPv6Prefixes({ eth0: [{ address: "192.168.1.5", family: "IPv4", internal: false } as never] }),
-    ).toEqual([]);
+  it("matches an IPv6 address by prefix length, zone suffix and case ignored", () => {
+    expect(inNet("2003:e1:1f28:9a00::42", v6net)).toBe(true);
+    expect(inNet("2003:00E1:1F28:9A00::42%eth0", v6net)).toBe(true);
+    expect(inNet("2003:e1:1f28:9a01::42", v6net)).toBe(false);
+    expect(inNet("2003:e1:1f28:9a01::42", { ...v6net, prefixLength: 56 })).toBe(true);
+  });
+
+  it("refuses a malformed IPv6 value instead of guessing", () => {
+    for (const bad of ["2003:::1", "2003::1::2", "2003:e1:zzzz:9a00::1", "not-an-address", "::ffff:10.0.0.1"]) {
+      expect(inNet(bad, v6net), bad).toBe(false);
+    }
+  });
+});
+
+describe("the host's own networks", () => {
+  const nets = listLocalNets({
+    eth0: [v4("10.47.88.2")],
+    "eth0.50": [v4("192.168.50.2")],
+    docker0: [v4("172.17.0.1", 16)],
+  });
+
+  it("finds the host's address in the network a remote sits in", () => {
+    expect(localAddressFor("192.168.50.77", nets)).toBe("192.168.50.2");
+    expect(localAddressFor("::ffff:10.47.88.99", nets)).toBe("10.47.88.2");
+    expect(localAddressFor("8.8.8.8", nets)).toBeUndefined();
+  });
+
+  it("knows which addresses the host carries", () => {
+    expect(hasLocalAddress("192.168.50.2", nets)).toBe(true);
+    expect(hasLocalAddress("192.168.50.3", nets)).toBe(false);
+  });
+
+  it("narrows to the networks of the interface that carries an address", () => {
+    expect(netsOfInterface("192.168.50.2", nets).map(n => n.address)).toEqual(["192.168.50.2"]);
+    expect(netsOfInterface("1.2.3.4", nets)).toEqual([]);
   });
 });
 
 describe("pickMembershipIPv4s", () => {
-  it("joins every real LAN interface", () => {
+  it("joins every real LAN interface, once per interface", () => {
+    // A membership belongs to the interface: a second address on the same card would join it
+    // again and throw EADDRINUSE.
     expect(
       pickMembershipIPv4s({
-        eth0: [{ family: "IPv4", address: "10.47.88.2", internal: false } as any],
-        eth1: [{ family: "IPv4", address: "192.168.1.5", internal: false } as any],
-        lo: [{ family: "IPv4", address: "127.0.0.1", internal: true } as any],
+        eth0: [v4("10.47.88.2"), v4("10.47.88.3")],
+        eth1: [v4("192.168.1.5")],
+        lo: [v4("127.0.0.1", 8, true)],
       }),
-    ).toEqual(["10.47.88.2", "192.168.1.5"]);
+    ).toEqual([
+      { iface: "eth0", address: "10.47.88.2" },
+      { iface: "eth1", address: "192.168.1.5" },
+    ]);
   });
 
-  it("skips a Docker bridge — nothing a remote sends can arrive there", () => {
-    // The same exception the advertised address makes, and for the same reason. A join on
-    // docker0 cannot hear an M-SEARCH, costs a syscall, and on a host whose bridge is not
-    // in the multicast routing table it writes a warning that reads like a defect.
+  it("skips a virtual bridge — nothing a remote sends can arrive there", () => {
     expect(
       pickMembershipIPv4s({
-        docker0: [{ family: "IPv4", address: "172.17.0.1", internal: false } as any],
-        br1: [{ family: "IPv4", address: "172.18.0.1", internal: false } as any],
-        eth0: [{ family: "IPv4", address: "10.47.88.2", internal: false } as any],
+        docker0: [v4("172.17.0.1", 16)],
+        "br-1": [v4("172.19.0.1", 16)],
+        eth0: [v4("10.47.88.2")],
       }),
-    ).toEqual(["10.47.88.2"]);
+    ).toEqual([{ iface: "eth0", address: "10.47.88.2" }]);
   });
 
   it("uses the bridge after all when it is everything the host has (inside a container)", () => {
-    expect(pickMembershipIPv4s({ eth0: [{ family: "IPv4", address: "172.17.0.5", internal: false } as any] })).toEqual([
-      "172.17.0.5",
-    ]);
+    expect(pickMembershipIPv4s({ eth0: [v4("172.17.0.5", 16)] })).toEqual([{ iface: "eth0", address: "172.17.0.5" }]);
   });
 });

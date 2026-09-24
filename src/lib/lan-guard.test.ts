@@ -1,98 +1,60 @@
+import type { LocalNet } from "./detect-ip";
 import { isLanClient } from "./lan-guard";
 
-describe("isLanClient", () => {
-  it("accepts private ranges and localhost", () => {
-    for (const ip of ["10.47.88.5", "192.168.1.10", "172.16.0.1", "172.31.255.1", "127.0.0.1", "::1"]) {
-      expect(isLanClient(ip)).toBe(true);
-    }
-  });
-  it("accepts a link-local address (a remote that got no DHCP lease)", () => {
-    // 169.254/16 is what a controller self-assigns when the DHCP server is slow or
-    // gone. It is still on the wire in the same LAN — rejecting it locks the user's
-    // remote out exactly in the situation they are already troubleshooting.
-    expect(isLanClient("169.254.10.5")).toBe(true);
-  });
+/**
+ * A network of the host.
+ *
+ * @param address the host's address in it
+ * @param prefixLength the prefix length
+ * @param iface the interface name
+ */
+function net(address: string, prefixLength: number, iface = "eth0"): LocalNet {
+  return { iface, family: address.includes(":") ? "IPv6" : "IPv4", address, prefixLength, virtual: false };
+}
 
-  it("accepts IPv6-mapped private IPv4", () => {
-    expect(isLanClient("::ffff:10.47.88.5")).toBe(true);
-  });
-  it("rejects public IPs, the 172.32 boundary, and undefined", () => {
-    expect(isLanClient("8.8.8.8")).toBe(false);
-    expect(isLanClient("172.32.0.1")).toBe(false);
-    expect(isLanClient(undefined)).toBe(false);
-  });
+// A host in 192.168.1.0/24 with native IPv6 (2003:e1:1f28:9a00::/64) and a ULA prefix.
+const home = (): LocalNet[] => [net("192.168.1.5", 24), net("2003:e1:1f28:9a00::5", 64), net("fd12:3456:789a::5", 64)];
 
-  it("accepts IPv6 link-local and unique-local clients (an IPv6-only LAN segment)", () => {
-    for (const ip of ["fe80::1", "fe80::a1b2:c3d4%en0", "FE80::1", "fd12:3456:789a::1", "fc00::1"]) {
-      expect(isLanClient(ip), ip).toBe(true);
-    }
-  });
-  it("accepts upper-case IPv6 locals by the rule alone — no rescue from the host's own /64 prefixes", () => {
-    // The lowercase step is the rule under test. On a host with its own fe80:: link-local
-    // address the global-prefix fallback would accept "FE80::1" anyway and hide a missing
-    // toLowerCase() — so the prefix list is injected empty (mutation N5c, 2026-09-08).
-    for (const ip of ["FE80::1", "FE80::A1B2:C3D4%en0", "FD12:3456:789A::1", "FC00::1"]) {
-      expect(
-        isLanClient(ip, () => []),
-        ip,
-      ).toBe(true);
+describe("isLanClient — only the host's own networks", () => {
+  it("accepts a client in one of the host's networks", () => {
+    for (const ip of ["192.168.1.10", "::ffff:192.168.1.10", "2003:e1:1f28:9a00::42", "fd12:3456:789a::1"]) {
+      expect(isLanClient(ip, home), ip).toBe(true);
     }
   });
 
-  it("rejects global IPv6 and the ranges next to the local ones", () => {
-    for (const ip of ["2001:db8::1", "fe00::1", "fec0::1", "ff02::1"]) {
-      expect(isLanClient(ip), ip).toBe(false);
+  it("refuses a private address that is NOT one of the host's networks", () => {
+    // Another VLAN, a VPN: private address space, but not this host's network. Tailscale hands out
+    // 100.64/10 over IPv4 and fd7a:115c:a1e0::/48 over IPv6 — neither is a network of the host.
+    for (const ip of ["10.47.88.5", "172.16.0.1", "192.168.2.10", "100.64.0.1", "fd7a:115c:a1e0::1", "fc00::1"]) {
+      expect(isLanClient(ip, home), ip).toBe(false);
     }
   });
 
-  it("rejects addresses that merely start with the same digits", () => {
-    // 100.64/10 is carrier-grade NAT — public-side address space, not a LAN.
-    // A prefix match on "10" instead of "10." would hand the whole range access.
-    expect(isLanClient("100.64.0.1")).toBe(false);
-    expect(isLanClient("109.1.2.3")).toBe(false);
-    expect(isLanClient("1.2.3.4")).toBe(false);
-  });
-});
-
-describe("isLanClient — globally routable IPv6", () => {
-  // On a connection with native IPv6 every device in the house carries an address
-  // out of the provider's block. It looks like an internet address; only the /64
-  // prefix says whether it is on the same link.
-  const own = (): string[] => ["2003:00e1:1f28:9a00", "2a02:0908:1234:5600"];
-
-  it("accepts a remote in the host's own /64", () => {
-    expect(isLanClient("2003:e1:1f28:9a00::42", own)).toBe(true);
-    expect(isLanClient("2003:00e1:1f28:9a00:1234:5678:9abc:def0", own)).toBe(true);
-    expect(isLanClient("2a02:908:1234:5600:0:0:0:1", own)).toBe(true);
+  it("refuses public addresses, a global IPv6 from another prefix, and nothing", () => {
+    for (const ip of ["8.8.8.8", "2003:e1:1f28:9a01::42", "2001:4860:4860::8888", "not-an-address", "2003:::1"]) {
+      expect(isLanClient(ip, home), ip).toBe(false);
+    }
+    expect(isLanClient(undefined, home)).toBe(false);
   });
 
-  it("still refuses a global address from a different /64", () => {
-    // One group different is a different network — that is the internet.
-    expect(isLanClient("2003:e1:1f28:9a01::42", own)).toBe(false);
-    expect(isLanClient("2001:4860:4860::8888", own)).toBe(false);
-  });
-
-  it("refuses everything global when the host has no IPv6 of its own", () => {
-    expect(isLanClient("2003:e1:1f28:9a00::42", () => [])).toBe(false);
-  });
-
-  it("keeps the link-local and unique-local answers without consulting the host", () => {
-    const boom = (): string[] => {
-      throw new Error("must not be asked for a link-local or unique-local client");
+  it("accepts loopback and link-local without asking for the networks", () => {
+    // A link-local address is on the same wire by definition — 169.254 is what a remote
+    // self-assigns when the DHCP server is slow or gone, exactly when the user troubleshoots.
+    const boom = (): LocalNet[] => {
+      throw new Error("must not be asked for loopback or link-local");
     };
-    expect(isLanClient("fe80::1%eth0", boom)).toBe(true);
-    expect(isLanClient("fd12:3456:789a::1", boom)).toBe(true);
-    expect(isLanClient("192.168.1.5", boom)).toBe(true);
-    expect(isLanClient("::ffff:10.0.0.4", boom)).toBe(true);
+    for (const ip of ["127.0.0.1", "::1", "169.254.10.5", "fe80::1", "FE80::A1B2:C3D4%en0", "::ffff:127.0.0.1"]) {
+      expect(isLanClient(ip, boom), ip).toBe(true);
+    }
   });
 
-  it("matches a zone suffix and mixed case against the prefix", () => {
-    expect(isLanClient("2003:00E1:1F28:9A00::42%eth0", own)).toBe(true);
+  it("with a chosen interface, only that interface's network counts", () => {
+    const chosen = (): LocalNet[] => [net("192.168.50.2", 24, "eth0.50")];
+    expect(isLanClient("192.168.50.77", chosen)).toBe(true);
+    expect(isLanClient("192.168.1.10", chosen)).toBe(false);
   });
 
-  it("refuses a malformed IPv6 value instead of guessing", () => {
-    expect(isLanClient("2003:::1", own)).toBe(false);
-    expect(isLanClient("not-an-address", own)).toBe(false);
-    expect(isLanClient("2003:e1:zzzz:9a00::1", own)).toBe(false);
+  it("refuses everything routable when the host has no network at all", () => {
+    expect(isLanClient("192.168.1.10", () => [])).toBe(false);
   });
 });

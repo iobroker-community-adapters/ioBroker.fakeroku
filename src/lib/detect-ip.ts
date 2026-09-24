@@ -1,28 +1,119 @@
 import { networkInterfaces, type NetworkInterfaceInfo } from "node:os";
 
-/**
- * Is this a routable (non-internal) IPv4 address?
- *
- * @param addr one entry from an os.networkInterfaces() list
- * @returns true for a non-internal IPv4 address
- */
-function isRoutableIPv4(addr: NetworkInterfaceInfo): boolean {
-  return addr.family === "IPv4" && !addr.internal;
+/** The OS network-interface map (the `os.networkInterfaces()` shape). */
+export type InterfaceMap = NodeJS.Dict<NetworkInterfaceInfo[]>;
+
+/** One network the host itself sits in: an address of one of its interfaces, with its prefix. */
+export interface LocalNet {
+  /** The interface name (`eth0`, `wlan0`, `docker0` …). */
+  iface: string;
+  /** The address family. */
+  family: "IPv4" | "IPv6";
+  /** The host's own address in this network (IPv6 without a zone suffix). */
+  address: string;
+  /** The prefix length of the network (from `cidr`, or derived from the netmask). */
+  prefixLength: number;
+  /** A virtual bridge (container, VM, WSL) — nothing on the LAN sits behind it. */
+  virtual: boolean;
+}
+
+/** One interface to join the SSDP multicast group on: its name and its IPv4 address. */
+export interface Membership {
+  /** The interface name — a group membership belongs to the interface, not to one address. */
+  iface: string;
+  /** The IPv4 address the membership and the outgoing NOTIFY use. */
+  address: string;
 }
 
 /**
- * Every non-internal IPv4 address of the given interface map, in enumeration
- * order. Pure — takes the interface map so it can be unit-tested without real
- * network cards.
+ * Interface names of virtual bridges: Docker (`docker0`, compose/user networks `br-<id>`, the
+ * container ends `veth…`), libvirt (`virbr…`), VirtualBox host-only (`vboxnet…`), Hyper-V/WSL
+ * (`vEthernet (…)`), CNI/flannel/podman/LXC bridges. Recognised by NAME: Docker hands out
+ * 172.17.0.0/16 up to 172.31.0.0/16 and then pools out of 192.168.0.0/16 (moby
+ * `ipamutils`), so an address rule either misses the third compose network or collides with
+ * ordinary LANs.
+ */
+const VIRTUAL_IFACE = /^(docker\d*|br-|veth|virbr|vboxnet|vEthernet|cni|flannel|podman|lxcbr)/i;
+
+/** Docker's default bridges by address — the fallback for a bridge that carries an unusual name. */
+const CONTAINER_BRIDGE_PREFIXES = ["172.17.", "172.18."];
+
+/**
+ * Is this interface a virtual bridge no remote on the LAN can reach?
  *
- * @param interfaces the OS network-interface map (os.networkInterfaces() shape)
+ * @param iface the interface name
+ * @param address one of its IPv4 addresses
+ * @returns true for a virtual bridge
+ */
+function isVirtual(iface: string, address: string): boolean {
+  return VIRTUAL_IFACE.test(iface) || CONTAINER_BRIDGE_PREFIXES.some(prefix => address.startsWith(prefix));
+}
+
+/**
+ * The prefix length of an interface address: from `cidr` when the OS gives it, else counted from
+ * the netmask.
+ *
+ * @param addr one entry of an os.networkInterfaces() list
+ * @returns the prefix length, or null when neither is usable
+ */
+function prefixLengthOf(addr: NetworkInterfaceInfo): number | null {
+  const fromCidr = typeof addr.cidr === "string" ? Number(addr.cidr.split("/")[1]) : NaN;
+  if (Number.isInteger(fromCidr)) {
+    return fromCidr;
+  }
+  if (addr.family === "IPv4" && typeof addr.netmask === "string") {
+    const bits = ipv4ToInt(addr.netmask);
+    return bits === null ? null : bits.toString(2).replace(/0/g, "").length;
+  }
+  if (addr.family === "IPv6" && typeof addr.netmask === "string") {
+    const groups = expandIPv6(addr.netmask);
+    return groups ? groups.reduce((n, g) => n + parseInt(g, 16).toString(2).replace(/0/g, "").length, 0) : null;
+  }
+  return null;
+}
+
+/**
+ * Every network the host sits in, from an interface map. Pure — takes the map so it can be
+ * unit-tested without real network cards. Loopback is left out; an interface the OS reports
+ * without addresses is skipped.
+ *
+ * @param interfaces the OS network-interface map
+ * @returns the host's networks, in enumeration order
+ */
+export function listLocalNets(interfaces: InterfaceMap): LocalNet[] {
+  const out: LocalNet[] = [];
+  for (const [iface, addrs] of Object.entries(interfaces)) {
+    for (const addr of addrs ?? []) {
+      if (addr.internal || (addr.family !== "IPv4" && addr.family !== "IPv6")) {
+        continue;
+      }
+      // Without a usable prefix only the address itself counts as the network (/32, /128): it
+      // stays usable to bind and advertise, and the trust boundary grows by nothing.
+      const prefixLength = prefixLengthOf(addr) ?? (addr.family === "IPv4" ? 32 : 128);
+      const address = addr.family === "IPv6" ? addr.address.split("%")[0].toLowerCase() : addr.address;
+      out.push({
+        iface,
+        family: addr.family,
+        address,
+        prefixLength,
+        virtual: addr.family === "IPv4" && isVirtual(iface, address),
+      });
+    }
+  }
+  return out;
+}
+
+/**
+ * Every non-internal IPv4 address of the given interface map, in enumeration order.
+ *
+ * @param interfaces the OS network-interface map
  * @returns every routable IPv4 address (may be empty)
  */
-export function listNonInternalIPv4s(interfaces: NodeJS.Dict<NetworkInterfaceInfo[]>): string[] {
+export function listNonInternalIPv4s(interfaces: InterfaceMap): string[] {
   const out: string[] = [];
   for (const addrs of Object.values(interfaces)) {
     for (const addr of addrs ?? []) {
-      if (isRoutableIPv4(addr)) {
+      if (addr.family === "IPv4" && !addr.internal) {
         out.push(addr.address);
       }
     }
@@ -31,49 +122,46 @@ export function listNonInternalIPv4s(interfaces: NodeJS.Dict<NetworkInterfaceInf
 }
 
 /**
- * The container-bridge networks Docker hands out by default: `docker0` (172.17.x.x)
- * and the first user-defined / compose bridge (172.18.x.x). They are non-internal
- * IPv4 addresses like any other, but nothing on the LAN can reach them.
- */
-const CONTAINER_BRIDGE_PREFIXES = ["172.17.", "172.18."];
-
-/**
- * Is this address one of Docker's default bridge networks?
+ * The address to advertise when no interface is chosen and nothing better is known: the first
+ * IPv4 that is not a virtual bridge, and a bridge address only as a last resort (inside a
+ * container it is all there is). Pure.
  *
- * @param address an IPv4 address
- * @returns true for a Docker default-bridge address
+ * Why bridges are skipped: an ioBroker host commonly runs Docker, and a bridge can come first in
+ * the interface enumeration. Advertising it puts an address into every SSDP answer that no remote
+ * on the LAN can reach — while the adapter reports "advertising on 172.17.0.1", which looks like
+ * success (hassemu v1.21.0 hit exactly this).
+ *
+ * @param interfaces the OS network-interface map
+ * @returns the IPv4 address to advertise, or "" if none is found
  */
-function isContainerBridge(address: string): boolean {
-  return CONTAINER_BRIDGE_PREFIXES.some(prefix => address.startsWith(prefix));
+export function pickPrimaryIPv4(interfaces: InterfaceMap): string {
+  const nets = listLocalNets(interfaces).filter(net => net.family === "IPv4");
+  return (nets.find(net => !net.virtual) ?? nets[0])?.address ?? "";
 }
 
 /**
- * Pick the address to advertise from a set of OS network interfaces: the first
- * routable IPv4 that is NOT a Docker default bridge, and only as a last resort a
- * bridge address. Pure — takes the interface map so it can be unit-tested without
- * real network cards.
+ * The interfaces to join the SSDP multicast group on: ONE entry per interface (its first IPv4) —
+ * a membership belongs to the interface, and joining it a second time through another address of
+ * the same card throws EADDRINUSE. Virtual bridges are left out unless they are all there is.
+ * Pure.
  *
- * Why the exception exists: an ioBroker host commonly runs Docker, and `docker0`
- * (172.17.x.x) or the first compose bridge (172.18.x.x) can come first in the
- * interface enumeration. Advertising one of them puts an address into every SSDP
- * answer and NOTIFY that no remote on the LAN can reach — while the adapter starts
- * green and reports "advertising on 172.17.0.1", which looks like success. The
- * sibling emulator hit exactly this (hassemu v1.21.0) and fixed it the same way, so
- * the fleet gives one answer instead of two.
- *
- * @param interfaces the OS network-interface map (os.networkInterfaces() shape)
- * @returns the routable IPv4 address to advertise, or "" if none is found
+ * @param interfaces the OS network-interface map
+ * @returns the interfaces to join on (may be empty)
  */
-export function pickPrimaryIPv4(interfaces: NodeJS.Dict<NetworkInterfaceInfo[]>): string {
-  const addresses = listNonInternalIPv4s(interfaces);
-  return addresses.find(address => !isContainerBridge(address)) ?? addresses[0] ?? "";
+export function pickMembershipIPv4s(interfaces: InterfaceMap): Membership[] {
+  const byIface = new Map<string, LocalNet>();
+  for (const net of listLocalNets(interfaces)) {
+    if (net.family === "IPv4" && !byIface.has(net.iface)) {
+      byIface.set(net.iface, net);
+    }
+  }
+  const all = [...byIface.values()];
+  const real = all.filter(net => !net.virtual);
+  return (real.length > 0 ? real : all).map(net => ({ iface: net.iface, address: net.address }));
 }
 
 /**
- * Best-effort primary IPv4 of the host — used as the advertised SSDP LOCATION
- * when no interface is configured, so a controller gets a routable IP instead of
- * the bind wildcard (`0.0.0.0` is not reachable). Returns "" when the host has no
- * routable IPv4 (e.g. no network), which the caller treats as "cannot advertise".
+ * Best-effort primary IPv4 of the host.
  *
  * @returns the primary IPv4 address, or "" if none is found
  */
@@ -82,33 +170,100 @@ export function detectPrimaryIPv4(): string {
 }
 
 /**
- * The interfaces to join the SSDP multicast group on: every routable IPv4 that is not a
- * Docker default bridge — and the bridges after all if that is everything the host has
- * (inside a container it is). Pure, so it can be unit-tested without real network cards.
+ * The host's interfaces to join the SSDP multicast group on when no interface is chosen.
  *
- * Same exception as {@link pickPrimaryIPv4}, and for the same reason: no remote lives behind
- * `docker0`, so joining there cannot hear anything. It costs a syscall and, when the bridge
- * is not in the multicast routing table, a warning that reads like a defect. Advertising and
- * joining now answer the question about a container bridge the same way.
- *
- * @param interfaces the OS network-interface map (os.networkInterfaces() shape)
- * @returns the addresses to join the multicast group on (may be empty)
+ * @returns the interfaces to join on (may be empty)
  */
-export function pickMembershipIPv4s(interfaces: NodeJS.Dict<NetworkInterfaceInfo[]>): string[] {
-  const addresses = listNonInternalIPv4s(interfaces);
-  const real = addresses.filter(address => !isContainerBridge(address));
-  return real.length > 0 ? real : addresses;
+export function detectLocalIPv4s(): Membership[] {
+  return pickMembershipIPv4s(networkInterfaces());
 }
 
 /**
- * The host's interfaces to join the SSDP multicast group on when no specific interface is
- * configured, so discovery works on every LAN the host is on. Without this a multi-homed
- * host only hears M-SEARCH on the OS default interface.
+ * The host's networks, read fresh — an address change (DHCP, a provider's IPv6 prefix) is seen on
+ * the next call instead of being frozen at start-up.
  *
- * @returns the addresses to join on (may be empty)
+ * @returns the host's networks
  */
-export function detectLocalIPv4s(): string[] {
-  return pickMembershipIPv4s(networkInterfaces());
+export function detectLocalNets(): LocalNet[] {
+  return listLocalNets(networkInterfaces());
+}
+
+/**
+ * Does the host carry this IPv4 address on one of its interfaces?
+ *
+ * @param address the address to look for
+ * @param nets the host's networks
+ * @returns true if an interface carries it
+ */
+export function hasLocalAddress(address: string, nets: readonly LocalNet[]): boolean {
+  return nets.some(net => net.address === address);
+}
+
+/**
+ * The networks of the interface that carries the given address — what "stay in the chosen
+ * interface's network" means.
+ *
+ * @param address an address of the host
+ * @param nets the host's networks
+ * @returns the networks of that interface (empty if no interface carries the address)
+ */
+export function netsOfInterface(address: string, nets: readonly LocalNet[]): LocalNet[] {
+  const owner = nets.find(net => net.address === address)?.iface;
+  return owner === undefined ? [] : nets.filter(net => net.iface === owner);
+}
+
+/**
+ * The host's own IPv4 address in the network a remote sits in — the address that remote can
+ * reach. On a host with several networks a search from the IoT VLAN must be answered with the
+ * host's IoT VLAN address, not with the address of another network the remote cannot route to.
+ *
+ * @param remote the remote's address
+ * @param nets the host's networks
+ * @returns the host's address in the remote's network, or undefined if it shares none
+ */
+export function localAddressFor(remote: string, nets: readonly LocalNet[]): string | undefined {
+  const ip = remote.replace(/^::ffff:/i, "");
+  return nets.find(net => net.family === "IPv4" && inNet(ip, net))?.address;
+}
+
+/**
+ * Is an address inside one of the host's networks (by the network's prefix length)?
+ *
+ * @param address the address to test (IPv4, or IPv6 with an optional zone suffix)
+ * @param net the network
+ * @returns true if the address lies in the network
+ */
+export function inNet(address: string, net: LocalNet): boolean {
+  if (net.family === "IPv4") {
+    const a = ipv4ToInt(address);
+    const n = ipv4ToInt(net.address);
+    if (a === null || n === null) {
+      return false;
+    }
+    const mask = net.prefixLength === 0 ? 0 : (~0 << (32 - net.prefixLength)) >>> 0;
+    return (a & mask) >>> 0 === (n & mask) >>> 0;
+  }
+  const a = expandIPv6(address);
+  const n = expandIPv6(net.address);
+  if (!a || !n) {
+    return false;
+  }
+  const bits = (groups: string[]): string => groups.map(g => parseInt(g, 16).toString(2).padStart(16, "0")).join("");
+  return bits(a).slice(0, net.prefixLength) === bits(n).slice(0, net.prefixLength);
+}
+
+/**
+ * An IPv4 address as an unsigned 32-bit number, or null if it is not a dotted quad.
+ *
+ * @param address the address text
+ * @returns the number, or null
+ */
+function ipv4ToInt(address: string): number | null {
+  const parts = address.split(".");
+  if (parts.length !== 4 || parts.some(p => !/^\d{1,3}$/.test(p) || Number(p) > 255)) {
+    return null;
+  }
+  return parts.reduce((n, p) => ((n << 8) | Number(p)) >>> 0, 0);
 }
 
 /**
@@ -130,62 +285,13 @@ function expandIPv6(address: string): string[] | null {
   }
   const head = halves[0] ? halves[0].split(":") : [];
   const tail = halves.length === 2 ? (halves[1] ? halves[1].split(":") : []) : [];
-  const groups =
-    halves.length === 2 ? [...head, ...Array<string>(8 - head.length - tail.length).fill("0"), ...tail] : head;
+  const fill = 8 - head.length - tail.length;
+  if (halves.length === 2 && fill < 1) {
+    return null;
+  }
+  const groups = halves.length === 2 ? [...head, ...Array<string>(fill).fill("0"), ...tail] : head;
   if (groups.length !== 8 || groups.some(g => !/^[0-9a-f]{1,4}$/.test(g))) {
     return null;
   }
   return groups.map(g => g.padStart(4, "0"));
-}
-
-/**
- * The /64 network prefix of an IPv6 address — its first four groups. A /64 is
- * exactly one network segment (the size SLAAC assigns), so two addresses sharing
- * it are on the same link.
- *
- * @param address the IPv6 address text
- * @returns the normalised prefix (e.g. "2003:00e1:1f28:9a00"), or null
- */
-export function ipv6Prefix64(address: string): string | null {
-  const groups = expandIPv6(address);
-  return groups ? groups.slice(0, 4).join(":") : null;
-}
-
-/**
- * The /64 prefixes of every non-internal IPv6 address of the given interface map.
- * Pure — takes the interface map so it can be unit-tested without real network
- * cards.
- *
- * These are what makes a globally routable IPv6 client recognisable as local: on
- * a modern connection the router hands every device in the house an address out
- * of the provider's block, which looks exactly like an internet address. Only the
- * shared prefix tells "the TV in the living room" from "a host on the internet".
- *
- * @param interfaces the OS network-interface map (os.networkInterfaces() shape)
- * @returns every /64 prefix the host itself is in (may be empty), de-duplicated
- */
-export function listLocalIPv6Prefixes(interfaces: NodeJS.Dict<NetworkInterfaceInfo[]>): string[] {
-  const out = new Set<string>();
-  for (const addrs of Object.values(interfaces)) {
-    for (const addr of addrs ?? []) {
-      if (addr.family !== "IPv6" || addr.internal) {
-        continue;
-      }
-      const prefix = ipv6Prefix64(addr.address);
-      if (prefix) {
-        out.add(prefix);
-      }
-    }
-  }
-  return [...out];
-}
-
-/**
- * The /64 prefixes of the host's own IPv6 addresses — the LAN guard's notion of
- * "my network" for a globally routable client.
- *
- * @returns every /64 prefix the host is in (may be empty)
- */
-export function detectLocalIPv6Prefixes(): string[] {
-  return listLocalIPv6Prefixes(networkInterfaces());
 }

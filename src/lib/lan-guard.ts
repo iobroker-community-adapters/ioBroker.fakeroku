@@ -1,55 +1,41 @@
-import { detectLocalIPv6Prefixes, ipv6Prefix64 } from "./detect-ip";
+import { detectLocalNets, inNet, type LocalNet } from "./detect-ip";
 
 /**
- * LAN restriction for both network services (ECP HTTP + SSDP): only accept
- * requests from private / local networks — the IPv4 private and link-local ranges, loopback, and the IPv6
- * link-local / unique-local ranges. The old adapter accepted key presses from any
- * reachable IP.
+ * The trust boundary of both network services (ECP HTTP + SSDP): only a client in one of the
+ * host's OWN networks is answered — the old adapter accepted key presses from any reachable IP.
  *
- * A globally routable IPv6 address is accepted when it sits in one of the host's
- * OWN /64 prefixes. On a connection with native IPv6 the router hands every
- * device in the house an address out of the provider's block, so a remote on the
- * same link looks exactly like an internet host — the shared prefix is what tells
- * them apart. Anything from a different prefix stays out, as before. The prefixes
- * are read lazily and only for such an address, so the common IPv4 case does not
- * touch the network interfaces at all, and a provider's prefix change is picked
- * up on the next request instead of being frozen at start-up.
+ * "Own network" is measured, not guessed from address ranges: a client counts when it lies in the
+ * network (address + prefix length) of one of the interfaces the caller hands in. That keeps a
+ * routed private network out (another VLAN, a VPN such as Tailscale over 100.64/10 or its IPv6
+ * ULA block), and it takes in a global IPv6 client from the host's own prefix — on a connection
+ * with native IPv6 every device in the house carries such an address.
  *
- * @param remoteAddress the client IP from the request socket
- * @param localPrefixes supplies the host's own IPv6 /64 prefixes (injected for tests)
- * @returns true if the client is on a private/local network
+ * Always accepted, without asking the interfaces: loopback (the host itself) and the link-local
+ * ranges 169.254.0.0/16 and fe80::/10 — a link-local address is on the same wire by definition
+ * (169.254 is what a remote self-assigns when the DHCP server is slow or gone, which is exactly
+ * when the user troubleshoots).
+ *
+ * With a chosen interface the caller hands in only that interface's networks, so nothing outside
+ * the chosen network gets an answer.
+ *
+ * @param remoteAddress the client IP from the socket
+ * @param nets supplies the networks that count as own (read lazily, only for a routable client)
+ * @returns true if the client is in one of the given networks
  */
 export function isLanClient(
   remoteAddress: string | undefined,
-  localPrefixes: () => readonly string[] = detectLocalIPv6Prefixes,
+  nets: () => readonly LocalNet[] = detectLocalNets,
 ): boolean {
   if (!remoteAddress) {
     return false;
   }
-  const ip = remoteAddress.replace(/^::ffff:/, "");
-  if (ip === "127.0.0.1" || ip === "::1") {
+  const ip = remoteAddress.replace(/^::ffff:/i, "").toLowerCase();
+  if (/^127\./.test(ip) || ip === "::1") {
     return true;
   }
-  if (/^10\./.test(ip)) {
+  if (/^169\.254\./.test(ip) || /^fe[89ab][0-9a-f]:/.test(ip)) {
     return true;
   }
-  if (/^192\.168\./.test(ip)) {
-    return true;
-  }
-  if (/^172\.(1[6-9]|2\d|3[01])\./.test(ip)) {
-    return true;
-  }
-  if (/^169\.254\./.test(ip)) {
-    return true;
-  }
-  // IPv6 in the LAN: link-local (fe80::/10, possibly with a `%zone` suffix) and
-  // unique-local (fc00::/7). A remote on an IPv6-only segment is still local.
-  const v6 = ip.toLowerCase();
-  if (/^fe[89ab][0-9a-f]:/.test(v6) || /^f[cd][0-9a-f]{2}:/.test(v6)) {
-    return true;
-  }
-  // A globally routable IPv6 address: local exactly when it shares one of the
-  // host's own /64 network prefixes.
-  const prefix = ipv6Prefix64(v6);
-  return prefix !== null && localPrefixes().includes(prefix);
+  const family = ip.includes(":") ? "IPv6" : "IPv4";
+  return nets().some(net => net.family === family && inNet(ip, net));
 }
