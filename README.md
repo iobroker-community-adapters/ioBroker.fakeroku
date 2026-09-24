@@ -95,7 +95,7 @@ becomes `true` — or watch `.command` for the last button as text.
 	### **WORK IN PROGRESS**
 -->
 
-### 1.7.1 (2026-09-16)
+### 1.7.1 (2026-09-16) — stable
 
 - (krobipd) Changed: the instance restarts once after this update to clear a setting left behind by an older version; nothing else changes for you.
 
