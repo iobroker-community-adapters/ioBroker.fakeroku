@@ -1,4 +1,4 @@
-import type { DeviceType } from "../ecp/state-model";
+import { type DeviceType, TV_KEYS } from "../ecp/state-model";
 import { DEFAULT_ECP_PORT, RESERVED_IDS } from "./constants";
 import { resolveDeviceUuid } from "./device-identity";
 import { t } from "./i18n";
@@ -24,9 +24,75 @@ import { sanitizeId } from "./pure-helpers";
 const MIN_PORT = 1;
 const MAX_PORT = 65535;
 
+/**
+ * The port the pre-0.6.0 adapter fell back to for a row whose port was empty or unusable
+ * (`parseInt(dev.port) || 9093`). A remote paired with such a device found it there.
+ */
+const LEGACY_DEFAULT_PORT = 9093;
+
+/**
+ * What the adapter's object tree holds right now, as far as the rows need it: the device ids, and
+ * the key states below each. Built once per start from the object dump the orphan sweep reads.
+ */
+export interface DeviceTree {
+  /** The top-level device object ids. */
+  devices: ReadonlySet<string>;
+  /** Per device id, the key names below `<id>.keys`. */
+  keys: ReadonlyMap<string, ReadonlySet<string>>;
+}
+
+/** A tree with nothing in it — a fresh installation, or a caller that knows none. */
+export const EMPTY_TREE: DeviceTree = { devices: new Set(), keys: new Map() };
+
+/**
+ * Build the {@link DeviceTree} from the adapter's object ids (relative to the namespace).
+ *
+ * @param ids the object ids, e.g. "Wohnzimmer", "Wohnzimmer.keys.Home"
+ * @param types per id, the object type (only `device` objects count as devices)
+ * @returns the tree
+ */
+export function deviceTreeOf(ids: Iterable<string>, types: (id: string) => string | undefined): DeviceTree {
+  const devices = new Set<string>();
+  const keys = new Map<string, Set<string>>();
+  for (const id of ids) {
+    const parts = id.split(".");
+    if (parts.length === 1 && types(id) === "device") {
+      devices.add(id);
+    } else if (parts.length === 3 && parts[1] === "keys") {
+      const set = keys.get(parts[0]) ?? new Set<string>();
+      set.add(parts[2]);
+      keys.set(parts[0], set);
+    }
+  }
+  return { devices, keys };
+}
+
+/**
+ * The object id the pre-0.6.0 adapter built from a device name: dots and whitespace runs became
+ * one `_`, everything else stayed — an umlaut, a bracket, a `#`. The rebuild's {@link sanitizeId}
+ * replaces every such character one by one, so the same name leads to a different id.
+ *
+ * @param name the stored device name
+ * @returns the old adapter's object id for it
+ */
+export function legacyObjectId(name: string): string {
+  return name.replace(/[.\s]+/g, "_");
+}
+
+/**
+ * Can this be one segment of an ioBroker object id? Non-empty, no dot, and nothing js-controller
+ * forbids (7.2.2 `FORBIDDEN_CHARS`, common-db tools.ts: letters, digits and `_-/ :!#$%&()+=@^{}|~`).
+ *
+ * @param id the candidate
+ * @returns true if it is a usable id segment
+ */
+export function isUsableObjectId(id: string): boolean {
+  return id.length > 0 && !/[^_\-/ :!#$%&()+=@^{}|~\p{Ll}\p{Lu}\p{Nd}]/u.test(id);
+}
+
 /** One configured emulated Roku, normalised. */
 export interface DeviceRow {
-  /** The name exactly as stored — what the object id and the SSDP identity derive from. */
+  /** The name exactly as stored — what the SSDP identity of a row without a `uuid` derives from. */
   readonly storedName: string;
   /** The name to display and to persist on the next write (trimmed). */
   readonly name: string;
@@ -38,8 +104,18 @@ export interface DeviceRow {
   readonly identity: string;
   /** True when the row carried a persisted id the adapters never wrote, and this one replaces it. */
   readonly identityReplaced: boolean;
+  /** True when the row carries no usable stored `uuid` — the identity is derived from the name. */
+  readonly identityDerived: boolean;
   /** True when the stored port was unusable and the default stands in. */
   readonly portReplaced: boolean;
+  /**
+   * The object id of this device's tree. Fixed once known: a stored `objectId`, else the tree
+   * the installation already has for this row (under today's id or the old adapter's), else the
+   * id built from the name. A rename changes the displayed name, never this.
+   */
+  readonly objectId: string;
+  /** True when the row carries no stored `objectId` yet — the next save persists {@link objectId}. */
+  readonly objectIdDerived: boolean;
 }
 
 /**
@@ -49,11 +125,12 @@ export interface DeviceRow {
  * adapter clamped for the same reason (`Math.min(65535, Math.max(0, parseInt(…) || 9093))`).
  *
  * @param value the stored port value
- * @returns the port to use, or the adapter default when the value is unusable
+ * @param fallback the port for an unusable value (the adapter default, or the old adapter's)
+ * @returns the port to use, or the fallback when the value is unusable
  */
-export function normalizePort(value: unknown): number {
+export function normalizePort(value: unknown, fallback: number = DEFAULT_ECP_PORT): number {
   const port = Math.trunc(Number(value));
-  return Number.isFinite(port) && port >= MIN_PORT && port <= MAX_PORT ? port : DEFAULT_ECP_PORT;
+  return Number.isFinite(port) && port >= MIN_PORT && port <= MAX_PORT ? port : fallback;
 }
 
 /**
@@ -72,28 +149,67 @@ export function normalizeType(value: unknown): DeviceType {
  * missing, not a string, or only whitespace — the device manager shows it as an unnamed
  * card and refuses to save it, and the runtime cannot build an object id from it).
  *
+ * A row without a stored `type` comes from before 0.7.0 — most of them from the old adapter,
+ * which created every key state the remote pressed, TV keys included. Its type is read from the
+ * tree it already has: TV keys there mean a TV, or the orphan sweep would delete them (and with
+ * them their values, room assignments and history settings). The same rows take the old
+ * adapter's fallback port.
+ *
  * @param raw one element of native.devices
+ * @param tree what the object tree holds (empty: nothing is known)
  * @returns the normalised row, or null
  */
-export function toDeviceRow(raw: unknown): DeviceRow | null {
+export function toDeviceRow(raw: unknown, tree: DeviceTree = EMPTY_TREE): DeviceRow | null {
   if (typeof raw !== "object" || raw === null) {
     return null;
   }
-  const row = raw as { name?: unknown; port?: unknown; type?: unknown; uuid?: unknown };
+  const row = raw as { name?: unknown; port?: unknown; type?: unknown; uuid?: unknown; objectId?: unknown };
   if (typeof row.name !== "string" || row.name.trim().length === 0) {
     return null;
   }
   const identity = resolveDeviceUuid({ name: row.name, uuid: row.uuid });
-  const port = normalizePort(row.port);
+  const objectId = resolveObjectId(row.name, row.objectId, tree);
+  const legacyRow = row.type === undefined;
+  const port = normalizePort(row.port, legacyRow ? LEGACY_DEFAULT_PORT : DEFAULT_ECP_PORT);
+  const tvKeysInTree = [...(tree.keys.get(objectId) ?? [])].some(key => (TV_KEYS as readonly string[]).includes(key));
   return {
     storedName: row.name,
     name: row.name.trim(),
     port,
-    type: normalizeType(row.type),
+    type: legacyRow && tvKeysInTree ? "tv" : normalizeType(row.type),
     identity,
     identityReplaced: typeof row.uuid === "string" && row.uuid.length > 0 && row.uuid !== identity,
+    identityDerived: identity !== row.uuid,
     portReplaced: row.port !== undefined && port !== Number(row.port),
+    objectId,
+    objectIdDerived: !(typeof row.objectId === "string" && isUsableObjectId(row.objectId)),
   };
+}
+
+/**
+ * The object id of a row: its stored `objectId`; else a tree the installation already has for
+ * it — under the id built from the name today, or under the old adapter's id (an installation
+ * upgraded from before 0.6.0 whose name holds an umlaut, a bracket or a double space) — else the
+ * id built from the name. Taking the existing tree is what keeps an upgrade from deleting it.
+ *
+ * @param storedName the name exactly as stored
+ * @param stored the stored `objectId`, if any
+ * @param tree what the object tree holds
+ * @returns the object id
+ */
+function resolveObjectId(storedName: string, stored: unknown, tree: DeviceTree): string {
+  if (typeof stored === "string" && isUsableObjectId(stored)) {
+    return stored;
+  }
+  const current = sanitizeId(storedName);
+  if (tree.devices.has(current)) {
+    return current;
+  }
+  const legacy = legacyObjectId(storedName);
+  if (isUsableObjectId(legacy) && tree.devices.has(legacy)) {
+    return legacy;
+  }
+  return current;
 }
 
 /**
@@ -102,15 +218,16 @@ export function toDeviceRow(raw: unknown): DeviceRow | null {
  * list ("the user deleted everything") and must not trigger the orphan sweep.
  *
  * @param devices the raw `native.devices` value
+ * @param tree what the object tree holds (empty: nothing is known)
  * @returns the usable rows, or null when there is no list
  */
-export function toDeviceRows(devices: unknown): DeviceRow[] | null {
+export function toDeviceRows(devices: unknown, tree: DeviceTree = EMPTY_TREE): DeviceRow[] | null {
   if (!Array.isArray(devices)) {
     return null;
   }
   const rows: DeviceRow[] = [];
   for (const raw of devices) {
-    const row = toDeviceRow(raw);
+    const row = toDeviceRow(raw, tree);
     if (row) {
       rows.push(row);
     }
@@ -119,14 +236,13 @@ export function toDeviceRows(devices: unknown): DeviceRow[] | null {
 }
 
 /**
- * The object-id path segment of a row — always from the STORED name, so an installation
- * keeps the tree it has until the user actually saves the device.
+ * The object-id path segment of a row — fixed once known, see {@link DeviceRow.objectId}.
  *
  * @param row the normalised row
- * @returns the id-safe device path segment
+ * @returns the device's object id
  */
 export function deviceObjectId(row: DeviceRow): string {
-  return sanitizeId(row.storedName);
+  return row.objectId;
 }
 
 /**
@@ -150,11 +266,14 @@ export function nextFreePort(usedPorts: readonly number[]): number {
  * safety net behind the form validator (the dialog validator may not fire in every admin
  * version; this never lets a duplicate through).
  *
+ * The object id is judged only for a NEW device: an existing one keeps the id it has, whatever
+ * it is renamed to.
+ *
  * @param devices the full current device list
  * @param candidate the name+port being added/edited
  * @param candidate.name the candidate device name
  * @param candidate.port the candidate ECP port
- * @param exceptIndex the list position to ignore (the device being edited), or -1
+ * @param exceptIndex the list position to ignore (the device being edited), or -1 for a new one
  * @returns a translated clash message, or null if free
  */
 export function findClash(
@@ -163,12 +282,14 @@ export function findClash(
   exceptIndex: number,
 ): ioBroker.StringOrTranslated | null {
   const name = candidate.name.trim().toLowerCase();
-  // The object-tree path is sanitizeId(name); guard the two ways it can go wrong
-  // regardless of the plain-name check: a name that sanitizes to a reserved id
-  // ("info" would collide with the adapter's own channel), and two different
-  // names that sanitize to the SAME id ("My Roku" and "My*Roku" → "My_Roku").
-  const id = sanitizeId(candidate.name.trim());
-  if (id === "" || RESERVED_IDS.has(id)) {
+  if (candidate.name.trim() === "") {
+    return t("deviceNameInvalid");
+  }
+  // A new device's tree is built from its name: guard the two ways that can go wrong — a
+  // reserved id ("info" would collide with the adapter's own channel), and a different name
+  // that maps to an id another device already occupies ("My Roku" and "My*Roku" → "My_Roku").
+  const id = exceptIndex === -1 ? sanitizeId(candidate.name.trim()) : null;
+  if (id !== null && (id === "" || RESERVED_IDS.has(id))) {
     return t("deviceNameInvalid");
   }
   for (let i = 0; i < devices.length; i++) {
@@ -178,11 +299,9 @@ export function findClash(
     if (devices[i].name.toLowerCase() === name) {
       return t("deviceNameInUse");
     }
-    // deviceObjectId, not the displayed name: the tree is built from the STORED name, so a
-    // row saved as " Roku " occupies "_Roku_" at runtime while its display name reads "Roku".
-    // Checking the display name would let a new "_Roku_" through here and let the start skip
-    // it as a duplicate id — a device that never comes up and an instance that stays red.
-    if (deviceObjectId(devices[i]) === id) {
+    // The other device's REAL object id — built from its stored name, taken over from the old
+    // adapter, or stored — not an id derived from the name the list displays.
+    if (id !== null && deviceObjectId(devices[i]) === id) {
       return t("deviceNameInvalid");
     }
     if (Number(devices[i].port) === candidate.port) {

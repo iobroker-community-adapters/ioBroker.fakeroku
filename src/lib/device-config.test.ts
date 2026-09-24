@@ -4,7 +4,10 @@ vi.mock("./i18n", () => ({ t: (key: string, ...args: unknown[]) => (args.length 
 
 import {
   deviceObjectId,
+  deviceTreeOf,
   findClash,
+  isUsableObjectId,
+  legacyObjectId,
   nextFreePort,
   normalizePort,
   normalizeType,
@@ -114,9 +117,88 @@ describe("toDeviceRows", () => {
 });
 
 describe("deviceObjectId", () => {
-  it("is built from the stored name, so an existing tree does not wander on an update", () => {
+  it("is built from the stored name when nothing else is known", () => {
     expect(deviceObjectId(toDeviceRow({ name: " Roku " })!)).toBe("_Roku_");
     expect(deviceObjectId(toDeviceRow({ name: "My Roku!" })!)).toBe("My_Roku_");
+  });
+
+  it("is the stored objectId once there is one — a rename never moves the tree", () => {
+    const row = toDeviceRow({ name: "Lounge", port: 8060, type: "player", objectId: "Living_room" })!;
+    expect(deviceObjectId(row)).toBe("Living_room");
+    expect(row.objectIdDerived).toBe(false);
+  });
+
+  it("ignores a stored objectId that cannot be an object id segment", () => {
+    const row = toDeviceRow({ name: "Roku", port: 8060, type: "player", objectId: "a.b" })!;
+    expect(deviceObjectId(row)).toBe("Roku");
+    expect(row.objectIdDerived).toBe(true);
+  });
+
+  it("keeps the tree the OLD adapter built for a name with an umlaut, a bracket or two spaces", () => {
+    // The pre-0.6.0 adapter replaced only dots and whitespace runs; the rebuild replaces every
+    // character outside [A-Za-z0-9-_] one by one. Without the bridge the orphan sweep deleted the
+    // old tree — values, room assignments and history settings with it.
+    for (const [name, legacy] of [
+      ["Küche", "Küche"],
+      ["Roku (Wohnzimmer)", "Roku_(Wohnzimmer)"],
+      ["Roku  TV", "Roku_TV"],
+    ]) {
+      expect(legacyObjectId(name)).toBe(legacy);
+      const tree = deviceTreeOf([legacy], () => "device");
+      expect(deviceObjectId(toDeviceRow({ name, port: 9093 }, tree)!), name).toBe(legacy);
+    }
+  });
+
+  it("prefers today's id when the tree already lives there", () => {
+    const tree = deviceTreeOf(["K_che", "Küche"], () => "device");
+    expect(deviceObjectId(toDeviceRow({ name: "Küche" }, tree)!)).toBe("K_che");
+  });
+
+  it("counts only device objects as a tree, not a state that happens to carry the name", () => {
+    const tree = deviceTreeOf(["Küche"], () => "state");
+    expect(deviceObjectId(toDeviceRow({ name: "Küche" }, tree)!)).toBe("K_che");
+  });
+});
+
+describe("isUsableObjectId", () => {
+  it("allows what js-controller allows in one segment (7.2.2 FORBIDDEN_CHARS), no dot", () => {
+    for (const id of ["Roku", "Küche", "Roku_(Wohnzimmer)", "a#b", "x-y_z"]) {
+      expect(isUsableObjectId(id), id).toBe(true);
+    }
+    for (const id of ["", "a.b", "a*b", "a,b", 'a"b', "a;b"]) {
+      expect(isUsableObjectId(id), id).toBe(false);
+    }
+  });
+});
+
+describe("a row from before 0.7.0 (no type stored)", () => {
+  it("is a TV when its tree carries TV keys, so the sweep keeps them", () => {
+    const tree = deviceTreeOf(["TV", "TV.keys", "TV.keys.Home", "TV.keys.VolumeUp"], id =>
+      id === "TV" ? "device" : id === "TV.keys" ? "channel" : "state",
+    );
+    expect(toDeviceRow({ name: "TV", port: 9093 }, tree)!.type).toBe("tv");
+  });
+
+  it("stays a player without TV keys, and a stored type always wins", () => {
+    const tree = deviceTreeOf(["P", "P.keys.Home"], id => (id === "P" ? "device" : "state"));
+    expect(toDeviceRow({ name: "P", port: 9093 }, tree)!.type).toBe("player");
+    const tvTree = deviceTreeOf(["T", "T.keys.VolumeUp"], id => (id === "T" ? "device" : "state"));
+    expect(toDeviceRow({ name: "T", port: 8060, type: "player" }, tvTree)!.type).toBe("player");
+  });
+
+  it("falls back to the old adapter's port 9093 for an unusable port", () => {
+    // The old adapter used parseInt(port) || 9093 — a remote paired with such a device found it
+    // there; 8060 would move it.
+    expect(toDeviceRow({ name: "Old", port: "" })!.port).toBe(9093);
+    expect(toDeviceRow({ name: "New", port: "", type: "player" })!.port).toBe(8060);
+  });
+});
+
+describe("identityDerived", () => {
+  it("tells a stored identity from one derived from the name", () => {
+    expect(toDeviceRow({ name: "A", uuid: "0123456789abcdef0123456789abcdef" })!.identityDerived).toBe(false);
+    expect(toDeviceRow({ name: "A" })!.identityDerived).toBe(true);
+    expect(toDeviceRow({ name: "A", uuid: "bad id" })!.identityDerived).toBe(true);
   });
 });
 
@@ -156,6 +238,14 @@ describe("findClash", () => {
 
   it("excludes the edited device so its own name+port do not clash with itself", () => {
     expect(findClash(devices, { name: "Living room", port: 8060 }, 0)).toBeNull();
+  });
+
+  it("judges no object id for an edit — the device keeps the id it has", () => {
+    // "Kitchen" renamed to "Living*room": a new device would land on Living_room, a renamed
+    // one stays on Kitchen.
+    expect(findClash(devices, { name: "Living*room", port: 8061 }, 1)).toBeNull();
+    expect(findClash(devices, { name: "info", port: 8061 }, 1)).toBeNull();
+    expect(findClash(devices, { name: "   ", port: 8061 }, 1)).toBe("deviceNameInvalid");
   });
 
   it("rejects a name that maps to the reserved 'info' object id", () => {

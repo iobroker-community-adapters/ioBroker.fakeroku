@@ -306,10 +306,11 @@ interface Ctx {
  * @param opts   per-fake behaviour (which ECP port fails to start, SSDP failure)
  * @param opts.failEcpPort ECP port whose fake server fails to start
  * @param opts.ssdpStartFails Whether the fake SSDP responder fails to start
+ * @param opts.fresh A fresh installation: no device object exists yet for the configured rows
  */
 function setup(
   config: Record<string, unknown> = {},
-  opts: { failEcpPort?: number; ssdpStartFails?: boolean } = {},
+  opts: { failEcpPort?: number; ssdpStartFails?: boolean; fresh?: boolean } = {},
 ): Ctx {
   // The default config chooses 192.168.1.5 — an interface has to carry it, or the adapter
   // (rightly) waits for it and then refuses to serve an address the host does not have.
@@ -326,6 +327,19 @@ function setup(
   // Same content in the instance object: that is where js-controller keeps it and where the
   // key-migration looks.
   i.instanceNative = structuredClone(i.config);
+  // An EXISTING installation unless a test says otherwise: every configured row already has its
+  // device object, so it has been announced and keeps the identity it has. On a fresh
+  // installation a row without a usable stored uuid gets its own identity and the adapter restarts.
+  if (!opts.fresh && Array.isArray(i.config.devices)) {
+    for (const row of i.config.devices as { name?: unknown; uuid?: unknown }[]) {
+      if (row && typeof row.name === "string" && row.name.trim()) {
+        const id = row.name.replace(/[^A-Za-z0-9\-_]/g, "_");
+        if (id !== "info" && !i.objects.has(id)) {
+          i.objects.set(id, { type: "device", common: { name: row.name }, native: {} });
+        }
+      }
+    }
+  }
 
   const ecp: FakeEcp[] = [];
   const ssdps: FakeSsdp[] = [];
@@ -630,6 +644,73 @@ describe("Fakeroku onReady — device identity", () => {
     await ctx.i.onReady();
     expect((ctx.ecp[0].options.device as { uuid: string }).uuid).toBe(deriveUuid("Roku"));
     expect(ctx.i.log.warn).toHaveBeenCalledWith(expect.stringContaining("unusable device id"));
+  });
+});
+
+describe("Fakeroku onReady — a device nothing has seen yet gets its own identity", () => {
+  it("writes a random identity and the object id on the first start of a fresh instance, then restarts", async () => {
+    // Derived from the name, the default "Roku" announced the same USN from every ioBroker in a
+    // network and from both instances on one host.
+    const ctx = setup({ devices: [{ name: "Roku", port: 8060, type: "player" }] }, { fresh: true });
+    await ctx.i.onReady();
+    const stored = ctx.i.instanceNative.devices as { uuid: string; objectId: string }[];
+    expect(stored[0].uuid).toMatch(/^[0-9a-f]{32}$/);
+    expect(stored[0].uuid).not.toBe(deriveUuid("Roku"));
+    expect(stored[0].objectId).toBe("Roku");
+    // The write restarts the instance — nothing may be announced under the old identity first.
+    expect(ctx.ecp).toHaveLength(0);
+    expect(ctx.i.log.info).toHaveBeenCalledWith(expect.stringContaining("got its own network identity"));
+  });
+
+  it("leaves a device alone that has a tree — it has been announced, maybe paired", async () => {
+    const ctx = setup({ devices: [{ name: "Roku", port: 8060, type: "player" }] });
+    await ctx.i.onReady();
+    expect(ctx.i.extendForeignObjectAsync).not.toHaveBeenCalled();
+    expect((ctx.ecp[0].options.device as { uuid: string }).uuid).toBe(deriveUuid("Roku"));
+  });
+
+  it("starts with the derived identity when the write fails, and tries again next start", async () => {
+    const ctx = setup({ devices: [{ name: "Roku", port: 8060, type: "player" }] }, { fresh: true });
+    ctx.i.extendForeignObjectAsync.mockRejectedValueOnce(new Error("write refused"));
+    await ctx.i.onReady();
+    expect(ctx.i.log.warn).toHaveBeenCalledWith(expect.stringContaining("could not get its own identity"));
+    expect((ctx.ecp[0].options.device as { uuid: string }).uuid).toBe(deriveUuid("Roku"));
+  });
+});
+
+describe("Fakeroku onReady — an installation upgraded from the old adapter keeps its tree", () => {
+  it("uses the tree the old adapter built for a name with an umlaut, and keeps it", async () => {
+    // Old adapter: "Küche" → object id "Küche"; the rebuild's rule gives "K_che". Before, the
+    // sweep deleted "Küche" with its values, room assignments and history settings.
+    const ctx = setup({ devices: [{ name: "Küche", port: 9093, uuid: "legacy-uuid" }] }, { fresh: true });
+    ctx.i.objects.set("Küche", { type: "device", common: { name: "Küche" }, native: {} });
+    ctx.i.objects.set("Küche.keys.Home", { type: "state", common: { name: "Home" }, native: {} });
+    ctx.i.states.set("Küche.keys.Home", { val: false, ack: true });
+    ctx.i.enums.set("enum.rooms.kitchen", new Set(["fakeroku.0.Küche.keys.Home"]));
+
+    await ctx.i.onReady();
+
+    expect(ctx.i.objects.has("Küche.keys.Home")).toBe(true);
+    expect(ctx.i.objects.has("K_che")).toBe(false);
+    expect(ctx.i.enums.get("enum.rooms.kitchen")!.has("fakeroku.0.Küche.keys.Home")).toBe(true);
+  });
+
+  it("keeps the TV keys the old adapter created for a row that stored no type", async () => {
+    const ctx = setup({ devices: [{ name: "TV", port: 9093, uuid: "legacy-tv" }] }, { fresh: true });
+    ctx.i.objects.set("TV", { type: "device", common: { name: "TV" }, native: {} });
+    ctx.i.objects.set("TV.keys.VolumeUp", { type: "state", common: { name: "VolumeUp" }, native: {} });
+
+    await ctx.i.onReady();
+
+    expect(ctx.i.objects.has("TV.keys.VolumeUp")).toBe(true);
+    expect(ctx.i.objects.has("TV.keys.InputTuner")).toBe(true);
+    expect((ctx.ecp[0].options as { deviceType: string }).deviceType).toBe("tv");
+  });
+
+  it("starts an old row with an unusable port on the old adapter's 9093", async () => {
+    const ctx = setup({ devices: [{ name: "Alt", port: "", uuid: "legacy-alt" }] });
+    await ctx.i.onReady();
+    expect((ctx.ecp[0].options.device as { port: number }).port).toBe(9093);
   });
 });
 
@@ -2314,5 +2395,43 @@ describe("Fakeroku — the paths that only a failing database reaches", () => {
 
     // A timer left armed keeps firing into an adapter that is already gone.
     expect(ctx.i.clearTimeout).toHaveBeenCalledWith({ kind: "timeout" });
+  });
+});
+
+describe("Fakeroku — the host says stop in the middle of the start", () => {
+  it("starts nothing more and queues nothing once onUnload ran", async () => {
+    const ctx = setup(
+      {
+        devices: [
+          { name: "A", port: 8060, type: "player" },
+          { name: "B", port: 8061, type: "player" },
+        ],
+      },
+      { failEcpPort: 8060 },
+    );
+    // The host stops while the first device's objects are being created.
+    const realExtend = ctx.i.extendObject.getMockImplementation() as (id: string, o: unknown) => Promise<void>;
+    ctx.i.extendObject.mockImplementation((id: string, o: unknown) => {
+      if (id === "A") {
+        ctx.i.onUnload(() => {});
+      }
+      return realExtend(id, o);
+    });
+    await ctx.i.onReady();
+    expect(ctx.ecp).toHaveLength(0);
+    expect(ctx.i.pending).toHaveLength(0);
+    // No "Only 0 of 2 … could be started" for a stop the user asked for.
+    expect(ctx.i.log.error).not.toHaveBeenCalled();
+  });
+});
+
+describe("Fakeroku — log lines name the device the way the user named it", () => {
+  it("the flood warning carries the device name, not its object id", async () => {
+    const ctx = setup({ devices: [{ name: "Wohn zimmer", port: 8060, type: "player" }] });
+    await ctx.i.onReady();
+    for (let n = 0; n < 30; n++) {
+      ctx.i.applyCommand("Wohn_zimmer", { type: "keypress", key: "Home" });
+    }
+    expect(ctx.i.log.warn).toHaveBeenCalledWith(expect.stringContaining('"Wohn zimmer" receives more than 25'));
   });
 });

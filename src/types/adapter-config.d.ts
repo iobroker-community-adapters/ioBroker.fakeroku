@@ -10,11 +10,13 @@ declare global {
       /** Legacy pre-0.5.0 key of the old adapter, moved to `bind` on the same start. */
       BIND?: string;
       /**
-       * Emulated Roku devices. `type` defaults to "player" when absent (pre-0.7.0 configs).
-       * `uuid` is the stable SSDP identity: adopted from the old adapter's persisted value on
-       * migration (keeps the controller pairing), derived from the name for devices without one.
+       * Emulated Roku devices. `type` is read from the existing tree when absent (pre-0.7.0
+       * configs). `uuid` is the stable SSDP identity: adopted from the old adapter's persisted
+       * value (keeps the controller pairing), derived from the name for rows without one, random
+       * for devices created since 1.8.0. `objectId` fixes the device's object tree — a rename
+       * changes only the displayed name.
        */
-      devices: { name: string; port: number; type?: "player" | "tv"; uuid?: string }[];
+      devices: { name: string; port: number; type?: "player" | "tv"; uuid?: string; objectId?: string }[];
     }
   }
 }

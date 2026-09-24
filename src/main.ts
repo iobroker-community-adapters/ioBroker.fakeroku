@@ -9,7 +9,8 @@ import { COMMAND_TYPES, type CommandEvent } from "./ecp/ecp-command";
 import { EcpHttpServer } from "./ecp/ecp-http-server";
 import { commandToStateWrite, type DeviceType, keysForType } from "./ecp/state-model";
 import { RESERVED_IDS } from "./lib/constants";
-import { deviceObjectId, toDeviceRows, type DeviceRow } from "./lib/device-config";
+import { deviceObjectId, deviceTreeOf, toDeviceRows, type DeviceRow } from "./lib/device-config";
+import { randomIdentity } from "./lib/device-identity";
 import {
   detectLocalIPv4s,
   detectLocalNets,
@@ -120,6 +121,8 @@ export class Fakeroku extends utils.Adapter {
   private readonly commandGates = new Map<string, RateGate>();
   /** Per device, when the dropped-commands warning was last written. */
   private readonly rateWarnedAt = new Map<string, number>();
+  /** Per device id, the name the user gave it — for log lines the user can recognise. */
+  private readonly deviceNames = new Map<string, string>();
   /** The devices that are actually listening — the basis for info.connection. */
   private readonly running: RokuAdvert[] = [];
   /** Devices whose ECP server did not start; retried on a timer until they come up. */
@@ -236,6 +239,13 @@ export class Fakeroku extends utils.Adapter {
       await I18n.init(join(this.adapterDir, "admin"), this);
       await this.refreshOwnObjects();
 
+      // The object tree as it is before this start touches it: the rows resolve their object id
+      // and — for a row from before 0.7.0 — their type against it.
+      const owned = await this.readOwnObjects();
+      if (this.stopping) {
+        return;
+      }
+
       // Read the device list BEFORE anything can return early: the orphan sweep below
       // has to know the configured set at every exit, or a tree the user just deleted
       // stays in the database for good (there is no second path that removes it).
@@ -244,7 +254,13 @@ export class Fakeroku extends utils.Adapter {
       // not read — sweep nothing, or we would delete a tree we cannot account for).
       // lib/device-config.ts is the ONE normaliser; the device manager reads the same
       // rows, so an edit can never resolve a different identity than the one advertised.
-      const configured = toDeviceRows(this.config.devices);
+      const configured = toDeviceRows(
+        this.config.devices,
+        deviceTreeOf(owned.keys(), id => owned.get(id)?.type),
+      );
+      if (configured && (await this.persistNewIdentities(configured, owned))) {
+        return;
+      }
 
       // Empty AND "0.0.0.0" both mean "auto": bind all interfaces, answer every network with the
       // host's own address in it. js-controller never rewrites an existing native default, so
@@ -402,6 +418,11 @@ export class Fakeroku extends utils.Adapter {
   private async startDevices(configured: readonly DeviceRow[]): Promise<void> {
     const seenIds = new Set<string>();
     for (const row of configured) {
+      // The host said stop: nothing more may start, and nothing may land in the queue onUnload
+      // just emptied.
+      if (this.stopping) {
+        return;
+      }
       const deviceId = deviceObjectId(row);
       // Two configured names can sanitize to the same object id — the admin guards
       // against it, but a hand-edited config could still carry it. Skip the duplicate
@@ -434,13 +455,14 @@ export class Fakeroku extends utils.Adapter {
         continue;
       }
       this.deviceKeys.set(deviceId, new Set(keys));
+      this.deviceNames.set(deviceId, row.name);
       const device: PendingDevice = {
         deviceId,
         friendlyName: row.name,
         advert: { uuid: row.identity, port: row.port },
         deviceType: row.type,
       };
-      if (!(await this.startDeviceServer(device, "start"))) {
+      if (!(await this.startDeviceServer(device, "start")) && !this.stopping) {
         this.pending.push(device);
       }
     }
@@ -454,6 +476,10 @@ export class Fakeroku extends utils.Adapter {
    * @returns true if the server is listening
    */
   private async startDeviceServer(device: PendingDevice, phase: "start" | "retry"): Promise<boolean> {
+    // The host said stop while this device's objects were being created: bind nothing.
+    if (this.stopping) {
+      return false;
+    }
     let server: EcpHttpServer | undefined;
     try {
       server = this.makeEcpServer({
@@ -669,11 +695,11 @@ export class Fakeroku extends utils.Adapter {
    * Re-apply the adapter's OWN objects — the `info` channel and `info.connection`
    * — on every start.
    *
-   * js-controller creates the manifest's instanceObjects only where they are
-   * missing, so a changed name or description never reaches an installation that
-   * already has them: the manifest would be correct and the real tree unchanged.
-   * extendObject is what carries the change into an existing tree, so an update
-   * always lands on every datapoint, not just on fresh installs.
+   * js-controller extends the manifest's instanceObjects on every start, but it preserves
+   * `common.name` of an existing object (7.2.2 `_extendObjects`, `preserve: { common: ["name"] }`):
+   * a changed description or role arrives by itself, a changed NAME only on a fresh install.
+   * extendObject is what carries the name into an existing tree, so an update always lands on
+   * every datapoint, not just on fresh installs.
    *
    * It also repairs the `info` channel after a hand-edited device row named
    * "info" turned it into a device object (see the reserved-id guard in startDevices).
@@ -768,8 +794,9 @@ export class Fakeroku extends utils.Adapter {
         this.extendObject(`${deviceId}.keys.${key}`, {
           type: "state",
           // "sensor" = generic boolean read-only (active/inactive). The docs suggest
-          // button.press for a keypress-as-state, but the repochecker rejects it
-          // (E1010 — not in its role list); sensor is the gate-conformant fit.
+          // button.press for a keypress-as-state, but the repochecker requires button.press to
+          // be read:false, write:true (config_StateRoles) — a key state is read-only, so
+          // button.press fails with E1010; sensor is the gate-conformant fit.
           // The name is the ECP key identifier and identical in every language, but
           // it still has to BE a translation object (tRaw), never a bare string.
           // No desc: the key name already says everything there is to say. The
@@ -810,6 +837,67 @@ export class Fakeroku extends utils.Adapter {
   }
 
   /**
+   * The adapter's objects, keyed relative to the namespace.
+   *
+   * @returns the object dump
+   */
+  private async readOwnObjects(): Promise<Map<string, ioBroker.Object>> {
+    const objects = await this.getAdapterObjectsAsync();
+    const prefix = `${this.namespace}.`;
+    const owned = new Map<string, ioBroker.Object>();
+    for (const [id, obj] of Object.entries(objects)) {
+      if (id.startsWith(prefix)) {
+        owned.set(id.slice(prefix.length), obj);
+      }
+    }
+    return owned;
+  }
+
+  /**
+   * Give every device that has never been announced its own identity and fix its object id —
+   * on its very first start, before anything announces it.
+   *
+   * "Never announced" is a row without a stored `uuid` whose object tree does not exist yet: the
+   * manifest's default device of a fresh instance, or a hand-written row. Its identity would
+   * otherwise be derived from its name, and every installation — every instance on one host too —
+   * announcing a device called "Roku" would share one USN. A row whose tree exists has been
+   * announced, maybe paired, and keeps the identity it has.
+   *
+   * Writing `native` restarts the instance, so the start ends here when something was written.
+   *
+   * @param rows the configured rows
+   * @param owned the object tree as it is
+   * @returns true when the config was written — the caller aborts its start
+   */
+  private async persistNewIdentities(
+    rows: readonly DeviceRow[],
+    owned: ReadonlyMap<string, ioBroker.Object>,
+  ): Promise<boolean> {
+    const fresh = rows.filter(row => row.identityDerived && !owned.has(row.objectId));
+    if (fresh.length === 0) {
+      return false;
+    }
+    const devices = rows.map(row => ({
+      name: row.storedName,
+      port: row.port,
+      type: row.type,
+      uuid: fresh.includes(row) ? randomIdentity() : row.identity,
+      objectId: row.objectId,
+    }));
+    try {
+      await this.extendForeignObjectAsync(`system.adapter.${this.namespace}`, { native: { devices } });
+    } catch (e) {
+      // Not fatal: the device starts with the identity derived from its name, as before.
+      this.log.warn(`New emulated Roku could not get its own identity (${errText(e)}) — trying again next start`);
+      return false;
+    }
+    this.log.info(
+      `New emulated Roku ${fresh.map(row => `"${row.name}"`).join(", ")} got its own network identity — the instance restarts once`,
+    );
+    return true;
+  }
+
+  /**
    * Remove objects left over from an earlier version or config — the legacy
    * `apps` node, keys no longer standard, and whole device sub-trees no longer
    * configured (a renamed/removed device). The adapter otherwise only ever
@@ -822,14 +910,10 @@ export class Fakeroku extends utils.Adapter {
    * @param configuredDeviceIds the id-safe names of the currently configured devices
    */
   private async cleanupOrphans(configuredDeviceIds: ReadonlySet<string>): Promise<void> {
-    const objects = await this.getAdapterObjectsAsync();
-    const prefix = `${this.namespace}.`;
-    const owned = new Map<string, ioBroker.Object>();
-    for (const [id, obj] of Object.entries(objects)) {
-      if (id.startsWith(prefix)) {
-        owned.set(id.slice(prefix.length), obj);
-      }
-    }
+    // A dump read NOW, after this start created and renamed its objects: the native repair
+    // below writes an object back whole, and a dump from before the start would write the
+    // names and descriptions of the previous version back over the ones just set.
+    const owned = await this.readOwnObjects();
     const toDelete = planObjectCleanup([...owned.keys()], configuredDeviceIds, this.deviceKeys);
     for (const id of toDelete) {
       await this.delObjectAsync(id, { recursive: true }).catch((e: unknown) => {
@@ -1010,7 +1094,7 @@ export class Fakeroku extends utils.Adapter {
     if (now - (this.rateWarnedAt.get(deviceId) ?? 0) >= RATE_WARN_INTERVAL_MS) {
       this.rateWarnedAt.set(deviceId, now);
       this.log.warn(
-        `Emulated Roku "${deviceId}" receives more than ${MAX_COMMANDS_PER_SECOND} commands per second — dropping the excess (a misbehaving controller?)`,
+        `Emulated Roku "${this.deviceNames.get(deviceId) ?? deviceId}" receives more than ${MAX_COMMANDS_PER_SECOND} commands per second — dropping the excess (a misbehaving controller?)`,
       );
     }
     return false;
@@ -1166,6 +1250,7 @@ export class Fakeroku extends utils.Adapter {
       }
       this.ecpServers.clear();
       this.deviceKeys.clear();
+      this.deviceNames.clear();
       this.commandGates.clear();
       this.rateWarnedAt.clear();
       this.running.length = 0;

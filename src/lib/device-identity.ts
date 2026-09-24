@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 
 /**
  * Derive a stable Roku device identity (serial / UDN) from the device name.
@@ -47,4 +47,20 @@ const UUID_SHAPE = /^[A-Za-z0-9-]{1,64}$/;
  */
 export function resolveDeviceUuid(device: { name: string; uuid?: unknown }): string {
   return typeof device.uuid === "string" && UUID_SHAPE.test(device.uuid) ? device.uuid : deriveUuid(device.name);
+}
+
+/**
+ * A fresh identity for a device that has never been announced — the shape {@link deriveUuid}
+ * produces (32 lower-case hex digits), but random.
+ *
+ * A derived identity is the same on every installation and every instance for the same name:
+ * the default device "Roku" announced one and the same USN from every ioBroker in a network,
+ * and from both instances on one host. A controller keyed on the USN (Home Assistant rewrites its
+ * stored host to wherever it saw that USN last) then mixed them up. Identities that already paired
+ * stay as they are; only a device that nothing has seen yet gets its own.
+ *
+ * @returns a 32-char lowercase hex identity
+ */
+export function randomIdentity(): string {
+  return randomBytes(16).toString("hex");
 }

@@ -3,7 +3,7 @@
 // an update reaches every object of an existing installation.
 //
 // Suite 1 "object inventory": start the adapter in the throwaway js-controller with one
-//   emulated Roku of EVERY device type (a player with the 16 base keys, a TV with the 27),
+//   emulated Roku of EVERY device type (a player with the 16 base keys, a TV with the 31),
 //   then dump every fakeroku.0.* object to test/objects.inventory.json in the ioBroker
 //   object-structure bot's format.
 // Suite 2 "upgrade from the previous release" (only when INVENTORY_PREVIOUS is set —
@@ -38,7 +38,7 @@ const canonical = v =>
 /**
  * The adapter's objects come from its configuration alone — no device, no cloud. What the
  * inventory needs is therefore one emulated Roku of every type the adapter can create:
- * a player (16 remote keys) and a TV (those plus the 11 TV keys).
+ * a player (16 remote keys) and a TV (those plus the 15 TV keys).
  *
  * The ports are deliberately far away from the real-Roku default: a port taken on the build
  * machine would only queue that device for a retry (its objects exist either way), but the
@@ -58,8 +58,8 @@ const FIXTURE_NATIVE = {
   ],
 };
 
-/** Objects the adapter creates for the fixture configuration: 2 own + (4 + 16) + (4 + 27). */
-const EXPECTED_OBJECTS = 53;
+/** Objects the adapter creates for the fixture configuration: 2 own + (4 + 16) + (4 + 31). */
+const EXPECTED_OBJECTS = 57;
 
 /**
  * Adapter-specific: wait until the object tree is complete.
