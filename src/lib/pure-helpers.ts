@@ -15,17 +15,30 @@ export function sanitizeId(raw: string): string {
 }
 
 /**
- * Normalize a Roku key name taken from the ECP URL path:
- * decode the URL-encoded character of a `Lit_<char>` keyboard keypress (a malformed
- * escape stays raw), then replace ALL dots with `_` (the old adapter's
- * `replace('.', '_')` only hit the first).
+ * Normalize a Roku key name taken from the ECP URL path: decode the character of a `Lit_<char>`
+ * keyboard keypress (a malformed escape stays raw).
+ *
+ * The text is kept as typed. The old adapter replaced dots with `_` because every key became an
+ * object id; here only the fixed standard keys have objects and none of them carries a dot, so a
+ * replacement would only falsify the typed character (`Lit_.` reading `Lit__`).
  *
  * @param raw the raw key segment from the request URL
  * @returns the normalized key name
  */
 export function normalizeKey(raw: string): string {
-  const decoded = raw.startsWith("Lit_") ? `Lit_${decodePercentEscapes(raw.slice(4))}` : raw;
-  return decoded.replace(/\./g, "_");
+  return raw.startsWith("Lit_") ? `Lit_${decodeFormText(raw.slice(4))}` : raw;
+}
+
+/**
+ * Decode URL text the way ECP clients encode it: `+` is a space (Python's `quote_plus`, which
+ * Home Assistant's `rokuecp` uses for `Lit_` and search text — a real `+` arrives as `%2B`), then
+ * the percent escapes. A malformed escape keeps the raw text.
+ *
+ * @param s the encoded text
+ * @returns the decoded text, or the raw text (with `+` as space) if it cannot be decoded
+ */
+export function decodeFormText(s: string): string {
+  return decodePercentEscapes(s.replace(/\+/g, " "));
 }
 
 /**

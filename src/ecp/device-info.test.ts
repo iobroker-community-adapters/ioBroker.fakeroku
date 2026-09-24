@@ -28,6 +28,13 @@ describe("buildDeviceInfoXml", () => {
     expect(info).toContain("<model-name>Roku Ultra</model-name>");
     expect(info).toContain("<supports-tv-power-control>false</supports-tv-power-control>");
   });
+  it("names the device the way openHAB and rokuecp read it", () => {
+    // openHAB labels a discovered Roku from friendly-model-name + user-device-location.
+    expect(info).toContain("<user-device-name>Living Room</user-device-name>");
+    expect(info).toContain("<friendly-model-name>Roku Ultra</friendly-model-name>");
+    expect(info).toContain("<default-device-name>Roku Ultra - abc123</default-device-name>");
+    expect(info).toContain("<user-device-location></user-device-location>");
+  });
   it("a TV advertises is-tv with power and volume capability", () => {
     const tv = buildDeviceInfoXml(device, "Living Room", "tv");
     expect(tv).toContain("<is-tv>true</is-tv>");
@@ -47,8 +54,12 @@ describe("buildDescXml", () => {
   it("escapes the friendly name — a user's name must not break the description a remote parses", () => {
     expect(buildDescXml(device, "A & B <TV>", "player")).toContain("<friendlyName>A &amp; B &lt;TV&gt;</friendlyName>");
   });
-  it("a TV root description uses the tv device type", () => {
-    expect(buildDescXml(device, "Living Room", "tv")).toContain("urn:roku-com:device:tv:1-0");
+  it("a TV announces the player device type, like a real Roku TV — and its own model", () => {
+    // `urn:roku-com:device:tv:1-0` exists nowhere but in this adapter's history; Home
+    // Assistant's SSDP filter never matched it.
+    const tv = buildDescXml(device, "Living Room", "tv");
+    expect(tv).toContain("<deviceType>urn:roku-com:device:player:1-0</deviceType>");
+    expect(tv).toContain("<modelName>Roku TV</modelName>");
   });
 });
 

@@ -4,7 +4,17 @@ import { errText } from "../lib/errors";
 import { isLanClient } from "../lib/lan-guard";
 import type { AdapterLogger } from "../lib/logger";
 import { type CommandEvent, parseEcpCommand } from "./ecp-command";
-import { type AppEntry, buildAppsXml, buildDescXml, buildDeviceInfoXml, buildScpdXml } from "./device-info";
+import {
+  APP_ICON_PNG,
+  type AppEntry,
+  buildActiveAppXml,
+  buildAppsXml,
+  buildDescXml,
+  buildDeviceInfoXml,
+  buildMediaPlayerXml,
+  buildScpdXml,
+  buildTvChannelsXml,
+} from "./device-info";
 import type { DeviceType } from "./state-model";
 
 /** Configuration for one emulated Roku's ECP HTTP server. */
@@ -59,11 +69,23 @@ const NON_LAN_LOG_INTERVAL_MS = 60_000;
  */
 const MAX_CONNECTIONS = 32;
 
+/** One GET answer: the body and its content type. */
+interface GetReply {
+  /** The response body. */
+  body: string | Buffer;
+  /** The Content-Type header. */
+  type: string;
+}
+
+/** The content type of every XML answer. */
+const XML = "text/xml; charset=utf-8";
+
 /**
- * The Roku ECP HTTP server for one emulated device. Serves the UPnP description,
- * /query/device-info (with a current version) and /query/apps; turns POST
- * key/launch/input/search into command events. Unknown GET paths get a clean 404
- * (not the old adapter's empty 200), and commands are accepted only from the LAN.
+ * The Roku ECP HTTP server for one emulated device. Serves the UPnP description, the service
+ * description, /query/device-info, /query/apps, /query/active-app, /query/media-player,
+ * /query/tv-channels (TV only) and /query/icon/<id>; turns POST key/launch/input/search into
+ * command events. Unknown GET paths get a clean 404 (not the old adapter's empty 200), and
+ * commands are accepted only from the adapter's own networks.
  */
 export class EcpHttpServer {
   private server: http.Server | undefined;
@@ -132,20 +154,19 @@ export class EcpHttpServer {
     const url = req.url ?? "/";
 
     if (method === "GET") {
-      const body = this.routeGet(url);
-      if (body === null) {
+      const reply = this.routeGet(url);
+      if (reply === null) {
         res.statusCode = 404;
         res.end();
         return;
       }
       if (url.split("?")[0] === "/query/device-info") {
-        // The pairing probe — the first thing a remote asks and the usual failure
-        // point (a Sofabaton rejects a too-old version). Visible for diagnosis.
+        // The pairing probe — the first thing most remotes ask. Visible for diagnosis.
         this.config.logger.debug(`device-info queried from ${peer} (remote pairing/probe)`);
       }
       res.statusCode = 200;
-      res.setHeader("Content-Type", "text/xml; charset=utf-8");
-      res.end(body);
+      res.setHeader("Content-Type", reply.type);
+      res.end(reply.body);
       return;
     }
 
@@ -185,21 +206,35 @@ export class EcpHttpServer {
     res.end();
   }
 
-  private routeGet(url: string): string | null {
-    switch (url.split("?")[0]) {
+  private routeGet(url: string): GetReply | null {
+    const path = url.split("?")[0];
+    const xml = (body: string): GetReply => ({ body, type: XML });
+    switch (path) {
       case "/":
-        return buildDescXml(this.config.device, this.config.friendlyName, this.config.deviceType);
+        return xml(buildDescXml(this.config.device, this.config.friendlyName, this.config.deviceType));
       case "/query/device-info":
-        return buildDeviceInfoXml(this.config.device, this.config.friendlyName, this.config.deviceType);
+        return xml(buildDeviceInfoXml(this.config.device, this.config.friendlyName, this.config.deviceType));
       case "/query/apps":
-        return buildAppsXml(this.config.apps);
+        return xml(buildAppsXml(this.config.apps));
+      // Asked on every update by Home Assistant (rokuecp) and openHAB; a 404 failed the whole
+      // setup there. See device-info.ts for what each answer says.
+      case "/query/active-app":
+        return xml(buildActiveAppXml());
+      case "/query/media-player":
+        return xml(buildMediaPlayerXml());
+      case "/query/tv-channels":
+        // Only a Roku TV has a tuner; rokuecp asks for the list only where is-tv is true.
+        return this.config.deviceType === "tv" ? xml(buildTvChannelsXml()) : null;
       // The root description points at this document; answering 404 for a path the device
       // itself advertises is a contradiction a strict UPnP control point can trip over.
       case "/ecp_SCPD.xml":
-        return buildScpdXml();
-      default:
-        return null;
+        return xml(buildScpdXml());
     }
+    const icon = /^\/query\/icon\/([^/]+)$/.exec(path);
+    if (icon && this.config.apps.some(app => app.id === icon[1])) {
+      return { body: APP_ICON_PNG, type: "image/png" };
+    }
+    return null;
   }
 
   /** Synchronous close — safe from onUnload. */

@@ -21,6 +21,19 @@ describe("parseEcpCommand", () => {
     expect(parseEcpCommand("POST", "/install/13")).toEqual({ type: "install", appId: "13" });
   });
 
+  it("keeps the parameters of a launch, decoded — a deep link is a different button", () => {
+    expect(parseEcpCommand("POST", "/launch/12?contentId=80057281&mediaType=movie")).toEqual({
+      type: "launch",
+      appId: "12",
+      text: "contentId=80057281&mediaType=movie",
+    });
+  });
+  it("decodes the text of a search the way rokuecp encodes it", () => {
+    expect(parseEcpCommand("POST", "/search/browse?keyword=the+news%21")).toEqual({
+      type: "search",
+      text: "keyword=the news!",
+    });
+  });
   it("rejects a launch without an app id", () => {
     // Without the argument check this becomes { type: "launch", appId: undefined },
     // which the adapter writes to `command` as the bare string "launch:".

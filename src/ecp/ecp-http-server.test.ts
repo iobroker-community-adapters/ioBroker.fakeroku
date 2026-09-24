@@ -96,6 +96,28 @@ describe("EcpHttpServer", () => {
     expect(r.status).toBe(404);
   });
 
+  it("answers the state queries Home Assistant and openHAB ask on every update", async () => {
+    // rokuecp turns any 4xx into RokuError and fails the whole setup (cannot_connect); openHAB
+    // marks the device offline. The emulator never runs an app, so the answers say "home screen,
+    // nothing playing" — what a real Roku answers in that state.
+    const app = await request("GET", "/query/active-app");
+    expect(app.status).toBe(200);
+    expect(app.body).toContain("<app>Roku</app>");
+    expect(app.headers["content-type"]).toMatch(/^text\/xml/);
+    const player = await request("GET", "/query/media-player");
+    expect(player.status).toBe(200);
+    expect(player.body).toBe('<player error="false" state="close"/>');
+  });
+  it("has no TV channel list on a player, like a real streaming box", async () => {
+    expect((await request("GET", "/query/tv-channels")).status).toBe(404);
+  });
+  it("serves an icon for an app it lists, and nothing for one it does not", async () => {
+    const icon = await request("GET", "/query/icon/12");
+    expect(icon.status).toBe(200);
+    expect(icon.headers["content-type"]).toBe("image/png");
+    expect((await request("GET", "/query/icon/999")).status).toBe(404);
+  });
+
   it("serves the service description the root description points at", async () => {
     // The root description advertises <SCPDURL>ecp_SCPD.xml</SCPDURL>. Advertising a
     // document and then answering 404 for it is a contradiction a strict UPnP control
@@ -484,5 +506,38 @@ describe("EcpHttpServer", () => {
         return true;
       };
     }
+  });
+});
+
+describe("EcpHttpServer — a Roku TV", () => {
+  let server: EcpHttpServer;
+  let port = 0;
+  beforeAll(async () => {
+    port = await freePort();
+    server = new EcpHttpServer({
+      device: { uuid: "tv1", port },
+      friendlyName: "TV",
+      apps: [],
+      deviceType: "tv",
+      bindIp: "127.0.0.1",
+      logger: noopLog,
+      onCommand: () => true,
+    });
+    await server.start();
+  });
+  afterAll(() => server.stop());
+
+  it("answers the channel list rokuecp asks a device with is-tv for — empty, no tuner", async () => {
+    const r = await new Promise<{ status: number; body: string }>((resolve, reject) => {
+      const req = http.request({ host: "127.0.0.1", port, method: "GET", path: "/query/tv-channels" }, res => {
+        let body = "";
+        res.on("data", c => (body += c));
+        res.on("end", () => resolve({ status: res.statusCode ?? 0, body }));
+      });
+      req.on("error", reject);
+      req.end();
+    });
+    expect(r.status).toBe(200);
+    expect(r.body).toBe("<tv-channels/>");
   });
 });

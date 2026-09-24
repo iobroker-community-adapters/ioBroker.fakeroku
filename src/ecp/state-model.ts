@@ -35,16 +35,25 @@ export const BASE_KEYS = [
 ] as const;
 
 /**
- * The extra keys only a Roku TV understands: volume, power, channel and input.
- * A "tv" device exposes {@link BASE_KEYS} plus these.
+ * The extra keys only a Roku TV understands: volume, power, channel and input. A "tv" device
+ * exposes {@link BASE_KEYS} plus these.
+ *
+ * The input list is Roku's own (ECP documentation: InputTuner, InputHDMI1–4, InputAV1). The power
+ * keys go beyond the documented PowerOff because the controllers send them: `PowerOn` (Home
+ * Assistant/rokuecp, openHAB, node-roku-client), `Power` (Homey, node-roku-client, rokuecp) and
+ * `Sleep` (rokuecp). A key a controller sends but no state carries only ever reaches `command`.
  */
 export const TV_KEYS = [
   "VolumeUp",
   "VolumeDown",
   "VolumeMute",
   "PowerOff",
+  "PowerOn",
+  "Power",
+  "Sleep",
   "ChannelUp",
   "ChannelDown",
+  "InputTuner",
   "InputHDMI1",
   "InputHDMI2",
   "InputHDMI3",
@@ -54,6 +63,24 @@ export const TV_KEYS = [
 
 /** Every key any device type can carry — used to recognise a keypress as a standard key. */
 const ALL_KEYS: ReadonlySet<string> = new Set<string>([...BASE_KEYS, ...TV_KEYS]);
+
+/**
+ * The standard keys by their lower-case spelling. A real Roku takes a key name in any case — the
+ * ECP documentation itself sends `keydown/left`, openHAB sends `POWERON` — so `home` must pulse
+ * `keys.Home` like `Home` does, not only land in `command` as an unknown word.
+ */
+const KEY_BY_LOWER: ReadonlyMap<string, string> = new Map([...ALL_KEYS].map(key => [key.toLowerCase(), key]));
+
+/**
+ * The canonical spelling of a standard key, or the key unchanged when it is none (`Lit_a`, an
+ * unknown word) — the typed character of a `Lit_` key keeps its case.
+ *
+ * @param key the key name as the controller sent it
+ * @returns the canonical key name
+ */
+export function canonicalKey(key: string): string {
+  return KEY_BY_LOWER.get(key.toLowerCase()) ?? key;
+}
 
 /**
  * The key set a device of the given type exposes: BASE_KEYS for a player, plus
@@ -92,7 +119,7 @@ function describeCommand(cmd: CommandEvent): string {
       return cmd.key ?? "";
     case "launch":
     case "install":
-      return `${cmd.type}:${cmd.appId ?? ""}`;
+      return `${cmd.type}:${cmd.appId ?? ""}${cmd.text ? `?${cmd.text}` : ""}`;
     case "input":
     case "search":
       return `${cmd.type}:${cmd.text ?? ""}`;
@@ -110,19 +137,21 @@ function describeCommand(cmd: CommandEvent): string {
  * @returns the state writes
  */
 export function commandToStateWrite(cmd: CommandEvent): StateWrite {
+  const key = cmd.key === undefined ? undefined : canonicalKey(cmd.key);
+  const canonical: CommandEvent = key === undefined ? cmd : { ...cmd, key };
   const write: StateWrite = {
-    command: describeCommand(cmd).slice(0, MAX_COMMAND_LENGTH),
+    command: describeCommand(canonical).slice(0, MAX_COMMAND_LENGTH),
     commandType: cmd.type,
     pulseKey: null,
     holdKey: null,
   };
-  if (cmd.key && ALL_KEYS.has(cmd.key)) {
+  if (key && ALL_KEYS.has(key)) {
     if (cmd.type === "keypress") {
-      write.pulseKey = cmd.key;
+      write.pulseKey = key;
     } else if (cmd.type === "keydown") {
-      write.holdKey = { key: cmd.key, value: true };
+      write.holdKey = { key, value: true };
     } else if (cmd.type === "keyup") {
-      write.holdKey = { key: cmd.key, value: false };
+      write.holdKey = { key, value: false };
     }
   }
   return write;

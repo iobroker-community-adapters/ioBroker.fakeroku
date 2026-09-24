@@ -1108,6 +1108,31 @@
     "native": {},
     "_id": "fakeroku.0.TV.keys.InputHDMI4"
   },
+  "fakeroku.0.TV.keys.InputTuner": {
+    "type": "state",
+    "common": {
+      "name": {
+        "en": "InputTuner",
+        "de": "InputTuner",
+        "ru": "InputTuner",
+        "pt": "InputTuner",
+        "nl": "InputTuner",
+        "fr": "InputTuner",
+        "it": "InputTuner",
+        "es": "InputTuner",
+        "pl": "InputTuner",
+        "uk": "InputTuner",
+        "zh-cn": "InputTuner"
+      },
+      "type": "boolean",
+      "role": "sensor",
+      "read": true,
+      "write": false,
+      "def": false
+    },
+    "native": {},
+    "_id": "fakeroku.0.TV.keys.InputTuner"
+  },
   "fakeroku.0.TV.keys.InstantReplay": {
     "type": "state",
     "common": {
@@ -1183,6 +1208,31 @@
     "native": {},
     "_id": "fakeroku.0.TV.keys.Play"
   },
+  "fakeroku.0.TV.keys.Power": {
+    "type": "state",
+    "common": {
+      "name": {
+        "en": "Power",
+        "de": "Power",
+        "ru": "Power",
+        "pt": "Power",
+        "nl": "Power",
+        "fr": "Power",
+        "it": "Power",
+        "es": "Power",
+        "pl": "Power",
+        "uk": "Power",
+        "zh-cn": "Power"
+      },
+      "type": "boolean",
+      "role": "sensor",
+      "read": true,
+      "write": false,
+      "def": false
+    },
+    "native": {},
+    "_id": "fakeroku.0.TV.keys.Power"
+  },
   "fakeroku.0.TV.keys.PowerOff": {
     "type": "state",
     "common": {
@@ -1207,6 +1257,31 @@
     },
     "native": {},
     "_id": "fakeroku.0.TV.keys.PowerOff"
+  },
+  "fakeroku.0.TV.keys.PowerOn": {
+    "type": "state",
+    "common": {
+      "name": {
+        "en": "PowerOn",
+        "de": "PowerOn",
+        "ru": "PowerOn",
+        "pt": "PowerOn",
+        "nl": "PowerOn",
+        "fr": "PowerOn",
+        "it": "PowerOn",
+        "es": "PowerOn",
+        "pl": "PowerOn",
+        "uk": "PowerOn",
+        "zh-cn": "PowerOn"
+      },
+      "type": "boolean",
+      "role": "sensor",
+      "read": true,
+      "write": false,
+      "def": false
+    },
+    "native": {},
+    "_id": "fakeroku.0.TV.keys.PowerOn"
   },
   "fakeroku.0.TV.keys.Rev": {
     "type": "state",
@@ -1307,6 +1382,31 @@
     },
     "native": {},
     "_id": "fakeroku.0.TV.keys.Select"
+  },
+  "fakeroku.0.TV.keys.Sleep": {
+    "type": "state",
+    "common": {
+      "name": {
+        "en": "Sleep",
+        "de": "Sleep",
+        "ru": "Sleep",
+        "pt": "Sleep",
+        "nl": "Sleep",
+        "fr": "Sleep",
+        "it": "Sleep",
+        "es": "Sleep",
+        "pl": "Sleep",
+        "uk": "Sleep",
+        "zh-cn": "Sleep"
+      },
+      "type": "boolean",
+      "role": "sensor",
+      "read": true,
+      "write": false,
+      "def": false
+    },
+    "native": {},
+    "_id": "fakeroku.0.TV.keys.Sleep"
   },
   "fakeroku.0.TV.keys.Up": {
     "type": "state",

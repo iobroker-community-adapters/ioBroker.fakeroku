@@ -1,4 +1,4 @@
-import { normalizeKey } from "../lib/pure-helpers";
+import { decodeFormText, normalizeKey } from "../lib/pure-helpers";
 
 /** The ECP verbs a Roku remote sends via POST — also the value list of the `commandType` state. */
 export const COMMAND_TYPES = ["keypress", "keydown", "keyup", "launch", "install", "input", "search"] as const;
@@ -14,7 +14,10 @@ export interface CommandEvent {
   key?: string;
   /** App id for launch/install. */
   appId?: string;
-  /** Raw query text for input/search. */
+  /**
+   * The decoded query text: what was typed or searched for (input/search), or the parameters a
+   * launch/install carried (`contentId=…&mediaType=…`, a deep link into the app).
+   */
   text?: string;
 }
 
@@ -44,10 +47,12 @@ export function parseEcpCommand(method: string, url: string): CommandEvent | nul
       return arg ? { type: verb, key: normalizeKey(arg) } : null;
     case "launch":
     case "install":
-      return arg ? { type: verb, appId: arg } : null;
+      // The parameters are part of the command: the same app launched with another contentId is a
+      // different button on the remote, and dropping them made the two indistinguishable.
+      return arg ? { type: verb, appId: arg, ...(query ? { text: decodeFormText(query) } : {}) } : null;
     case "input":
     case "search":
-      return { type: verb, text: query ?? "" };
+      return { type: verb, text: decodeFormText(query ?? "") };
     default:
       return null;
   }

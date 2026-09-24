@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { BASE_KEYS, commandToStateWrite, keysForType, MAX_COMMAND_LENGTH, TV_KEYS } from "./state-model";
+import { BASE_KEYS, canonicalKey, commandToStateWrite, keysForType, MAX_COMMAND_LENGTH, TV_KEYS } from "./state-model";
 
 const root = join(__dirname, "..", "..");
 
@@ -14,7 +14,7 @@ describe("keysForType", () => {
   it("a TV exposes base + TV keys (volume, power, channel, input)", () => {
     const keys = keysForType("tv");
     expect(keys).toEqual([...BASE_KEYS, ...TV_KEYS]);
-    for (const k of ["VolumeUp", "PowerOff", "ChannelUp", "InputHDMI1"]) {
+    for (const k of ["VolumeUp", "PowerOff", "PowerOn", "Power", "Sleep", "ChannelUp", "InputTuner", "InputHDMI1"]) {
       expect(keys).toContain(k);
     }
   });
@@ -56,6 +56,25 @@ describe("commandToStateWrite", () => {
       command: "search:news",
       pulseKey: null,
     });
+  });
+});
+
+describe("key names in any case", () => {
+  it("reads home, HOME and Home as the same standard key — a real Roku does", () => {
+    // The ECP documentation itself sends keydown/left; openHAB sends POWERON.
+    expect(commandToStateWrite({ type: "keypress", key: "home" })).toMatchObject({ command: "Home", pulseKey: "Home" });
+    expect(commandToStateWrite({ type: "keydown", key: "left" }).holdKey).toEqual({ key: "Left", value: true });
+    expect(commandToStateWrite({ type: "keypress", key: "POWERON" }).pulseKey).toBe("PowerOn");
+  });
+  it("keeps the typed character of a Lit_ key and any unknown word as sent", () => {
+    expect(canonicalKey("Lit_A")).toBe("Lit_A");
+    expect(canonicalKey("Lit_a")).toBe("Lit_a");
+    expect(canonicalKey("SomethingNew")).toBe("SomethingNew");
+  });
+  it("records the parameters of a launch in the command", () => {
+    expect(commandToStateWrite({ type: "launch", appId: "12", text: "contentId=1" }).command).toBe(
+      "launch:12?contentId=1",
+    );
   });
 });
 

@@ -3,6 +3,7 @@ import { errText } from "../lib/errors";
 import { isLanClient } from "../lib/lan-guard";
 import type { AdapterLogger } from "../lib/logger";
 import {
+  answersSearch,
   buildAliveNotify,
   buildByebyeNotify,
   buildSearchResponse,
@@ -240,7 +241,7 @@ export class RokuSsdpResponder {
       this.config.logger.debug(`SSDP search from non-LAN ${address} ignored`);
       return;
     }
-    for (const device of this.devices) {
+    for (const device of this.devices.filter(d => answersSearch(d, target))) {
       const response = Buffer.from(buildSearchResponse(device, this.config.advertiseIp, target));
       this.socket?.send(response, port, address, err => {
         if (err) {

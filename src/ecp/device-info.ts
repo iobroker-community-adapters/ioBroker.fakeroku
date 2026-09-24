@@ -2,17 +2,15 @@ import type { RokuAdvert } from "../discovery/ssdp-messages";
 import type { DeviceType } from "./state-model";
 
 /**
- * A fake but CURRENT Roku OS version. This is the pairing lever: a modern remote
- * like a Sofabaton reads /query/device-info at pairing and rejects a too-old
- * version (HA forum #501046) — emulated_roku hardcodes 7.5.0 / "Roku 4" (2016) and
- * fails there, the old fakeroku had no device-info at all.
+ * A fake but CURRENT Roku OS version, kept at the newest Roku OS major (checked 2026-09-24: Roku
+ * OS 15 — 15.3 is the newest public release, 16.0 is a developer beta; support.roku.com release
+ * notes). It makes the emulated device look like a device of today to anything that reads it.
  *
- * Kept at the newest Roku OS major (checked 2026-09-15: Roku OS 15.0, released
- * 2025-10-15 — support.roku.com release notes + Wikipedia "Roku OS"). The exact
- * threshold Sofabaton applies is documented nowhere (thread, Sofabaton docs and
- * their 2024-12 Roku notice name none); staying current is the only lever we have.
- * The build number is cosmetic — no controller is known to read it. (The official
- * Roku app is a different case: it uses ECP-2 and never reads device-info.)
+ * It is NOT a proven pairing lever. The thread this adapter once cited for it (Home Assistant
+ * forum #501046) found its fix in answering /query/apps, and a Sofabaton pairs with
+ * emulated_roku, which still reports 7.5.0. No controller is known to reject an old version.
+ * The build number is cosmetic. (The official Roku app is a different case: it uses ECP-2 and
+ * never reads device-info.)
  */
 export const SOFTWARE_VERSION = "15.0.0";
 const SOFTWARE_BUILD = "4200";
@@ -44,7 +42,9 @@ const PROFILES: Record<DeviceType, DeviceProfile> = {
   tv: {
     modelName: "Roku TV",
     modelNumber: "C4A4X",
-    deviceType: "urn:roku-com:device:tv:1-0",
+    // Roku TVs announce themselves as a player too (a TCL or onn. Roku TV serves exactly this
+    // URN); `...:tv:1-0` exists nowhere else, and Home Assistant's SSDP filter never matched it.
+    deviceType: "urn:roku-com:device:player:1-0",
     isTv: true,
     supportsTvPowerControl: true,
     supportsAudioVolumeControl: true,
@@ -132,6 +132,10 @@ export function buildDeviceInfoXml(device: RokuAdvert, friendlyName: string, typ
   <model-number>${p.modelNumber}</model-number>
   <model-region>US</model-region>
   <friendly-device-name>${xmlEscape(friendlyName)}</friendly-device-name>
+  <friendly-model-name>${p.modelName}</friendly-model-name>
+  <default-device-name>${p.modelName} - ${device.uuid}</default-device-name>
+  <user-device-name>${xmlEscape(friendlyName)}</user-device-name>
+  <user-device-location></user-device-location>
   <is-tv>${p.isTv}</is-tv>
   <is-stick>false</is-stick>
   <software-version>${SOFTWARE_VERSION}</software-version>
@@ -178,3 +182,47 @@ export function buildScpdXml(): string {
   <serviceStateTable/>
 </scpd>`;
 }
+
+/**
+ * The app on screen: always the Roku home screen, which is the answer a real Roku gives while no
+ * app runs — an emulator never runs one.
+ *
+ * Not in Roku's current ECP table, but the controllers ask for it on every update: Home
+ * Assistant's `rokuecp` fails the whole setup on a 404 here (`cannot_connect`), openHAB marks the
+ * device offline. The answer has no app id, so neither goes on to ask for a TV channel.
+ *
+ * @returns the active-app XML
+ */
+export function buildActiveAppXml(): string {
+  return `<active-app>\n  <app>Roku</app>\n</active-app>`;
+}
+
+/**
+ * The media player state: nothing playing. openHAB asks for it after every active-app query that
+ * carries no app id, and a 404 turns into an offline device there.
+ *
+ * @returns the media-player XML
+ */
+export function buildMediaPlayerXml(): string {
+  return `<player error="false" state="close"/>`;
+}
+
+/**
+ * The TV channel list of a Roku TV: empty — the emulator has no tuner. `rokuecp` asks for it on a
+ * device that says `is-tv`, and takes an empty list as an empty list.
+ *
+ * @returns the tv-channels XML
+ */
+export function buildTvChannelsXml(): string {
+  return `<tv-channels/>`;
+}
+
+/**
+ * The icon of an app at /query/icon/<id>: a transparent 1×1 PNG. The emulator has no artwork,
+ * but a 404 made Home Assistant's media browser show broken images and made node-roku-client's
+ * `icon()` throw.
+ */
+export const APP_ICON_PNG = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR4nGNgAAIAAAUAAXpeqz8AAAAASUVORK5CYII=",
+  "base64",
+);

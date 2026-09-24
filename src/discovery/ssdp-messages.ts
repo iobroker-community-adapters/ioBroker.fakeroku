@@ -19,21 +19,27 @@ export interface RokuAdvert {
 const SERVER_SIG = "Roku UPnP/1.0 MiniUPnPd/1.4";
 const MAX_AGE = 3600;
 
-/** The search targets this responder answers. */
-const ANSWERED_TARGETS = ["roku:ecp", "ssdp:all", "upnp:rootdevice"] as const;
+/** The device type every Roku announces — players and Roku TVs alike. */
+export const ROKU_DEVICE_TYPE = "urn:roku-com:device:player:1-0";
 
-/** One search target a controller can ask for. */
-export type SearchTarget = (typeof ANSWERED_TARGETS)[number];
+/** The fixed search targets this responder answers; a `uuid:roku:ecp:<id>` search is answered too. */
+const ANSWERED_TARGETS = ["roku:ecp", "ssdp:all", "upnp:rootdevice", ROKU_DEVICE_TYPE] as const;
+
+/** A targeted search for one device, the form UPnP 1.0 §1.2.2 requires a device to answer. */
+const UUID_TARGET = /^uuid:roku:ecp:[A-Za-z0-9-]{1,64}$/;
+
+/** One search target a controller can ask for (a fixed target, or `uuid:roku:ecp:<id>`). */
+export type SearchTarget = string;
 
 /**
  * The search target of an M-SEARCH a Roku should answer, or null if this datagram is not
  * one. Requires the M-SEARCH request line, `MAN: "ssdp:discover"`, and an ST of roku:ecp /
- * ssdp:all / upnp:rootdevice.
+ * ssdp:all / upnp:rootdevice / the Roku device type / `uuid:roku:ecp:<id>`.
  *
  * The target is returned rather than a bare boolean because the answer has to name what was
  * searched for: a control point that asked for `upnp:rootdevice` discards a response whose
- * `ST` says something else (UPnP 1.1, 1.3.3). Harmony and Sofabaton search `roku:ecp`, so
- * that path is unaffected either way.
+ * `ST` says something else (UPnP 1.1, 1.3.3). Harmony and Sofabaton search `roku:ecp`; some
+ * casting apps search only the device type (AnymeX), and brs-desktop retries with it.
  *
  * @param message the raw datagram text
  * @returns the search target, or null if no response is warranted
@@ -46,7 +52,22 @@ export function rokuSearchTarget(message: string): SearchTarget | null {
     return null;
   }
   const st = message.match(/^ST:\s*(.+?)\s*$/im)?.[1];
-  return ANSWERED_TARGETS.find(target => target === st) ?? null;
+  if (st === undefined) {
+    return null;
+  }
+  return (ANSWERED_TARGETS as readonly string[]).includes(st) || UUID_TARGET.test(st) ? st : null;
+}
+
+/**
+ * Whether a device answers a search: every device answers every target except a targeted
+ * `uuid:` search, which only the device it names answers.
+ *
+ * @param device the emulated Roku
+ * @param target the search target
+ * @returns true if this device answers
+ */
+export function answersSearch(device: RokuAdvert, target: SearchTarget): boolean {
+  return !target.startsWith("uuid:") || target === `uuid:roku:ecp:${device.uuid}`;
 }
 
 /**
@@ -71,7 +92,9 @@ export function buildSearchResponse(
   return [
     "HTTP/1.1 200 OK",
     `Cache-Control: max-age=${MAX_AGE}`,
-    `ST: ${target === "upnp:rootdevice" ? "upnp:rootdevice" : "roku:ecp"}`,
+    // The wildcard is answered as the Roku service, which is the only thing this responder is;
+    // every other target is mirrored, since a control point discards an answer naming another.
+    `ST: ${target === "ssdp:all" ? "roku:ecp" : target}`,
     `USN: uuid:roku:ecp:${device.uuid}`,
     "Ext: ",
     `Server: ${SERVER_SIG}`,

@@ -1,4 +1,4 @@
-import { normalizeKey, sanitizeId } from "./pure-helpers";
+import { decodeFormText, normalizeKey, sanitizeId } from "./pure-helpers";
 
 describe("sanitizeId", () => {
   it("replaces dots and spaces with underscore", () => {
@@ -10,8 +10,12 @@ describe("sanitizeId", () => {
 });
 
 describe("normalizeKey", () => {
-  it("replaces ALL dots, not just the first (the old adapter's replace('.','_') bug)", () => {
-    expect(normalizeKey("Lit_a.b")).toBe("Lit_a_b");
+  it("keeps a typed dot as a dot — only the standard keys have objects, none carries one", () => {
+    expect(normalizeKey("Lit_.")).toBe("Lit_.");
+  });
+  it("reads + as a space and %2B as a plus, the way rokuecp's quote_plus encodes them", () => {
+    expect(normalizeKey("Lit_+")).toBe("Lit_ ");
+    expect(normalizeKey("Lit_%2B")).toBe("Lit_+");
   });
   it("decodes URL-encoded Lit_ characters", () => {
     expect(normalizeKey("Lit_%C3%A4")).toBe("Lit_ä");
@@ -22,5 +26,12 @@ describe("normalizeKey", () => {
   });
   it("leaves a plain key unchanged", () => {
     expect(normalizeKey("Home")).toBe("Home");
+  });
+});
+
+describe("decodeFormText", () => {
+  it("decodes form-encoded text and keeps a malformed escape raw", () => {
+    expect(decodeFormText("keyword=news+today%21")).toBe("keyword=news today!");
+    expect(decodeFormText("a%ZZ+b")).toBe("a%ZZ b");
   });
 });
