@@ -146,7 +146,15 @@ describe("inNet", () => {
   });
 
   it("refuses a malformed IPv6 value instead of guessing", () => {
-    for (const bad of ["2003:::1", "2003::1::2", "2003:e1:zzzz:9a00::1", "not-an-address", "::ffff:10.0.0.1"]) {
+    for (const bad of [
+      "2003:::1",
+      "2003::1::2",
+      "2003:e1:zzzz:9a00::1",
+      "not-an-address",
+      "::ffff:10.0.0.1",
+      // "::" stands for at least one zero group — with eight groups around it, it stands for none.
+      "2003:e1:1f28:9a00:1:2:3::4",
+    ]) {
       expect(inNet(bad, v6net), bad).toBe(false);
     }
   });

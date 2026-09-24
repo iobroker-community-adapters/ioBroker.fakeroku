@@ -114,10 +114,12 @@ vi.mock("@iobroker/adapter-core", () => {
     });
     // Writes only where the value actually differs — the js-controller contract the
     // startup key reset relies on, so a test can tell a real reset from a blind write.
+    // js-controller's `_setStateChangedHelper` writes when val, ack OR q differ — not only val.
     public setStateChangedAsync = vi.fn((id: string, state: unknown) => {
-      const s = state as { val?: unknown; ack?: boolean };
+      const s = state as { val?: unknown; ack?: boolean; q?: number };
       const key = id.replace(`${this.namespace}.`, "");
-      if (this.states.get(key)?.val !== s?.val) {
+      const had: { val: unknown; ack: boolean; q?: number } | undefined = this.states.get(key);
+      if (!had || had.val !== s?.val || had.ack !== (s?.ack === true) || (had.q ?? 0) !== (s?.q ?? 0)) {
         this.states.set(key, { val: s?.val, ack: s?.ack === true });
         this.written.push(key);
       }
@@ -186,9 +188,11 @@ vi.mock("@iobroker/adapter-core", () => {
           // describes a world in which deleting and re-creating an object is free.
           if (this.objects.get(k)?.type === "state") {
             this.states.delete(k);
-            for (const members of this.enums.values()) {
-              members.delete(`${this.namespace}.${k}`);
-            }
+          }
+          // removeIdFromAllEnums runs for EVERY object kind — a room assignment often hangs on
+          // the device, not on its states.
+          for (const members of this.enums.values()) {
+            members.delete(`${this.namespace}.${k}`);
           }
           this.objects.delete(k);
         }
@@ -197,7 +201,9 @@ vi.mock("@iobroker/adapter-core", () => {
     });
     public setInterval = vi.fn(() => ({ kind: "interval" }));
     public clearInterval = vi.fn();
-    public setTimeout = vi.fn((_cb: () => void, _ms: number) => ({ kind: "timeout" }));
+    // Every handle is its own object, so a test can tell WHICH timer was cleared.
+    private timerSeq = 0;
+    public setTimeout = vi.fn((_cb: () => void, _ms: number) => ({ kind: "timeout", seq: ++this.timerSeq }));
     public clearTimeout = vi.fn();
     constructor(_opts: unknown) {}
   }
@@ -224,6 +230,7 @@ vi.mock("node:os", async importOriginal => {
 import { I18n } from "@iobroker/adapter-core";
 import { join } from "node:path";
 import { FakerokuDeviceManagement } from "./device-management";
+import * as mainModule from "./main";
 import { Fakeroku } from "./main";
 import type { CommandEvent } from "./ecp/ecp-command";
 import { EcpHttpServer } from "./ecp/ecp-http-server";
@@ -395,6 +402,7 @@ function setup(
 
 afterEach(() => {
   osMock.interfaces = null;
+  vi.restoreAllMocks();
 });
 
 describe("Fakeroku onReady — device wiring", () => {
@@ -1708,9 +1716,9 @@ describe("Fakeroku collaborator wiring", () => {
 describe("Fakeroku start-up robustness", () => {
   it("reports a failing start-up instead of dying on an unhandled rejection", async () => {
     const ctx = setup();
-    (ctx.i as unknown as { getAdapterObjectsAsync: ReturnType<typeof vi.fn> }).getAdapterObjectsAsync.mockRejectedValue(
-      new Error("objects db down"),
-    );
+    // The objects database refusing a write. (Not getAdapterObjectsAsync: js-controller's
+    // `_getAdapterObjects` never rejects — each view sits in its own try/catch.)
+    ctx.i.extendObject.mockRejectedValue(new Error("objects db down"));
     // onReady is an event handler: an escaping rejection is an unhandled rejection
     // and js-controller restarts the instance in a loop with nothing in the log.
     await expect(ctx.i.onReady()).resolves.toBeUndefined();
@@ -1792,6 +1800,9 @@ describe("Fakeroku — a key release is never dropped", () => {
     // protection would be the thing that falsifies the tree.
     const ctx = setup();
     await ctx.i.onReady();
+    // A frozen clock: the gate refills continuously, and a loop that stalls 40 ms (GC, a busy
+    // CI runner, coverage instrumentation) would otherwise let a 26th command through.
+    vi.spyOn(Date, "now").mockReturnValue(1_000_000);
     ctx.i.applyCommand("Wohnzimmer", { type: "keydown", key: "Home" });
     for (let n = 0; n < 60; n++) {
       ctx.i.applyCommand("Wohnzimmer", { type: "keypress", key: "Select" });
@@ -1811,6 +1822,7 @@ describe("Fakeroku — a key release is never dropped", () => {
     await ctx.i.onReady();
     ctx.i.setState.mockClear();
     const commandWrites = (): number => ctx.i.setState.mock.calls.filter(c => c[0] === "Wohnzimmer.command").length;
+    vi.spyOn(Date, "now").mockReturnValue(1_000_000);
 
     for (let n = 0; n < 60; n++) {
       ctx.i.applyCommand("Wohnzimmer", { type: "keyup", key: "Home" });
@@ -2055,7 +2067,7 @@ describe("Fakeroku — leftovers of an older version inside an object", () => {
   it("removes a native attribute this version does not write, keeping the user's own common", async () => {
     // The pre-0.5.0 adapter wrote native.url on every key state. extendObject MERGES, so
     // it survives every update — and writing null would store null, not remove it. Only
-    // taking the object away and putting it back removes it, and what comes back must carry
+    // writing the object whole (setForeignObject) removes it, and that write must carry
     // common.custom (the user's history configuration) unchanged.
     const ctx = setup();
     ctx.i.objects.set("Wohnzimmer.keys.Home", {
@@ -2103,12 +2115,15 @@ describe("Fakeroku — leftovers of an older version inside an object", () => {
     const ctx = setup();
     await ctx.i.onReady();
     ctx.i.delObjectAsync.mockClear();
+    ctx.i.setForeignObject.mockClear();
 
     await ctx.i.onReady();
 
-    // Nothing to repair means nothing is taken away — an object that briefly vanishes on
-    // every start is exactly what this repair must not become.
+    // Nothing to repair means nothing is written — neither taken away nor rewritten. A start
+    // that rewrote every object would fire an objectChange per datapoint at every history
+    // adapter and script, on every start.
     expect(ctx.i.delObjectAsync).not.toHaveBeenCalled();
+    expect(ctx.i.setForeignObject).not.toHaveBeenCalled();
   });
 });
 
@@ -2389,12 +2404,15 @@ describe("Fakeroku — the paths that only a failing database reaches", () => {
   it("disarms the retry timer on unload", async () => {
     const ctx = setup({ devices: [{ name: "Kueche", port: 8061, type: "player" }] }, { failEcpPort: 8061 });
     await ctx.i.onReady();
+    const at = ctx.i.setTimeout.mock.calls.findIndex(([, ms]) => ms === 60_000);
+    const retryHandle = ctx.i.setTimeout.mock.results[at].value as unknown;
     ctx.i.clearTimeout.mockClear();
 
     await new Promise<void>(resolve => ctx.i.onUnload(resolve));
 
-    // A timer left armed keeps firing into an adapter that is already gone.
-    expect(ctx.i.clearTimeout).toHaveBeenCalledWith({ kind: "timeout" });
+    // A timer left armed keeps firing into an adapter that is already gone — and it is THIS
+    // handle, not any timer, that has to be cleared.
+    expect(ctx.i.clearTimeout).toHaveBeenCalledWith(retryHandle);
   });
 });
 
@@ -2433,5 +2451,145 @@ describe("Fakeroku — log lines name the device the way the user named it", () 
       ctx.i.applyCommand("Wohn_zimmer", { type: "keypress", key: "Home" });
     }
     expect(ctx.i.log.warn).toHaveBeenCalledWith(expect.stringContaining('"Wohn zimmer" receives more than 25'));
+  });
+});
+
+describe("Fakeroku — the compact-mode entry", () => {
+  it("exports a factory that builds an instance instead of starting one", () => {
+    // What js-controller does in compact mode: require the main file and call what it exports.
+    // A text check of the source cannot tell an export that works from one that does not.
+    const mod = mainModule as unknown as { default: (options: unknown) => unknown };
+    expect(typeof mod.default).toBe("function");
+    expect(mod.default({})).toBeInstanceOf(Fakeroku);
+  });
+});
+
+describe("Fakeroku — every stop point of the start", () => {
+  it("stops after reading the object tree", async () => {
+    const ctx = setup();
+    const read = ctx.i as unknown as { getAdapterObjectsAsync: ReturnType<typeof vi.fn> };
+    const real = read.getAdapterObjectsAsync.getMockImplementation() as () => Promise<unknown>;
+    read.getAdapterObjectsAsync.mockImplementationOnce(() => {
+      ctx.i.onUnload(() => {});
+      return real();
+    });
+    await ctx.i.onReady();
+    expect(ctx.ecp).toHaveLength(0);
+    expect(ctx.i.log.error).not.toHaveBeenCalled();
+  });
+
+  it("stops while waiting for a chosen address, without the missing-address error", async () => {
+    osMock.interfaces = { lo: [{ family: "IPv4", address: "127.0.0.1", internal: true }] };
+    const ctx = setup({ bind: "192.168.1.5" });
+    const ready = ctx.i.onReady();
+    await vi.waitFor(() => expect(ctx.i.setTimeout).toHaveBeenCalledWith(expect.any(Function), 10_000));
+    ctx.i.onUnload(() => {});
+    (ctx.i.setTimeout.mock.calls.at(-1)![0] as () => void)();
+    await ready;
+    expect(ctx.i.log.error).not.toHaveBeenCalled();
+    expect(ctx.ecp).toHaveLength(0);
+  });
+
+  it("stops when the chosen address came up during the stop", async () => {
+    osMock.interfaces = { lo: [{ family: "IPv4", address: "127.0.0.1", internal: true }] };
+    const ctx = setup({ bind: "192.168.1.5" });
+    const ready = ctx.i.onReady();
+    await vi.waitFor(() => expect(ctx.i.setTimeout).toHaveBeenCalledWith(expect.any(Function), 10_000));
+    osMock.interfaces = {
+      eth0: [{ family: "IPv4", address: "192.168.1.5", internal: false, cidr: "192.168.1.5/24" }],
+    };
+    ctx.i.onUnload(() => {});
+    (ctx.i.setTimeout.mock.calls.at(-1)![0] as () => void)();
+    await ready;
+    expect(ctx.ecp).toHaveLength(0);
+    expect(ctx.i.log.error).not.toHaveBeenCalled();
+  });
+
+  it("does not wait when the host already refuses timers — the stop is under way", async () => {
+    osMock.interfaces = { lo: [{ family: "IPv4", address: "127.0.0.1", internal: true }] };
+    const ctx = setup({ bind: "192.168.1.5" });
+    // js-controller hands back no handle once the adapter is shutting down.
+    ctx.i.setTimeout.mockImplementation(() => undefined as never);
+    const ready = ctx.i.onReady();
+    await vi.waitFor(() => expect(ctx.i.setTimeout).toHaveBeenCalled());
+    ctx.i.onUnload(() => {});
+    await ready;
+    expect(ctx.ecp).toHaveLength(0);
+  });
+
+  it("stops after the devices started, before the sweep", async () => {
+    const ctx = setup();
+    const real = ctx.i.extendObject.getMockImplementation() as (id: string, o: unknown) => Promise<void>;
+    ctx.i.extendObject.mockImplementation((id: string, o: unknown) => {
+      if (id === "Wohnzimmer.keys.Home") {
+        ctx.i.onUnload(() => {});
+      }
+      return real(id, o);
+    });
+    await ctx.i.onReady();
+    expect(ctx.ssdps).toHaveLength(0);
+    expect(ctx.i.log.error).not.toHaveBeenCalled();
+  });
+
+  it("stops after the sweep, before discovery", async () => {
+    const ctx = setup();
+    const read = ctx.i as unknown as { getAdapterObjectsAsync: ReturnType<typeof vi.fn> };
+    const real = read.getAdapterObjectsAsync.getMockImplementation() as () => Promise<unknown>;
+    read.getAdapterObjectsAsync
+      .mockImplementationOnce(() => real())
+      .mockImplementationOnce(() => {
+        ctx.i.onUnload(() => {});
+        return real();
+      });
+    await ctx.i.onReady();
+    expect(ctx.ssdps).toHaveLength(0);
+  });
+
+  it("starts with an instance object that does not exist", async () => {
+    const ctx = setup();
+    ctx.i.getForeignObjectAsync.mockResolvedValueOnce(undefined);
+    await ctx.i.onReady();
+    expect(ctx.ecp).toHaveLength(1);
+  });
+});
+
+describe("Fakeroku — the late discovery start (all interfaces, no address at first)", () => {
+  /**
+   * An adapter that started without any IPv4 and armed its discovery timer.
+   *
+   * @returns the context and the armed callback
+   */
+  async function waiting(): Promise<{ ctx: Ctx; fire: () => void }> {
+    osMock.interfaces = { lo: [{ family: "IPv4", address: "127.0.0.1", internal: true }] };
+    const ctx = setup({ bind: "" });
+    await ctx.i.onReady();
+    const fire = ctx.i.setTimeout.mock.calls.find(([, ms]) => ms === 60_000)?.[0] as () => void;
+    osMock.interfaces = {
+      eth0: [{ family: "IPv4", address: "192.168.1.30", internal: false, cidr: "192.168.1.30/24" }],
+    };
+    return { ctx, fire };
+  }
+
+  it("does nothing when the timer fires after unload", async () => {
+    const { ctx, fire } = await waiting();
+    ctx.i.onUnload(() => {});
+    fire();
+    await new Promise(r => setImmediate(r));
+    expect(ctx.ssdps).toHaveLength(0);
+  });
+
+  it("clears the waiting timer on unload", async () => {
+    const { ctx } = await waiting();
+    const at = ctx.i.setTimeout.mock.calls.findIndex(([, ms]) => ms === 60_000);
+    const handle = ctx.i.setTimeout.mock.results[at].value as unknown;
+    ctx.i.onUnload(() => {});
+    expect(ctx.i.clearTimeout).toHaveBeenCalledWith(handle);
+  });
+
+  it("reports a failed status write instead of an unhandled rejection", async () => {
+    const { ctx, fire } = await waiting();
+    ctx.i.setState.mockImplementationOnce(() => Promise.reject(new Error("states db gone")));
+    fire();
+    await vi.waitFor(() => expect(ctx.i.log.warn).toHaveBeenCalledWith(expect.stringContaining("states db gone")));
   });
 });

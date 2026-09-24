@@ -361,9 +361,6 @@ export class Fakeroku extends utils.Adapter {
    * interfaces" with no routable IPv4 at start-up: the ECP servers already listen).
    */
   private scheduleDiscoveryStart(): void {
-    if (this.discoveryTimer) {
-      return;
-    }
     const timer = this.setTimeout(() => {
       this.discoveryTimer = undefined;
       void this.tryStartDiscovery();

@@ -28,8 +28,20 @@ const dgramMock = vi.hoisted(() => {
   }
   const sockets: FakeSocket[] = [];
   // Injectable failures — each is the real OS error the production code guards.
-  const fail = { bind: false, join: false, mcastIf: false, send: false, close: false, throwString: false };
+  const fail = {
+    bind: false,
+    join: false,
+    mcastIf: false,
+    send: false,
+    sendThrows: false,
+    close: false,
+    create: false,
+    throwString: false,
+  };
   const make = (options?: unknown): FakeSocket => {
+    if (fail.create) {
+      throw new Error("EMFILE");
+    }
     const s: FakeSocket = {
       options,
       membership: [],
@@ -75,6 +87,9 @@ const dgramMock = vi.hoisted(() => {
         s.mcastIf.push(iface);
       },
       send: (...args) => {
+        if (fail.sendThrows) {
+          throw new Error("ERR_SOCKET_DGRAM_NOT_RUNNING");
+        }
         const cb = args[args.length - 1];
         if (!fail.send) {
           s.sent.push({
@@ -486,6 +501,74 @@ describe("RokuSsdpResponder", () => {
     expect(s.sent.map(x => `${x.address}:${x.port}`)).toEqual(["239.255.255.250:1900", "239.255.255.250:1900"]);
     expect(s.sent[0].text).toContain("NOTIFY * HTTP/1.1");
     expect(s.sent[0].text).toContain("ssdp:alive");
+  });
+
+  it("a sender whose socket errors later is reported, and the responder keeps running", async () => {
+    const log = recordingLog();
+    const r = new RokuSsdpResponder({
+      ...baseCfg,
+      logger: log,
+      bindIp: undefined,
+      membershipInterfaces: [m("10.0.0.9")],
+    });
+    await r.start();
+    dgramMock.sockets[1].emit("error", new Error("ENETDOWN"));
+    expect(log.warn).toHaveBeenCalledWith(expect.stringContaining("SSDP sender on if-10.0.0.9: ENETDOWN"));
+    expect(dgramMock.sockets[1].closed).toBe(false);
+  });
+
+  it("a sender that cannot pin its interface is reported, not fatal", async () => {
+    const log = recordingLog();
+    dgramMock.fail.mcastIf = true;
+    const r = new RokuSsdpResponder({
+      ...baseCfg,
+      logger: log,
+      bindIp: undefined,
+      membershipInterfaces: [m("10.0.0.9")],
+    });
+    await r.start();
+    expect(log.warn).toHaveBeenCalledWith(expect.stringContaining("could not pin its interface: EINVAL"));
+  });
+
+  it("a sender that cannot be opened costs only that interface its announcement", async () => {
+    const log = recordingLog();
+    const r = new RokuSsdpResponder({
+      ...baseCfg,
+      logger: log,
+      bindIp: undefined,
+      membershipInterfaces: [m("10.0.0.9")],
+    });
+    await r.start();
+    dgramMock.fail.create = true;
+    r.refreshAdvertise(baseCfg.advertiseIp, [m("10.0.0.9"), m("192.168.50.2")]);
+    dgramMock.fail.create = false;
+    expect(log.warn).toHaveBeenCalledWith(
+      expect.stringContaining("SSDP sender on if-192.168.50.2 could not open: EMFILE"),
+    );
+    r.announce();
+    expect(dgramMock.sockets[1].sent).toHaveLength(1);
+  });
+
+  it("an announce whose socket throws on send is logged at debug, the other devices still go out", async () => {
+    const log = recordingLog();
+    const r = new RokuSsdpResponder({
+      ...baseCfg,
+      logger: log,
+      devices: [
+        { uuid: "a", port: 8060 },
+        { uuid: "b", port: 8061 },
+      ],
+      bindIp: undefined,
+      membershipInterfaces: [],
+    });
+    await r.start();
+    dgramMock.fail.sendThrows = true;
+    expect(() => r.announce()).not.toThrow();
+    // One line per device: the first failure did not end the loop.
+    const failed = log.debug.mock.calls.filter(([text]) =>
+      String(text).includes("NOTIFY send failed: ERR_SOCKET_DGRAM_NOT_RUNNING"),
+    );
+    expect(failed).toHaveLength(2);
   });
 
   it("logs a failed announce at debug, not warn", async () => {

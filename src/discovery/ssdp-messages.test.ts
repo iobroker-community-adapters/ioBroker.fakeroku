@@ -24,6 +24,9 @@ describe("rokuSearchTarget", () => {
   it("accepts ssdp:all", () => {
     expect(rokuSearchTarget(MSEARCH.replace("ST: roku:ecp", "ST: ssdp:all"))).toBe("ssdp:all");
   });
+  it("ignores a search without an ST line", () => {
+    expect(rokuSearchTarget(MSEARCH.replace("ST: roku:ecp\r\n", ""))).toBe(null);
+  });
   it("accepts the Roku device type and a targeted uuid search (UPnP 1.0 §1.2.2)", () => {
     expect(rokuSearchTarget(MSEARCH.replace("ST: roku:ecp", `ST: ${ROKU_DEVICE_TYPE}`))).toBe(ROKU_DEVICE_TYPE);
     expect(rokuSearchTarget(MSEARCH.replace("ST: roku:ecp", "ST: uuid:roku:ecp:abc123"))).toBe("uuid:roku:ecp:abc123");
