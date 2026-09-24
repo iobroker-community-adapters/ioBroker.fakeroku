@@ -84,10 +84,12 @@ vi.mock("@iobroker/adapter-core", () => {
     // this is where a stale host claim survives an update — the double has to keep it separately
     // or the repair would look successful against nothing.
     public instanceCommon: Record<string, unknown> = {};
+    // A copy, as the controller answers: only a write reaches the store. A live reference would
+    // let a change the code makes on what it read look stored before any write happened.
     public getForeignObjectAsync = vi.fn((id: string) =>
       Promise.resolve(
         id === `system.adapter.${this.namespace}`
-          ? { common: this.instanceCommon, native: this.instanceNative }
+          ? { common: structuredClone(this.instanceCommon), native: structuredClone(this.instanceNative) }
           : undefined,
       ),
     );

@@ -57,7 +57,8 @@ function mockAdapter(devices: unknown = []): any {
     namespace: "fakeroku.0",
     on: vi.fn(),
     getForeignObjectAsync: vi.fn((id: string) =>
-      Promise.resolve(id === "system.adapter.fakeroku.0" ? { native: { devices: stored } } : null),
+      // A copy, as the controller answers — only writeDevices reaches `stored`.
+      Promise.resolve(id === "system.adapter.fakeroku.0" ? { native: { devices: structuredClone(stored) } } : null),
     ),
     extendForeignObjectAsync: vi.fn((_id: string, patch: { native: { devices: unknown } }) => {
       stored = patch.native.devices;
