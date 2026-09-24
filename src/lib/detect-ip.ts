@@ -104,24 +104,6 @@ export function listLocalNets(interfaces: InterfaceMap): LocalNet[] {
 }
 
 /**
- * Every non-internal IPv4 address of the given interface map, in enumeration order.
- *
- * @param interfaces the OS network-interface map
- * @returns every routable IPv4 address (may be empty)
- */
-export function listNonInternalIPv4s(interfaces: InterfaceMap): string[] {
-  const out: string[] = [];
-  for (const addrs of Object.values(interfaces)) {
-    for (const addr of addrs ?? []) {
-      if (addr.family === "IPv4" && !addr.internal) {
-        out.push(addr.address);
-      }
-    }
-  }
-  return out;
-}
-
-/**
  * The address to advertise when no interface is chosen and nothing better is known: the first
  * IPv4 that is not a virtual bridge, and a bridge address only as a last resort (inside a
  * container it is all there is). Pure.

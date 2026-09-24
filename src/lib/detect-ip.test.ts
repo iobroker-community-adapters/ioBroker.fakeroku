@@ -2,7 +2,6 @@ import {
   hasLocalAddress,
   inNet,
   listLocalNets,
-  listNonInternalIPv4s,
   localAddressFor,
   netsOfInterface,
   pickMembershipIPv4s,
@@ -74,21 +73,13 @@ describe("pickPrimaryIPv4", () => {
   });
 });
 
-describe("listNonInternalIPv4s", () => {
+describe("listLocalNets", () => {
   it("skips an interface the OS reports without addresses", () => {
     // os.networkInterfaces() types every entry as possibly undefined and does hand one out for
     // a down interface — iterating it directly throws at start-up.
-    expect(listNonInternalIPv4s({ down0: undefined, en0: [v4("192.168.1.5")] })).toEqual(["192.168.1.5"]);
+    expect(listLocalNets({ down0: undefined, en0: [v4("192.168.1.5")] }).map(n => n.address)).toEqual(["192.168.1.5"]);
   });
 
-  it("returns every non-internal IPv4 across interfaces, in enumeration order", () => {
-    expect(
-      listNonInternalIPv4s({ lo: [v4("127.0.0.1", 8, true)], eth0: [v4("10.47.88.2")], wlan0: [v4("192.168.1.5")] }),
-    ).toEqual(["10.47.88.2", "192.168.1.5"]);
-  });
-});
-
-describe("listLocalNets", () => {
   it("reads address, family and prefix of every non-internal entry", () => {
     expect(listLocalNets({ lo: [v4("127.0.0.1", 8, true)], eth0: [v4("192.168.1.5"), v6("2003:e1::5")] })).toEqual([
       { iface: "eth0", family: "IPv4", address: "192.168.1.5", prefixLength: 24, virtual: false },
