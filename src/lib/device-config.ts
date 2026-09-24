@@ -114,8 +114,6 @@ export interface DeviceRow {
    * id built from the name. A rename changes the displayed name, never this.
    */
   readonly objectId: string;
-  /** True when the row carries no stored `objectId` yet — the next save persists {@link objectId}. */
-  readonly objectIdDerived: boolean;
 }
 
 /**
@@ -182,7 +180,6 @@ export function toDeviceRow(raw: unknown, tree: DeviceTree = EMPTY_TREE): Device
     identityDerived: identity !== row.uuid,
     portReplaced: row.port !== undefined && port !== Number(row.port),
     objectId,
-    objectIdDerived: !(typeof row.objectId === "string" && isUsableObjectId(row.objectId)),
   };
 }
 

@@ -125,13 +125,11 @@ describe("deviceObjectId", () => {
   it("is the stored objectId once there is one — a rename never moves the tree", () => {
     const row = toDeviceRow({ name: "Lounge", port: 8060, type: "player", objectId: "Living_room" })!;
     expect(deviceObjectId(row)).toBe("Living_room");
-    expect(row.objectIdDerived).toBe(false);
   });
 
   it("ignores a stored objectId that cannot be an object id segment", () => {
     const row = toDeviceRow({ name: "Roku", port: 8060, type: "player", objectId: "a.b" })!;
     expect(deviceObjectId(row)).toBe("Roku");
-    expect(row.objectIdDerived).toBe(true);
   });
 
   it("keeps the tree the OLD adapter built for a name with an umlaut, a bracket or two spaces", () => {
