@@ -1,7 +1,9 @@
 /**
  * One-shot migration of instance settings keys (`system.adapter.<ns>.native`) — a key that
  * was renamed or whose value type changed is carried over on the first start after the
- * update, so an existing installation keeps what its user configured.
+ * update, so an existing installation keeps what its user configured; a key an earlier
+ * version declared and this one no longer reads is dropped (nulled), so it does not stay in
+ * every existing installation for good (js-controller never deletes a native key).
  *
  * Why this exists (fleet standard "listen-port declaration", 2026-09-15): the admin's
  * port-conflict check only sees instances carrying `native.port` AND `native.bind`, so a
@@ -48,7 +50,13 @@ export interface NativeKeyCoercion {
   coerce: (value: unknown) => unknown;
 }
 
-export type NativeKeyMigration = NativeKeyRename | NativeKeyCoercion;
+/** Drop: a key an earlier version declared and this one no longer reads — nulled when it still holds a value. */
+export interface NativeKeyDrop {
+  /** The obsolete key. */
+  drop: string;
+}
+
+export type NativeKeyMigration = NativeKeyRename | NativeKeyCoercion | NativeKeyDrop;
 
 /** The adapter surface the migration needs — object I/O, logging, the in-memory config. */
 export interface NativeKeyMigrationAdapter {
@@ -65,6 +73,8 @@ export interface NativeKeyMigrationAdapter {
 }
 
 const isRename = (m: NativeKeyMigration): m is NativeKeyRename => "from" in m;
+
+const isDrop = (m: NativeKeyMigration): m is NativeKeyDrop => "drop" in m;
 
 const isPresent = (v: unknown): boolean => v !== undefined && v !== null;
 
@@ -102,7 +112,8 @@ const isStorable = (v: unknown): boolean => v !== undefined && !(typeof v === "n
  * Renames targeting the same key are evaluated together, in order: the first source whose
  * value is meaningful wins; when none is, the first present one (its coercion may still turn
  * an empty legacy value into a sensible one). Every present source is nulled. A coercion
- * writes only when the coerced value differs from the stored one.
+ * writes only when the coerced value differs from the stored one. A drop nulls its key when it
+ * still holds a value — an absent or already nulled key writes nothing.
  *
  * @param native the instance's current native settings
  * @param migrations the renames and coercions to apply
@@ -141,7 +152,13 @@ export function buildNativeKeyPatch(
   }
 
   for (const m of migrations) {
-    if (isRename(m) || !isPresent(native[m.key])) {
+    if (isDrop(m) && isPresent(native[m.drop])) {
+      patch[m.drop] = null;
+    }
+  }
+
+  for (const m of migrations) {
+    if (isRename(m) || isDrop(m) || !isPresent(native[m.key])) {
       continue;
     }
     const coerced = m.coerce(native[m.key]);
@@ -190,12 +207,19 @@ export async function migrateNativeKeys(
     .filter(k => patch[k] !== null)
     .map(k => `${k} = ${JSON.stringify(patch[k])}`)
     .join(", ");
+  const removed = touched.filter(k => patch[k] === null).join(", ");
   try {
     await adapter.extendForeignObjectAsync(id, { native: patch });
-    adapter.log.info(`Settings migrated to the standard keys (${summary}) — this instance restarts once`);
+    adapter.log.info(
+      summary
+        ? `Settings migrated to the standard keys (${summary}) — this instance restarts once`
+        : `Obsolete settings removed (${removed}) — this instance restarts once`,
+    );
     return true;
   } catch (err) {
-    adapter.log.warn(`Settings migration could not be stored (${describeError(err)}) — using ${summary} for this run`);
+    adapter.log.warn(
+      `Settings migration could not be stored (${describeError(err)}) — ${summary ? `using ${summary}` : `ignoring ${removed}`} for this run`,
+    );
     const config = adapter.config as Record<string, unknown>;
     for (const k of touched) {
       if (patch[k] === null) {

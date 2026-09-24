@@ -52,6 +52,14 @@ const BIND_WAIT_MAX_MS = 120_000;
 const DISCOVERY_RETRY_INTERVAL_MS = 60_000;
 
 /**
+ * Keys the 0.1.x adapter declared and nothing reads any more: its own HTTP port and multicast
+ * address (both fixed by the Roku protocol today) and one global identity (every device carries its
+ * own now). js-controller never deletes a native key, so without the drop they stay in every
+ * installation that came from there.
+ */
+const DROPPED_NATIVE_KEYS: NativeKeyMigration[] = [{ drop: "HTTP_PORT" }, { drop: "MULTICAST_IP" }, { drop: "UUID" }];
+
+/**
  * The listen address moved to `bind` (fleet listen-port standard). Which legacy key holds the
  * user's CURRENT choice depends on the versions the installation went through:
  *
@@ -67,16 +75,14 @@ const DISCOVERY_RETRY_INTERVAL_MS = 60_000;
  * falsy, so a migrated "" would be as invisible as no key at all.
  *
  * @param native the instance's stored native settings
- * @returns the migrations for this installation
+ * @returns the migrations for this installation, the obsolete 0.1.x keys included
  */
 function bindKeyMigrations(native: Record<string, unknown>): NativeKeyMigration[] {
   const hasInterfaceKey = native.networkInterface !== undefined && native.networkInterface !== null;
-  return hasInterfaceKey
-    ? [
-        { from: "networkInterface", to: "bind", coerce: toBindAddress },
-        { key: "BIND", coerce: () => null },
-      ]
+  const bind: NativeKeyMigration[] = hasInterfaceKey
+    ? [{ from: "networkInterface", to: "bind", coerce: toBindAddress }, { drop: "BIND" }]
     : [{ from: "BIND", to: "bind", coerce: toBindAddress }];
+  return [...bind, ...DROPPED_NATIVE_KEYS];
 }
 
 /**

@@ -969,6 +969,17 @@ describe("Fakeroku onReady — network interface", () => {
     expect(concrete.i.instanceNative.BIND).toBeNull();
   });
 
+  it("drops the keys the 0.1.x adapter declared and nothing reads any more, then restarts once", async () => {
+    const ctx = setup({ HTTP_PORT: 8060, MULTICAST_IP: "239.255.255.250", UUID: "0a1b2c" });
+    await ctx.i.onReady();
+    // js-controller never deletes a native key: without the drop they stay in the instance for good.
+    expect(ctx.i.instanceNative.HTTP_PORT).toBeNull();
+    expect(ctx.i.instanceNative.MULTICAST_IP).toBeNull();
+    expect(ctx.i.instanceNative.UUID).toBeNull();
+    expect(ctx.ecp).toHaveLength(0);
+    expect(ctx.i.log.info).toHaveBeenCalledWith(expect.stringContaining("Obsolete settings removed"));
+  });
+
   it("an instance straight from the old adapter keeps its BIND address", async () => {
     // No networkInterface key: the installation never ran 0.6.0–1.6.1, BIND is its setting.
     const ctx = setup({ bind: "0.0.0.0", BIND: "10.1.2.3" });

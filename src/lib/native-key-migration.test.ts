@@ -72,7 +72,18 @@ const IFACE_AND_BIND: NativeKeyMigration[] = [
   { from: "BIND", to: "bind" },
 ];
 
+const DROP_OLD: NativeKeyMigration[] = [{ drop: "pollInterval" }, { drop: "password" }];
+
 describe("buildNativeKeyPatch", () => {
+  it("nulls a dropped key that still holds a value, and only that", () => {
+    expect(buildNativeKeyPatch({ pollInterval: 30, password: "", bind: "0.0.0.0" }, DROP_OLD)).toEqual({
+      pollInterval: null,
+      password: null,
+    });
+    expect(buildNativeKeyPatch({ pollInterval: null, bind: "0.0.0.0" }, DROP_OLD)).toEqual({});
+    expect(buildNativeKeyPatch({}, DROP_OLD)).toEqual({});
+  });
+
   it("moves the old value to the new key and nulls the old key", () => {
     expect(buildNativeKeyPatch({ host: "192.168.1.10", bind: "0.0.0.0", port: 8080 }, HOST_TO_BIND)).toEqual({
       bind: "192.168.1.10",
@@ -156,6 +167,20 @@ describe("migrateNativeKeys", () => {
     expect(adapter.log.info.mock.calls[0][0]).toContain('bind = "192.168.1.10", port = 8080');
     expect(adapter.log.info.mock.calls[0][0]).toContain("restarts once");
     expect(adapter.log.warn).not.toHaveBeenCalled();
+  });
+
+  it("removes obsolete keys in one write, says so, and does it once", async () => {
+    const { adapter, store } = fakeAdapter({ pollInterval: 30, bind: "0.0.0.0" });
+    await expect(migrateNativeKeys(adapter, DROP_OLD, errText)).resolves.toBe(true);
+    expect(adapter.extendForeignObjectAsync).toHaveBeenCalledWith("system.adapter.adapter.0", {
+      native: { pollInterval: null },
+    });
+    expect(store?.native).toEqual({ pollInterval: null, bind: "0.0.0.0" });
+    expect(adapter.log.info.mock.calls[0][0]).toBe(
+      "Obsolete settings removed (pollInterval) — this instance restarts once",
+    );
+    await expect(migrateNativeKeys(adapter, DROP_OLD, errText)).resolves.toBe(false);
+    expect(adapter.extendForeignObjectAsync).toHaveBeenCalledTimes(1);
   });
 
   it("is idempotent — the second start writes nothing", async () => {

@@ -101,6 +101,19 @@ becomes `true` — or watch `.command` for the last button as text.
 	### **WORK IN PROGRESS**
 -->
 
+### **WORK IN PROGRESS**
+
+- (krobipd) Fixed: Home Assistant and openHAB can set up the emulated Roku again — it now answers the active-app, media-player and TV-channel queries they send.
+- (krobipd) Fixed: keys sent in any upper or lower case (home, POWERON) press the right button, and spaces typed in Home Assistant arrive as spaces.
+- (krobipd) Fixed: an upgrade from the old adapter keeps every object tree with its rooms and history, also for names with an umlaut, a bracket or a double space.
+- (krobipd) Fixed: renaming a device only changes its displayed name; its datapoints and scripts pointing at them stay where they are.
+- (krobipd) Fixed: an instance started before the network is up starts its devices and adds discovery as soon as the host has an address.
+- (krobipd) Fixed: the device dialog greys out OK for a taken name or port and says why.
+- (krobipd) Changed: only devices in the host's own networks are answered; a chosen network interface keeps everything in its network and is never swapped for another.
+- (krobipd) Changed: a chosen network interface that does not exist is waited for up to two minutes at start, then reported, instead of being replaced.
+- (krobipd) New: the TV profile adds the PowerOn, Power, Sleep and InputTuner keys and announces itself the way real Roku TVs do.
+- (krobipd) New: every new emulated Roku gets its own network identity instead of one every installation with the same name would share.
+
 ### 1.7.1 (2026-09-16) — stable
 
 - (krobipd) Changed: the instance restarts once after this update to clear a setting left behind by an older version; nothing else changes for you.
