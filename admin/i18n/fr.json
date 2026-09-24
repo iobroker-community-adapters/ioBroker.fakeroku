@@ -7,7 +7,7 @@
   "deviceName": "Nom",
   "devicePort": "Port ECP",
   "portLabel": "Port",
-  "devicePortHint": "Le port ECP sur lequel ce Roku répond. Chaque Roku émulé a besoin de son propre port — n'en réutilisez pas. Par défaut 8060 (le vrai port Roku).",
+  "devicePortHint": "Le port ECP sur lequel ce Roku répond. Chaque Roku émulé a besoin de son propre port. Harmony et Sofabaton lisent le port dans la découverte ; Home Assistant et Homey utilisent toujours 8060 — attribuez 8060 au Roku qu'ils doivent piloter.",
   "deviceTypeLabel": "Type",
   "deviceTypePlayer": "Player (box de streaming)",
   "deviceTypeTv": "TV (avec volume, marche/arrêt, chaîne, entrée)",

@@ -6,14 +6,14 @@
 
 **Support:** [![Ko-fi](https://img.shields.io/badge/Ko--fi-Support-ff5e5b?logo=ko-fi)](https://ko-fi.com/krobipd) [![PayPal](https://img.shields.io/badge/Donate-PayPal-blue.svg)](https://paypal.me/krobipd)
 
-Emulates one or more **[Roku](https://www.roku.com/) devices** on your LAN so that ECP/SSDP remotes — a
-Logitech Harmony Hub or a Sofabaton X1/X2 — can trigger events in
-ioBroker. It is the **input** counterpart to the Logitech Harmony adapter: a button
-on the remote becomes a datapoint in ioBroker.
+Emulates one or more **[Roku](https://www.roku.com/) devices** on your LAN so that ECP/SSDP remotes and
+controllers — a Logitech Harmony Hub, a Sofabaton X1/X2, Home Assistant's Roku integration,
+openHAB — can trigger events in ioBroker. It is the **input** counterpart to the Logitech
+Harmony adapter: a button on the remote becomes a datapoint in ioBroker.
 
-Unlike the classic fake-Roku, this build answers the full Roku control surface
-including `/query/device-info` with a **current** Roku version, so it works beyond a
-classic Harmony hub.
+Besides the key presses it answers the queries these controllers make before and while
+they use a Roku — device info, app list, active app, media player, TV channels, app icons —
+so they accept the emulated device instead of giving up on it.
 
 > **The official Roku mobile app is not supported.** It drives Rokus over Roku's
 > proprietary, undocumented ECP-2 WebSocket channel, which this emulator does not
@@ -23,9 +23,9 @@ classic Harmony hub.
 ## Features
 
 - Emulates one or more Roku devices on the LAN — the Roku control protocol (ECP) over HTTP plus SSDP discovery on port 1900.
-- Full Roku control surface including `/query/device-info` with a current Roku version, beyond what a classic Harmony hub needs.
+- Answers the Roku queries controllers rely on: device info, apps, active app, media player, TV channels and app icons.
 - Clean data model per device: a `command` datapoint plus fixed `keys.<Key>` states, all created up front.
-- Several emulated Rokus from a single instance; discovery joins every routable network interface unless you pick one; command handling restricted to the LAN and capped at 25 commands per second per emulated Roku, so a misbehaving device cannot flood ioBroker. Releasing a key you are holding is never dropped by that cap.
+- Several emulated Rokus from a single instance; with "all interfaces" every network of the host is served with the host's own address in it, a chosen interface keeps everything in its network; only clients from the host's own networks are answered, capped at 25 commands per second per emulated Roku, so a misbehaving device cannot flood ioBroker. Releasing a key you are holding is never dropped by that cap.
 
 ## Sentry / Error reporting
 
@@ -43,21 +43,25 @@ For details and how to disable it, see the [Sentry plugin documentation](https:/
 
 ## Ports
 
-- **TCP 8060 (listening, one per emulated Roku, configurable)** — the Roku control protocol (ECP): the remote sends its key presses here and reads the actual port from the discovery announcement.
+- **TCP 8060 (listening, one per emulated Roku, configurable)** — the Roku control protocol (ECP): the remote sends its key presses here. A Harmony or Sofabaton reads the port from the discovery announcement; Home Assistant and Homey always use 8060.
 - **UDP 1900 (multicast, listening and outgoing)** — SSDP discovery, so a Harmony hub or Sofabaton finds the emulated Rokus; fixed by the UPnP standard.
 
 ## Configuration
 
-- **Network interface** — the network card the emulated Rokus bind to and advertise
-  on. Leave it on "all interfaces" and the adapter runs out of the box — it detects
-  the routable IP automatically. Pick a specific address only on a host with several
-  network cards.
+- **Network interface** — leave it on "all interfaces" and the adapter runs out of the
+  box: every network of the host is served, each with the host's own address in it.
+  Pick a specific address only if the emulated Rokus should exist in one network only —
+  then everything stays in that network. An address the host does not carry is waited
+  for up to two minutes at start-up, then reported; the adapter never falls back to
+  another network.
 - **Emulated Roku devices** — managed as cards: **+ Add** opens a dialog with a
   **name**, an **ECP port** (`8060` the real Roku port; a free one is pre-selected,
-  and the dialog refuses a name or port already in use) and a **type**. You can
-  emulate several Rokus from one instance — each needs its own port.
+  and the dialog does not let you confirm a name or port already in use) and a **type**.
+  You can emulate several Rokus from one instance — each needs its own port. Renaming a
+  card keeps its datapoints, their room and function assignments and their history
+  settings.
 - **Type** — *Player* (default) exposes the 16 standard navigation and playback keys;
-  *TV* additionally exposes volume, channel and input keys plus a power-off key. Choose *TV* only if
+  *TV* additionally exposes volume, power, channel and input keys. Choose *TV* only if
   you want those extra keys as ioBroker triggers.
 
 To add the emulated Roku to a Harmony hub, add a "Roku" device in the Harmony app
@@ -77,10 +81,12 @@ For every emulated Roku (`fakeroku.0.<name>`):
 |---|---|---|
 | `.command` | string, read-only | The last command as plain text (`Home`, `Lit_a`, `launch:12`, `search:news`). One datapoint for everything — no object-per-character sprawl. |
 | `.commandType` | string, read-only | `keypress` / `keydown` / `keyup` / `launch` / `install` / `input` / `search`. |
-| `.keys.<Key>` | boolean, read-only | One state per remote key the device type exposes — a *Player* has the 16 navigation/playback keys, a *TV* adds Volume\*, PowerOff, Channel\*, HDMI/AV inputs — all created up front. A keypress pulses it `true` for a moment; keydown/keyup hold it. |
+| `.keys.<Key>` | boolean, read-only | One state per remote key the device type exposes — a *Player* has the 16 navigation/playback keys, a *TV* adds Volume\*, PowerOn/PowerOff/Power, Sleep, Channel\*, Tuner/HDMI/AV inputs — all created up front. A keypress pulses it `true` for a moment; keydown/keyup hold it. Key names are read in any case (`home` is `Home`). |
 
 Free keyboard input (`Lit_x`) and app launches show up in `.command` only — they do
-not get their own objects.
+not get their own objects. An app button of a remote that sends app launches (a
+Sofabaton, Home Assistant) arrives as `launch:<id>`; a Harmony Hub did not send its app
+buttons to the emulated Roku.
 
 > Note: the Roku remote sends the **same** `Play` command for play and pause, so
 > play and pause cannot be told apart here — that is a protocol limitation, not an
@@ -107,7 +113,7 @@ becomes `true` — or watch `.command` for the last button as text.
 - (krobipd) Fixed: a key you hold right after a short press stays pressed instead of being released early.
 - (krobipd) Fixed: the device dialog now also refuses a name that would collide with an existing device in the object tree.
 - (krobipd) Improved: after the host gets a new IP address, remotes find the emulated Rokus again without restarting the instance.
-- (krobipd) Improved: the admin now warns you when a port you enter is already used by another adapter on this host; the instance restarts once after this update.
+- (krobipd) Changed: the network interface setting moved to the standard settings key (bind); the instance restarts once after this update.
 
 ### 1.6.1 (2026-09-07) — stable
 

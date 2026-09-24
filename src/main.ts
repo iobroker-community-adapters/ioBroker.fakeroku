@@ -739,12 +739,12 @@ export class Fakeroku extends utils.Adapter {
    * a crash, or a controller that never sent its keyup — leaves the key true in
    * the database for good, and a rule watching for the next press never sees an
    * edge again. The reset belongs on STARTUP, not into onUnload: only startup also
-   * covers the crash, and 27 writes per device would eat the shutdown budget that
+   * covers the crash, and up to 31 writes per device would eat the shutdown budget that
    * today comfortably carries a single one. setStateChanged writes only where the
    * value actually differs, so a healthy tree costs nothing.
    *
    * The writes go out together: they address different objects, and doing 20 (a player)
-   * or 31 (a TV) of them strictly one after another made start-up wait for one round trip
+   * or 35 (a TV) of them strictly one after another made start-up wait for one round trip
    * per datapoint — the key reset right below has always been parallel.
    *
    * @param deviceId the id-safe device path segment
@@ -816,7 +816,7 @@ export class Fakeroku extends utils.Adapter {
    *
    * The sweep used to sit on the happy path only, so removing the last emulated
    * Roku (or a host without a routable address) left its device object, its
-   * `command` / `commandType` and its 16–27 key states behind with nothing that
+   * `command` / `commandType` and its 16–31 key states behind with nothing that
    * would ever remove them: the user deletes a device in the admin and keeps its
    * datapoints forever. The adapter answers for its own datapoints
    * (`feedback_adapter_verantwortet_datenpunkte`), so the sweep runs whenever the

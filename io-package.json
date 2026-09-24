@@ -43,16 +43,16 @@
         "zh-cn": "不再提供直接从 GitHub 安装：适配器在发布前完成构建，因此请从 ioBroker 仓库安装。"
       },
       "1.6.0": {
-        "en": "Saving a device keeps its network identity, a busy ECP port is retried, a stopped instance unregisters its Rokus, and the adapter runs in compact mode.",
-        "de": "Speichern behält die Netzkennung, ein belegter ECP-Anschluss wird erneut versucht, eine gestoppte Instanz meldet ihre Rokus ab, und der Adapter läuft im Compact-Modus.",
-        "ru": "Сохранение сохраняет сетевой идентификатор, занятый порт ECP повторяется, остановленный экземпляр убирает свои Roku, адаптер работает в компактном режиме.",
-        "pt": "Guardar mantém a identidade de rede, uma porta ECP ocupada é repetida, uma instância parada remove os seus Roku e o adaptador corre em modo compacto.",
-        "nl": "Opslaan behoudt de netwerkidentiteit, een bezette ECP-poort wordt opnieuw geprobeerd, een gestopte instantie meldt zijn Roku's af en de adapter draait compact.",
-        "fr": "Enregistrer conserve l'identité réseau, un port ECP occupé est réessayé, une instance arrêtée retire ses Roku et l'adaptateur fonctionne en mode compact.",
-        "it": "Salvare mantiene l'identità di rete, una porta ECP occupata viene ritentata, un'istanza fermata rimuove i suoi Roku e l'adattatore funziona in modalità compatta.",
-        "es": "Guardar mantiene la identidad de red, un puerto ECP ocupado se reintenta, una instancia detenida retira sus Roku y el adaptador funciona en modo compacto.",
-        "pl": "Zapis zachowuje tożsamość sieciową, zajęty port ECP jest ponawiany, zatrzymana instancja usuwa swoje Roku, a adapter działa w trybie kompaktowym.",
-        "uk": "Збереження зберігає мережевий ідентифікатор, зайнятий порт ECP повторюється, зупинений екземпляр прибирає свої Roku, адаптер працює в компактному режимі.",
+        "en": "Saving a device keeps its network identity, a busy ECP port is retried, a stopped instance unregisters its Rokus, and the adapter can run in compact mode.",
+        "de": "Speichern behält die Netzkennung, ein belegter ECP-Anschluss wird erneut versucht, eine gestoppte Instanz meldet ihre Rokus ab, und der Adapter kann im Compact-Modus laufen.",
+        "ru": "Сохранение не меняет сетевой идентификатор, занятый порт ECP проверяется повторно, остановленный экземпляр убирает свои Roku, адаптер может работать в компактном режиме.",
+        "pt": "Guardar mantém a identidade de rede, uma porta ECP ocupada é tentada novamente, uma instância parada remove os seus Roku e o adaptador pode correr em modo compacto.",
+        "nl": "Opslaan behoudt de netwerkidentiteit, een bezette ECP-poort wordt opnieuw geprobeerd, een gestopte instantie meldt zijn Roku's af en de adapter kan compact draaien.",
+        "fr": "Enregistrer conserve l'identité réseau, un port ECP occupé est réessayé, une instance arrêtée retire ses Roku et l'adaptateur peut fonctionner en mode compact.",
+        "it": "Salvare mantiene l'identità di rete, una porta ECP occupata viene ritentata, un'istanza fermata rimuove i suoi Roku e l'adattatore può funzionare in modalità compatta.",
+        "es": "Guardar mantiene la identidad de red, un puerto ECP ocupado se reintenta, una instancia detenida retira sus Roku y el adaptador puede funcionar en modo compacto.",
+        "pl": "Zapis zachowuje tożsamość sieciową, zajęty port ECP jest próbowany ponownie, zatrzymana instancja usuwa swoje Roku, a adapter może działać w trybie kompaktowym.",
+        "uk": "Збереження не змінює мережевий ідентифікатор, зайнятий порт ECP перевіряється повторно, зупинений екземпляр прибирає свої Roku, адаптер може працювати в компактному режимі.",
         "zh-cn": "保存设备保留其网络标识，被占用的 ECP 端口会重试，停止的实例会注销其模拟 Roku，适配器支持精简模式。"
       },
       "1.5.0": {
@@ -97,15 +97,15 @@
     },
     "titleLang": {
       "en": "Fakeroku Emulator",
-      "de": "Fakeroku Emulator",
-      "ru": "Emulator Fakeroku",
+      "de": "Fakeroku-Emulator",
+      "ru": "Эмулятор Fakeroku",
       "pt": "Emulador de Fakeroku",
       "nl": "Fakeroku-emulator",
       "fr": "Émulateur Fakeroku",
       "it": "Emulatore Fakeroku",
-      "es": "Fakeroku Emulator",
-      "pl": "Fakeroku Emulator",
-      "uk": "Fakeroku Емулятор",
+      "es": "Emulador Fakeroku",
+      "pl": "Emulator Fakeroku",
+      "uk": "Емулятор Fakeroku",
       "zh-cn": "Fakeroku 模拟器"
     },
     "desc": {

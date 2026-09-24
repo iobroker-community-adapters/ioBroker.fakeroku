@@ -7,7 +7,7 @@
   "deviceName": "Nazwa",
   "devicePort": "Port ECP",
   "portLabel": "Port",
-  "devicePortHint": "Port ECP, na którym odpowiada ten Roku. Każdy emulowany Roku potrzebuje własnego portu — nie używaj tego samego. Domyślnie 8060 (prawdziwy port Roku).",
+  "devicePortHint": "Port ECP, na którym odpowiada ten Roku. Każdy emulowany Roku potrzebuje własnego portu. Harmony i Sofabaton odczytują port z wykrywania; Home Assistant i Homey zawsze używają 8060 — nadaj 8060 temu Roku, którym mają sterować.",
   "deviceTypeLabel": "Typ",
   "deviceTypePlayer": "Player (przystawka)",
   "deviceTypeTv": "TV (z głośnością, zasilaniem, kanałem, wejściem)",
@@ -33,5 +33,5 @@
   "stateLastCommandType": "Typ ostatniego polecenia",
   "stateLastCommandTypeDesc": "Jakiego rodzaju było to polecenie: naciśnięcie klawisza, przytrzymanie lub zwolnienie, uruchomienie lub instalacja aplikacji, wpisanie tekstu albo wyszukiwanie.",
   "channelKeys": "Klawisze pilota",
-  "channelKeysDesc": "Jeden stan na każdy klawisz oferowany przez to urządzenie; naciśnięcie ustawia go na krótko na prawdę."
+  "channelKeysDesc": "Jeden stan na każdy klawisz oferowany przez to urządzenie; naciśnięcie ustawia go na krótko na wartość true."
 }

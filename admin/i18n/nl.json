@@ -7,7 +7,7 @@
   "deviceName": "Naam",
   "devicePort": "ECP-poort",
   "portLabel": "Poort",
-  "devicePortHint": "De ECP-poort waarop deze Roku antwoordt. Elke geëmuleerde Roku heeft een eigen poort nodig — gebruik er geen dubbel. Standaard 8060 (de echte Roku-poort).",
+  "devicePortHint": "De ECP-poort waarop deze Roku antwoordt. Elke geëmuleerde Roku heeft een eigen poort nodig. Harmony en Sofabaton lezen de poort uit de detectie; Home Assistant en Homey gebruiken altijd 8060 — geef 8060 aan de Roku die zij moeten bedienen.",
   "deviceTypeLabel": "Type",
   "deviceTypePlayer": "Player (streaming-box)",
   "deviceTypeTv": "TV (met volume, aan/uit, kanaal, ingang)",
