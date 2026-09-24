@@ -26,14 +26,15 @@ function fakeAdapter(
 ): { adapter: FakeAdapter; store: { native?: Record<string, unknown> } | null } {
   const store: { native?: Record<string, unknown> } | null = native ? { native: { ...native } } : null;
   const adapter: FakeAdapter = {
-    namespace: "hueemu.0",
+    namespace: "adapter.0",
     log: { info: vi.fn<Log>(), warn: vi.fn<Log>() },
     config: { ...(native ?? {}) },
     getForeignObjectAsync: vi.fn<Read>((): Promise<unknown> => {
       if (opts.readFails) {
         return Promise.reject(new Error("objects db unreachable"));
       }
-      return Promise.resolve(store);
+      // A copy, as the controller answers — only a write reaches the store.
+      return Promise.resolve(structuredClone(store));
     }),
     extendForeignObjectAsync: vi.fn<Merge>(
       (_id: string, obj: { native: Record<string, unknown> }): Promise<unknown> => {
@@ -48,6 +49,17 @@ function fakeAdapter(
     ),
   };
   return { adapter, store };
+}
+
+/**
+ * The caller's error-text helper, as the adapter passes it in (the fleet form: one per repository).
+ * Marked, so a test can prove the migration renders through it and not on its own.
+ *
+ * @param e the caught value
+ * @returns the rendered text
+ */
+function errText(e: unknown): string {
+  return `[via helper] ${e instanceof Error ? e.message : String(e)}`;
 }
 
 const HOST_TO_BIND: NativeKeyMigration[] = [
@@ -134,9 +146,9 @@ describe("buildNativeKeyPatch", () => {
 describe("migrateNativeKeys", () => {
   it("merges only the touched keys in one write and reports the restart", async () => {
     const { adapter, store } = fakeAdapter({ host: "192.168.1.10", bind: "0.0.0.0", port: "8080", udn: "u" });
-    await expect(migrateNativeKeys(adapter, HOST_TO_BIND)).resolves.toBe(true);
+    await expect(migrateNativeKeys(adapter, HOST_TO_BIND, errText)).resolves.toBe(true);
     expect(adapter.extendForeignObjectAsync).toHaveBeenCalledTimes(1);
-    expect(adapter.extendForeignObjectAsync).toHaveBeenCalledWith("system.adapter.hueemu.0", {
+    expect(adapter.extendForeignObjectAsync).toHaveBeenCalledWith("system.adapter.adapter.0", {
       native: { bind: "192.168.1.10", host: null, port: 8080 },
     });
     expect(store?.native).toEqual({ host: null, bind: "192.168.1.10", port: 8080, udn: "u" });
@@ -148,36 +160,45 @@ describe("migrateNativeKeys", () => {
 
   it("is idempotent — the second start writes nothing", async () => {
     const { adapter } = fakeAdapter({ host: "192.168.1.10", bind: "0.0.0.0", port: "8080" });
-    await expect(migrateNativeKeys(adapter, HOST_TO_BIND)).resolves.toBe(true);
-    await expect(migrateNativeKeys(adapter, HOST_TO_BIND)).resolves.toBe(false);
+    await expect(migrateNativeKeys(adapter, HOST_TO_BIND, errText)).resolves.toBe(true);
+    await expect(migrateNativeKeys(adapter, HOST_TO_BIND, errText)).resolves.toBe(false);
     expect(adapter.extendForeignObjectAsync).toHaveBeenCalledTimes(1);
     expect(adapter.log.info).toHaveBeenCalledTimes(1);
   });
 
   it("writes nothing on an installation that already uses the standard keys", async () => {
     const { adapter } = fakeAdapter({ bind: "0.0.0.0", port: 8080 });
-    await expect(migrateNativeKeys(adapter, HOST_TO_BIND)).resolves.toBe(false);
+    await expect(migrateNativeKeys(adapter, HOST_TO_BIND, errText)).resolves.toBe(false);
     expect(adapter.extendForeignObjectAsync).not.toHaveBeenCalled();
     expect(adapter.log.info).not.toHaveBeenCalled();
   });
 
   it("writes nothing when the instance object has no native part", async () => {
     const { adapter } = fakeAdapter(undefined);
-    await expect(migrateNativeKeys(adapter, HOST_TO_BIND)).resolves.toBe(false);
+    await expect(migrateNativeKeys(adapter, HOST_TO_BIND, errText)).resolves.toBe(false);
     expect(adapter.extendForeignObjectAsync).not.toHaveBeenCalled();
   });
 
   it("warns and continues when the instance object cannot be read", async () => {
     const { adapter } = fakeAdapter({ host: "192.168.1.10" }, { readFails: true });
-    await expect(migrateNativeKeys(adapter, HOST_TO_BIND)).resolves.toBe(false);
+    await expect(migrateNativeKeys(adapter, HOST_TO_BIND, errText)).resolves.toBe(false);
     expect(adapter.extendForeignObjectAsync).not.toHaveBeenCalled();
     expect(adapter.log.warn).toHaveBeenCalledTimes(1);
     expect(adapter.log.warn.mock.calls[0][0]).toContain("objects db unreachable");
   });
 
+  it("renders both failures through the caller's helper, never on its own", async () => {
+    const read = fakeAdapter({ host: "192.168.1.10" }, { readFails: true });
+    await expect(migrateNativeKeys(read.adapter, HOST_TO_BIND, errText)).resolves.toBe(false);
+    expect(read.adapter.log.warn.mock.calls[0][0]).toContain("[via helper] objects db unreachable");
+    const write = fakeAdapter({ host: "192.168.1.10", bind: "0.0.0.0", port: "8080" }, { writeFails: true });
+    await expect(migrateNativeKeys(write.adapter, HOST_TO_BIND, errText)).resolves.toBe(false);
+    expect(write.adapter.log.warn.mock.calls[0][0]).toContain("[via helper] write refused");
+  });
+
   it("patches the in-memory config and continues when the write fails", async () => {
     const { adapter } = fakeAdapter({ host: "192.168.1.10", bind: "0.0.0.0", port: "8080" }, { writeFails: true });
-    await expect(migrateNativeKeys(adapter, HOST_TO_BIND)).resolves.toBe(false);
+    await expect(migrateNativeKeys(adapter, HOST_TO_BIND, errText)).resolves.toBe(false);
     expect(adapter.log.warn).toHaveBeenCalledTimes(1);
     expect(adapter.log.warn.mock.calls[0][0]).toContain("write refused");
     expect(adapter.log.info).not.toHaveBeenCalled();

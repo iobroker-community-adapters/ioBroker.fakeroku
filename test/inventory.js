@@ -21,6 +21,19 @@ const NS = `${ADAPTER}.0.`;
 const INVENTORY = path.join(__dirname, "objects.inventory.json");
 const VOLATILE = ["ts", "from", "user", "acl"];
 const COMPARED = ["name", "desc", "role", "type", "unit"];
+// Key order carries no meaning in an ioBroker object: extendObject keeps the key order an existing
+// object already has, while adapter-core's I18n.getTranslatedObject builds its own — the same eleven
+// texts in another order are the same name. Arrays keep their order.
+const canonical = v =>
+  JSON.stringify(v, (_k, x) =>
+    x && typeof x === "object" && !Array.isArray(x)
+      ? Object.fromEntries(
+          Object.keys(x)
+            .sort()
+            .map(k => [k, x[k]]),
+        )
+      : x,
+  );
 
 /**
  * The adapter's objects come from its configuration alone — no device, no cloud. What the
@@ -137,7 +150,7 @@ tests.integration(ADAPTER_DIR, {
               continue;
             }
             for (const f of COMPARED) {
-              if (JSON.stringify(got.common?.[f]) !== JSON.stringify(obj.common?.[f])) {
+              if (canonical(got.common?.[f]) !== canonical(obj.common?.[f])) {
                 stale.push(`${id}: ${f} still ${JSON.stringify(got.common?.[f])}`);
               }
             }

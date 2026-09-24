@@ -104,7 +104,7 @@ export class EcpHttpServer {
    * @param err the server error
    */
   private onRuntimeError(err: Error): void {
-    this.config.logger.error(`ECP server "${this.config.friendlyName}" error: ${err.message}`);
+    this.config.logger.error(`ECP server "${this.config.friendlyName}" error: ${errText(err)}`);
     const notify = this.config.onFatalError;
     if (notify && !this.fatalReported) {
       this.fatalReported = true;

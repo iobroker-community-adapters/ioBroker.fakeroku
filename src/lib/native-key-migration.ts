@@ -23,6 +23,11 @@
  *   falsy, which is all a later read needs.
  * - A write to the own instance object restarts the instance — so the caller aborts its
  *   start when this reports a write, instead of binding a port in a process about to go down.
+ *
+ * Fleet master: `Entwicklung/.consistency-master/src/lib/native-key-migration.ts`. Every adapter
+ * that migrates native keys carries this file and its test byte for byte — the release run
+ * (consistency level 1) reports any difference. Change the master, then copy; never the copy.
+ * The file imports nothing adapter-specific: the caller hands in its own error-text helper.
  */
 
 /** Rename: the old value wins over the freshly added default; the old key is nulled. */
@@ -47,7 +52,7 @@ export type NativeKeyMigration = NativeKeyRename | NativeKeyCoercion;
 
 /** The adapter surface the migration needs — object I/O, logging, the in-memory config. */
 export interface NativeKeyMigrationAdapter {
-  /** Instance namespace, e.g. `hueemu.0`. */
+  /** Instance namespace, e.g. `adapter.0`. */
   namespace: string;
   /** Adapter log — one info line per migration, warnings for a failed read or write. */
   log: { info: (msg: string) => void; warn: (msg: string) => void };
@@ -152,6 +157,8 @@ export function buildNativeKeyPatch(
  *
  * @param adapter the adapter (object I/O, log, in-memory config)
  * @param migrations the renames and coercions to apply
+ * @param describeError the adapter's error-text helper (one per repository) — renders whatever
+ *   the object store threw, so a rejected plain object never reads `[object Object]`
  * @returns true when the instance object was written — the caller must abort its start,
  *   the host restarts the instance with the migrated settings. false when nothing had to
  *   change, or when the write failed: then the in-memory config already carries the
@@ -160,6 +167,7 @@ export function buildNativeKeyPatch(
 export async function migrateNativeKeys(
   adapter: NativeKeyMigrationAdapter,
   migrations: NativeKeyMigration[],
+  describeError: (err: unknown) => string,
 ): Promise<boolean> {
   const id = `system.adapter.${adapter.namespace}`;
   let native: Record<string, unknown> | undefined;
@@ -167,7 +175,7 @@ export async function migrateNativeKeys(
     const obj = (await adapter.getForeignObjectAsync(id)) as { native?: Record<string, unknown> } | null | undefined;
     native = obj?.native;
   } catch (err) {
-    adapter.log.warn(`Settings migration skipped — could not read ${id}: ${String(err)}`);
+    adapter.log.warn(`Settings migration skipped — could not read ${id}: ${describeError(err)}`);
     return false;
   }
   if (!native) {
@@ -187,7 +195,7 @@ export async function migrateNativeKeys(
     adapter.log.info(`Settings migrated to the standard keys (${summary}) — this instance restarts once`);
     return true;
   } catch (err) {
-    adapter.log.warn(`Settings migration could not be stored (${String(err)}) — using ${summary} for this run`);
+    adapter.log.warn(`Settings migration could not be stored (${describeError(err)}) — using ${summary} for this run`);
     const config = adapter.config as Record<string, unknown>;
     for (const k of touched) {
       if (patch[k] === null) {

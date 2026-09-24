@@ -219,7 +219,7 @@ export class RokuSsdpResponder {
    * @param err the socket error
    */
   private onSocketError(err: Error): void {
-    this.config.logger.error(`SSDP socket error: ${err.message}`);
+    this.config.logger.error(`SSDP socket error: ${errText(err)}`);
     const notify = this.config.onFatalError;
     this.stop();
     if (notify && !this.fatalReported) {
@@ -244,7 +244,7 @@ export class RokuSsdpResponder {
       const response = Buffer.from(buildSearchResponse(device, this.config.advertiseIp, target));
       this.socket?.send(response, port, address, err => {
         if (err) {
-          this.config.logger.warn(`SSDP response send failed: ${err.message}`);
+          this.config.logger.warn(`SSDP response send failed: ${errText(err)}`);
         }
       });
     }
@@ -259,7 +259,7 @@ export class RokuSsdpResponder {
       const notify = Buffer.from(buildAliveNotify(device, this.config.advertiseIp));
       this.socket.send(notify, SSDP_PORT, MULTICAST_ADDR, err => {
         if (err) {
-          this.config.logger.debug(`SSDP NOTIFY send failed: ${err.message}`);
+          this.config.logger.debug(`SSDP NOTIFY send failed: ${errText(err)}`);
         }
       });
     }
@@ -296,7 +296,7 @@ export class RokuSsdpResponder {
         try {
           socket.send(Buffer.from(buildByebyeNotify(device)), SSDP_PORT, MULTICAST_ADDR, err => {
             if (err) {
-              this.config.logger.debug(`SSDP byebye send failed: ${err.message}`);
+              this.config.logger.debug(`SSDP byebye send failed: ${errText(err)}`);
             }
             done();
           });

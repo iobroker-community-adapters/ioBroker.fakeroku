@@ -854,11 +854,28 @@ describe("Fakeroku onReady — network interface", () => {
     expect(ctx.i.instanceNative.networkInterface).toBeNull();
   });
 
-  it("a concrete address wins over a legacy key left at all-interfaces", async () => {
-    const ctx = setup({ bind: "0.0.0.0", networkInterface: "0.0.0.0", BIND: "10.1.2.3" });
+  it("the setting the user saw last wins: networkInterface beats an older BIND, which is only cleared", async () => {
+    // networkInterface exists only on an instance that ran 0.6.0–1.6.1 — its admin showed that
+    // key, "" meant all interfaces. The old adapter's BIND next to it is a leftover from years ago.
+    for (const iface of ["", "0.0.0.0"]) {
+      const ctx = setup({ bind: "0.0.0.0", networkInterface: iface, BIND: "10.1.2.3" });
+      await ctx.i.onReady();
+      expect(ctx.i.instanceNative.bind, iface).toBe("0.0.0.0");
+      expect(ctx.i.instanceNative.networkInterface, iface).toBeNull();
+      expect(ctx.i.instanceNative.BIND, iface).toBeNull();
+    }
+    const concrete = setup({ bind: "0.0.0.0", networkInterface: "192.168.1.9", BIND: "10.1.2.3" });
+    await concrete.i.onReady();
+    expect(concrete.i.instanceNative.bind).toBe("192.168.1.9");
+    expect(concrete.i.instanceNative.BIND).toBeNull();
+  });
+
+  it("an instance straight from the old adapter keeps its BIND address", async () => {
+    // No networkInterface key: the installation never ran 0.6.0–1.6.1, BIND is its setting.
+    const ctx = setup({ bind: "0.0.0.0", BIND: "10.1.2.3" });
+    delete ctx.i.instanceNative.networkInterface;
     await ctx.i.onReady();
     expect(ctx.i.instanceNative.bind).toBe("10.1.2.3");
-    expect(ctx.i.instanceNative.networkInterface).toBeNull();
   });
 
   it("an empty legacy address migrates to 0.0.0.0, never to an empty string", async () => {
@@ -883,13 +900,45 @@ describe("Fakeroku onReady — network interface", () => {
     expect(ctx.i.log.info).toHaveBeenCalledWith(expect.stringContaining("no longer claims the whole host"));
   });
 
-  it("repairs the settings and the host claim in ONE write, not two restarts", async () => {
+  it("repairs the settings first and the host claim on the next start — each once, then never again", async () => {
+    // The settings go through the fleet helper, which writes only `native`; the host claim is
+    // its own write. Two restarts, once each.
     const ctx = setup({ bind: "0.0.0.0", networkInterface: "192.168.1.9" });
     ctx.i.instanceCommon.singletonHost = true;
     await ctx.i.onReady();
-    expect(ctx.i.extendForeignObjectAsync).toHaveBeenCalledTimes(1);
+    expect(ctx.ecp).toHaveLength(0);
     expect(ctx.i.instanceNative.bind).toBe("192.168.1.9");
+    expect(ctx.i.instanceCommon.singletonHost).toBe(true);
+    await ctx.i.onReady();
+    expect(ctx.ecp).toHaveLength(0);
     expect(ctx.i.instanceCommon.singletonHost).toBeNull();
+    expect(ctx.i.extendForeignObjectAsync).toHaveBeenCalledTimes(2);
+  });
+
+  it("starts anyway when the instance object cannot be read", async () => {
+    const ctx = setup({ bind: "192.168.1.5" });
+    ctx.i.getForeignObjectAsync.mockRejectedValueOnce(new Error("objects db busy"));
+    await ctx.i.onReady();
+    expect(ctx.i.log.warn).toHaveBeenCalledWith(expect.stringContaining("objects db busy"));
+    expect(ctx.ecp).toHaveLength(1);
+  });
+
+  it("a failed settings write starts this run with the MIGRATED address, not the injected default", async () => {
+    const ctx = setup({ bind: "0.0.0.0", networkInterface: "192.168.1.5" });
+    ctx.i.extendForeignObjectAsync.mockRejectedValueOnce(new Error("write refused"));
+    await ctx.i.onReady();
+    expect(ctx.i.log.warn).toHaveBeenCalledWith(expect.stringContaining("write refused"));
+    expect(ctx.i.config.bind).toBe("192.168.1.5");
+    expect(ctx.ecp[0].options.bindIp).toBe("192.168.1.5");
+  });
+
+  it("a failed host-claim write starts anyway and tries again next time", async () => {
+    const ctx = setup({ bind: "192.168.1.5" });
+    ctx.i.instanceCommon.singletonHost = true;
+    ctx.i.extendForeignObjectAsync.mockRejectedValueOnce(new Error("write refused"));
+    await ctx.i.onReady();
+    expect(ctx.i.log.warn).toHaveBeenCalledWith(expect.stringContaining("retrying on the next start"));
+    expect(ctx.ecp).toHaveLength(1);
   });
 
   it("leaves a repaired host claim alone — no second restart", async () => {
@@ -1731,6 +1780,28 @@ describe("Fakeroku — a device whose port was busy is retried", () => {
 
     expect(ctx.i.pending).toHaveLength(0);
     expect(ctx.i.states.get("info.connection")).toEqual({ val: true, ack: true });
+  });
+
+  it("a status write that fails after a successful retry is caught instead of ending the instance", async () => {
+    // The timer drops the retry with `void`. A rejection escaping it — the states database
+    // refusing the status write — is an unhandled rejection, and js-controller ends the
+    // instance over it (7.2.2 `_exceptionHandler`).
+    const ctx = setup(
+      {
+        devices: [
+          { name: "Wohnzimmer", port: 8060, type: "player" },
+          { name: "Kueche", port: 8061, type: "player" },
+        ],
+      },
+      { failEcpPort: 8061 },
+    );
+    await ctx.i.onReady();
+    ctx.freeEcpPort();
+    ctx.i.setState.mockImplementationOnce(() => Promise.reject(new Error("states db gone")));
+
+    await expect(ctx.i.retryPendingDevices()).resolves.toBeUndefined();
+
+    expect(ctx.i.log.warn).toHaveBeenCalledWith(expect.stringContaining("states db gone"));
   });
 
   it("keeps quiet about a retry that fails again — one warning, not one a minute", async () => {

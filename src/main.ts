@@ -12,7 +12,7 @@ import { RESERVED_IDS } from "./lib/constants";
 import { deviceObjectId, toDeviceRows, type DeviceRow } from "./lib/device-config";
 import { detectLocalIPv4s, detectPrimaryIPv4 } from "./lib/detect-ip";
 import { errText } from "./lib/errors";
-import { buildNativeKeyPatch, type NativeKeyMigration } from "./lib/native-key-migration";
+import { migrateNativeKeys, type NativeKeyMigration } from "./lib/native-key-migration";
 import { tDesc, tName, tRaw } from "./lib/i18n";
 import { planNativePrune, planObjectCleanup } from "./lib/object-cleanup";
 import { RateGate } from "./lib/rate-gate";
@@ -33,16 +33,32 @@ const RATE_WARN_INTERVAL_MS = 60_000;
 const DEVICE_RETRY_INTERVAL_MS = 60_000;
 
 /**
- * The listen address moved to `bind` (fleet listen-port standard). Two keys can hold it: the
- * adapter's own `networkInterface`, and `BIND` from the pre-0.5.0 adapter. Both are moved onto
- * `bind`; the helper prefers the source that says something, so a concrete address beats a key
- * left at "all interfaces". An empty legacy value becomes "0.0.0.0" — the admin's check skips an
- * instance whose `bind` is falsy, so a migrated "" would be as invisible as no key at all.
+ * The listen address moved to `bind` (fleet listen-port standard). Which legacy key holds the
+ * user's CURRENT choice depends on the versions the installation went through:
+ *
+ * - `networkInterface` exists only on an instance that ran 0.6.0–1.6.1. Its admin showed exactly
+ *   that key, and the adapter bound to it — "" meant all interfaces. It is the setting the user
+ *   saw last, so it wins, and a `BIND` still lying next to it is only cleared. The old adapter's
+ *   `BIND` had to be a concrete LAN address (it was also the advertised location), so letting it
+ *   win would pin an instance that ran on "all interfaces" for months to an address from years ago.
+ * - Without `networkInterface` the instance comes straight from the pre-0.6.0 adapter, and `BIND`
+ *   is its setting.
+ *
+ * An empty legacy value becomes "0.0.0.0" — the admin's check skips an instance whose `bind` is
+ * falsy, so a migrated "" would be as invisible as no key at all.
+ *
+ * @param native the instance's stored native settings
+ * @returns the migrations for this installation
  */
-const BIND_KEY_MIGRATIONS: NativeKeyMigration[] = [
-  { from: "networkInterface", to: "bind", coerce: toBindAddress },
-  { from: "BIND", to: "bind", coerce: toBindAddress },
-];
+function bindKeyMigrations(native: Record<string, unknown>): NativeKeyMigration[] {
+  const hasInterfaceKey = native.networkInterface !== undefined && native.networkInterface !== null;
+  return hasInterfaceKey
+    ? [
+        { from: "networkInterface", to: "bind", coerce: toBindAddress },
+        { key: "BIND", coerce: () => null },
+      ]
+    : [{ from: "BIND", to: "bind", coerce: toBindAddress }];
+}
 
 /**
  * A legacy listen address in the form the admin can read.
@@ -144,11 +160,15 @@ export class Fakeroku extends utils.Adapter {
    * `native` keys with the manifest default, and a `common` key the manifest dropped stays behind
    * for ever. Two changes therefore never reached an existing installation on their own:
    * the listen address had to MOVE to `bind` (a read fallback finds the injected default, not the
-   * user's value), and `singletonHost` — gone from the manifest since 1.6.0 — still claims the
-   * whole host, so nobody could add a second instance although the release said they could.
+   * user's value), and `singletonHost` — gone from the manifest since 1.6.0 — stayed in the
+   * instance object (read by nobody: `createInstance` reads the ADAPTER object, but a dead key
+   * is still the adapter's to remove).
    *
-   * Both are written in ONE merge, so the host restarts the instance at most once; `null` is what
-   * removes a key, since a merge cannot delete.
+   * The settings go through the fleet helper (`lib/native-key-migration.ts`, byte-identical with
+   * the fleet master): it merges only the touched keys, and when the write fails it carries the
+   * migrated values into this run's config instead of starting on the injected default. The host
+   * claim is a `common` key, which the helper does not touch, so it is its own write; an
+   * installation that needs both restarts twice, once each, and never again.
    *
    * @returns true when the object was written — the caller aborts its start, the host restarts
    */
@@ -164,30 +184,22 @@ export class Fakeroku extends utils.Adapter {
     if (!obj) {
       return false;
     }
-    const native = buildNativeKeyPatch(obj.native ?? {}, BIND_KEY_MIGRATIONS);
+    if (await migrateNativeKeys(this, bindKeyMigrations(obj.native ?? {}), errText)) {
+      return true;
+    }
     // `null` is the state AFTER a repair — treating it as present would rewrite on every start
     // and restart the instance for ever.
     const claim = obj.common?.singletonHost;
-    const dropsHostClaim = claim !== undefined && claim !== null;
-    if (!Object.keys(native).length && !dropsHostClaim) {
+    if (claim === undefined || claim === null) {
       return false;
     }
-    const summary = [
-      ...Object.keys(native)
-        .filter(k => native[k] !== null)
-        .map(k => `${k} = ${JSON.stringify(native[k])}`),
-      ...(dropsHostClaim ? ["the instance no longer claims the whole host"] : []),
-    ].join(", ");
     try {
-      await this.extendForeignObjectAsync(id, {
-        ...(dropsHostClaim ? { common: { singletonHost: null } } : {}),
-        ...(Object.keys(native).length ? { native } : {}),
-      });
+      await this.extendForeignObjectAsync(id, { common: { singletonHost: null } });
     } catch (err) {
       this.log.warn(`Settings repair could not be stored (${errText(err)}) — retrying on the next start`);
       return false;
     }
-    this.log.info(`Settings migrated to the standard keys (${summary}) — this instance restarts once`);
+    this.log.info("The instance no longer claims the whole host — it restarts once");
     return true;
   }
 
@@ -384,35 +396,45 @@ export class Fakeroku extends utils.Adapter {
    * leaving a dead device behind a red instance until someone restarts by hand.
    */
   private async retryPendingDevices(): Promise<void> {
-    // No stopping check at the entry: onUnload sets the flag and empties the queue in the
-    // same synchronous block, so a call that arrives afterwards finds nothing to do, and a
-    // call already inside the loop is caught after the bind and again at the tail. A guard
-    // here could never fire — measured, it survived its own mutation needle.
-    const stillPending: PendingDevice[] = [];
-    let recovered = false;
-    for (const device of this.pending) {
-      if (await this.startDeviceServer(device, "retry")) {
-        recovered = true;
-      } else {
-        stillPending.push(device);
+    // The timer drops this call with `void`, so nothing may escape it: a rejection here — the
+    // status write failing while the states database hiccups — would be an unhandled rejection,
+    // and js-controller ends the instance over it.
+    try {
+      // No stopping check at the entry: onUnload sets the flag and empties the queue in the
+      // same synchronous block, so a call that arrives afterwards finds nothing to do, and a
+      // call already inside the loop is caught after the bind and again at the tail. A guard
+      // here could never fire — measured, it survived its own mutation needle.
+      const stillPending: PendingDevice[] = [];
+      let recovered = false;
+      for (const device of this.pending) {
+        if (await this.startDeviceServer(device, "retry")) {
+          recovered = true;
+        } else {
+          stillPending.push(device);
+        }
+      }
+      if (this.stopping) {
+        // The host said stop while we were binding. Assigning the list back would re-fill the
+        // queue onUnload just emptied, and scheduleDeviceRetry would then arm a new timer —
+        // which js-controller refuses during shutdown, with a warning nobody can explain.
+        return;
+      }
+      this.pending = stillPending;
+      if (recovered) {
+        // Discovery may never have started (every device failed at boot) — bring it up now.
+        const advertiseIp = this.bindIp ?? detectPrimaryIPv4();
+        if (advertiseIp && !this.ssdp) {
+          this.startDiscovery(advertiseIp);
+        }
+        await this.reportConnectionState(advertiseIp);
+      }
+      this.scheduleDeviceRetry();
+    } catch (e) {
+      this.log.warn(`Retrying the waiting emulated Rokus failed: ${errText(e)}`);
+      if (!this.stopping) {
+        this.scheduleDeviceRetry();
       }
     }
-    if (this.stopping) {
-      // The host said stop while we were binding. Assigning the list back would re-fill the
-      // queue onUnload just emptied, and scheduleDeviceRetry would then arm a new timer —
-      // which js-controller refuses during shutdown, with a warning nobody can explain.
-      return;
-    }
-    this.pending = stillPending;
-    if (recovered) {
-      // Discovery may never have started (every device failed at boot) — bring it up now.
-      const advertiseIp = this.bindIp ?? detectPrimaryIPv4();
-      if (advertiseIp && !this.ssdp) {
-        this.startDiscovery(advertiseIp);
-      }
-      await this.reportConnectionState(advertiseIp);
-    }
-    this.scheduleDeviceRetry();
   }
 
   /**
@@ -954,7 +976,7 @@ export class Fakeroku extends utils.Adapter {
           clear();
           // Lint (prefer-promise-reject-errors) wants an Error here; errText downstream
           // would cope with anything, so this is the rule's shape, not a second safeguard.
-          reject(e instanceof Error ? e : new Error(String(e)));
+          reject(e instanceof Error ? e : new Error(errText(e)));
         },
       );
     });

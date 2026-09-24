@@ -19,4 +19,4 @@ body:
     id: adapter-version
     attributes:
       label: Adapter-Version (optional) / Adapter version (optional)
-      placeholder: "1.7.0"
+      placeholder: "z. B. 1.2.3 / e.g. 1.2.3"
