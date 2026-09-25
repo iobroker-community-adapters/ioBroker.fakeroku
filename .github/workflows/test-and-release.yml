@@ -10,27 +10,14 @@ on:
       # the release tag already exists (yamaha v1.1.0 was tagged that way).
       - "master"
       - "developing"
+      
     tags:
       # normal versions
       - "v[0-9]+.[0-9]+.[0-9]+"
       # pre-releases
       - "v[0-9]+.[0-9]+.[0-9]+-**"
-    # A push that only touches text starts no run: no test can fail on a prose line.
-    # Per GitHub's docs "Path filters are not evaluated for pushes of tags", so the
-    # release run on the tag is unaffected. Deliberately only under `push`, never
-    # under `pull_request`.
-    paths-ignore:
-      - "**.md"
-      - "docs/**"
-      - ".gitignore"
-      - ".gitattributes"
-      - ".editorconfig"
-      - "LICENSE"
-      # No job reads the Dependabot configuration; the pre-push guard rightly refuses a
-      # skip-CI marker for it, so the filter is the only thing that keeps a config
-      # change from running the full matrix (seven such runs on 2026-09-15).
-      - ".github/dependabot.yml"
-  pull_request: {}
+
+      pull_request: {}
 
 # Cancel previous PR/branch runs when a new commit is pushed
 concurrency:
