@@ -100,8 +100,7 @@ becomes `true` — or watch `.command` for the last button as text.
 	Placeholder for the next version (at the beginning of the line):
 	### **WORK IN PROGRESS**
 -->
-
-### **WORK IN PROGRESS**
+### 1.8.0 (2026-09-25)
 
 - (krobipd) Fixed: Home Assistant and openHAB can set up the emulated Roku again — it now answers the active-app, media-player and TV-channel queries they send.
 - (krobipd) Fixed: keys sent in any upper or lower case (home, POWERON) press the right button, and spaces typed in Home Assistant arrive as spaces.
@@ -144,12 +143,6 @@ becomes `true` — or watch `.command` for the last button as text.
 - (krobipd) Changed: the device dialog refuses a reserved or colliding name right away instead of reporting it after saving.
 - (krobipd) Changed: the adapter can now run in compact mode, sharing one process with other adapters instead of claiming its own.
 - (krobipd) Changed: more than one instance may run on the same machine again; only the ports have to differ.
-
-### 1.5.0 (2026-09-03)
-
-- (krobipd) Fixed: deleting the last emulated Roku left all of its datapoints behind for good. They are now removed whenever the configuration says a device is gone.
-- (krobipd) Fixed: on a host running Docker the adapter could announce itself under a container address no remote can reach. A real network address is preferred now.
-- (krobipd) Fixed: an emulated Roku whose server died while running left the instance showing "connected". It now reports the failure and names the device.
 
 [Older changelogs can be found there](CHANGELOG_OLD.md)
 
