@@ -10,14 +10,13 @@ on:
       # the release tag already exists (yamaha v1.1.0 was tagged that way).
       - "master"
       - "developing"
-
     tags:
       # normal versions
       - "v[0-9]+.[0-9]+.[0-9]+"
       # pre-releases
       - "v[0-9]+.[0-9]+.[0-9]+-**"
 
-      pull_request: {}
+  pull_request: {}
 
 # Cancel previous PR/branch runs when a new commit is pushed
 concurrency:
