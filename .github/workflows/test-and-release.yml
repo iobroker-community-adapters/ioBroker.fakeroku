@@ -10,7 +10,7 @@ on:
       # the release tag already exists (yamaha v1.1.0 was tagged that way).
       - "master"
       - "developing"
-      
+
     tags:
       # normal versions
       - "v[0-9]+.[0-9]+.[0-9]+"
