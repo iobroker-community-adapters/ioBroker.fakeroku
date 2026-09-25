@@ -1,4 +1,5 @@
 # Older changes
+
 ## 1.5.0 (2026-09-03)
 
 - (krobipd) Fixed: deleting the last emulated Roku left all of its datapoints behind for good. They are now removed whenever the configuration says a device is gone.
