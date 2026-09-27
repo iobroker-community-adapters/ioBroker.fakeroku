@@ -30,6 +30,16 @@
  * that migrates native keys carries this file and its test byte for byte — the release run
  * (consistency level 1) reports any difference. Change the master, then copy; never the copy.
  * The file imports nothing adapter-specific: the caller hands in its own error-text helper.
+ *
+ * `common` keys too (since 2026-09-25): js-controller MERGES the manifest's `common` into the instance object on every
+ * update and never removes a key (v7.2.2 `setupUpload.ts` `extendCommon`, only `visWidgets`/`localLinks` are deleted
+ * and `compact` overwritten) — a key an earlier manifest declared stays in every existing instance for good, e.g.
+ * `nondeletable` (the instance can no longer be deleted) or `singletonHost`. `{ commonDrop: "<key>" }` nulls it in the
+ * same single write as the native changes, so the update still costs one restart. The keys js-controller keeps for the
+ * user or maintains itself are never touched, whatever the table says (`KEPT_COMMON_KEYS`).
+ *
+ * Order within one call: every rename is applied before any drop, in one write — a takeover of a dropped key belongs
+ * in the same table as `{ from, to }`; a takeover in the adapter's own code must run before this call.
  */
 
 /** Rename: the old value wins over the freshly added default; the old key is nulled. */
@@ -56,7 +66,34 @@ export interface NativeKeyDrop {
   drop: string;
 }
 
-export type NativeKeyMigration = NativeKeyRename | NativeKeyCoercion | NativeKeyDrop;
+/** Common drop: a key an earlier manifest declared in `common` and this one no longer does — nulled when it still holds a value. */
+export interface CommonKeyDrop {
+  /** The obsolete `common` key, spelled exactly as the old manifest had it. */
+  commonDrop: string;
+}
+
+export type NativeKeyMigration = NativeKeyRename | NativeKeyCoercion | NativeKeyDrop | CommonKeyDrop;
+
+/**
+ * `common` keys a drop never touches: js-controller keeps them for the user on every update (`preserveAttributes` in
+ * v7.2.2 `setupUpload.ts` — the instance title, schedules, mode, log level, enabled flag, custom settings, tier) or
+ * maintains them itself (`visWidgets`, `localLinks`, `compact`); `supportedMessages` is repaired by the package check
+ * `messagebox-repair`.
+ */
+export const KEPT_COMMON_KEYS: readonly string[] = [
+  "title",
+  "schedule",
+  "restartSchedule",
+  "mode",
+  "loglevel",
+  "enabled",
+  "custom",
+  "tier",
+  "visWidgets",
+  "localLinks",
+  "compact",
+  "supportedMessages",
+];
 
 /** The adapter surface the migration needs — object I/O, logging, the in-memory config. */
 export interface NativeKeyMigrationAdapter {
@@ -68,13 +105,18 @@ export interface NativeKeyMigrationAdapter {
   config: object;
   /** Reads the instance object. */
   getForeignObjectAsync(id: string): Promise<unknown>;
-  /** Merges the touched native keys into the instance object. */
-  extendForeignObjectAsync(id: string, obj: { native: Record<string, unknown> }): Promise<unknown>;
+  /** Merges the touched native and common keys into the instance object. */
+  extendForeignObjectAsync(
+    id: string,
+    obj: { native?: Record<string, unknown>; common?: Record<string, unknown> },
+  ): Promise<unknown>;
 }
 
 const isRename = (m: NativeKeyMigration): m is NativeKeyRename => "from" in m;
 
 const isDrop = (m: NativeKeyMigration): m is NativeKeyDrop => "drop" in m;
+
+const isCommonDrop = (m: NativeKeyMigration): m is CommonKeyDrop => "commonDrop" in m;
 
 const isPresent = (v: unknown): boolean => v !== undefined && v !== null;
 
@@ -158,12 +200,33 @@ export function buildNativeKeyPatch(
   }
 
   for (const m of migrations) {
-    if (isRename(m) || isDrop(m) || !isPresent(native[m.key])) {
+    if (isRename(m) || isDrop(m) || isCommonDrop(m) || !isPresent(native[m.key])) {
       continue;
     }
     const coerced = m.coerce(native[m.key]);
     if (isStorable(coerced) && !Object.is(coerced, native[m.key])) {
       patch[m.key] = coerced;
+    }
+  }
+  return patch;
+}
+
+/**
+ * Computes the common patch — every `commonDrop` whose key still holds a value is nulled; a key in
+ * `KEPT_COMMON_KEYS` never is.
+ *
+ * @param common the instance's current common part
+ * @param migrations the table (renames, coercions and native drops are ignored here)
+ * @returns the keys to merge into common — empty when nothing needs to change
+ */
+export function buildCommonKeyPatch(
+  common: Record<string, unknown>,
+  migrations: NativeKeyMigration[],
+): Record<string, unknown> {
+  const patch: Record<string, unknown> = {};
+  for (const m of migrations) {
+    if (isCommonDrop(m) && !KEPT_COMMON_KEYS.includes(m.commonDrop) && isPresent(common[m.commonDrop])) {
+      patch[m.commonDrop] = null;
     }
   }
   return patch;
@@ -188,28 +251,37 @@ export async function migrateNativeKeys(
 ): Promise<boolean> {
   const id = `system.adapter.${adapter.namespace}`;
   let native: Record<string, unknown> | undefined;
+  let common: Record<string, unknown> | undefined;
   try {
-    const obj = (await adapter.getForeignObjectAsync(id)) as { native?: Record<string, unknown> } | null | undefined;
+    const obj = (await adapter.getForeignObjectAsync(id)) as
+      { native?: Record<string, unknown>; common?: Record<string, unknown> } | null | undefined;
     native = obj?.native;
+    common = obj?.common;
   } catch (err) {
     adapter.log.warn(`Settings migration skipped — could not read ${id}: ${describeError(err)}`);
     return false;
   }
-  if (!native) {
-    return false;
-  }
-  const patch = buildNativeKeyPatch(native, migrations);
+  const patch = native ? buildNativeKeyPatch(native, migrations) : {};
+  const commonPatch = common ? buildCommonKeyPatch(common, migrations) : {};
   const touched = Object.keys(patch);
-  if (touched.length === 0) {
+  const commonTouched = Object.keys(commonPatch);
+  if (touched.length === 0 && commonTouched.length === 0) {
     return false;
   }
   const summary = touched
     .filter(k => patch[k] !== null)
     .map(k => `${k} = ${JSON.stringify(patch[k])}`)
     .join(", ");
-  const removed = touched.filter(k => patch[k] === null).join(", ");
+  const removed = [...touched.filter(k => patch[k] === null), ...commonTouched.map(k => `common.${k}`)].join(", ");
+  const write: { native?: Record<string, unknown>; common?: Record<string, unknown> } = {};
+  if (touched.length > 0) {
+    write.native = patch;
+  }
+  if (commonTouched.length > 0) {
+    write.common = commonPatch;
+  }
   try {
-    await adapter.extendForeignObjectAsync(id, { native: patch });
+    await adapter.extendForeignObjectAsync(id, write);
     adapter.log.info(
       summary
         ? `Settings migrated to the standard keys (${summary}) — this instance restarts once`

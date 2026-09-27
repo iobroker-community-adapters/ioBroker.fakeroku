@@ -997,32 +997,29 @@ describe("Fakeroku onReady — network interface", () => {
     expect(ctx.i.instanceNative.networkInterface).toBeNull();
   });
 
-  it("drops the leftover host claim, so a second instance becomes possible at all", async () => {
+  it("drops the leftover common keys, so a second instance becomes possible at all", async () => {
     const ctx = setup({ bind: "10.1.2.3" });
     ctx.i.instanceNative.networkInterface = null;
     ctx.i.instanceNative.BIND = null;
-    // singletonHost left the manifest in 1.6.0, but js-controller never deletes a key it wrote —
-    // every installation upgraded from an older version still claims the whole host.
+    // singletonHost left the manifest in 1.6.0 and license was replaced by licenseInformation, but
+    // js-controller never deletes a common key it wrote — every older installation still has both.
     ctx.i.instanceCommon.singletonHost = true;
+    ctx.i.instanceCommon.license = "MIT";
     await ctx.i.onReady();
     expect(ctx.ecp).toHaveLength(0);
     expect(ctx.i.instanceCommon.singletonHost).toBeNull();
-    expect(ctx.i.log.info).toHaveBeenCalledWith(expect.stringContaining("no longer claims the whole host"));
+    expect(ctx.i.instanceCommon.license).toBeNull();
+    expect(ctx.i.log.info).toHaveBeenCalledWith(expect.stringContaining("common.singletonHost"));
   });
 
-  it("repairs the settings first and the host claim on the next start — each once, then never again", async () => {
-    // The settings go through the fleet helper, which writes only `native`; the host claim is
-    // its own write. Two restarts, once each.
+  it("repairs the settings and the common keys in ONE write — one restart, then never again", async () => {
     const ctx = setup({ bind: "0.0.0.0", networkInterface: "192.168.1.9" });
     ctx.i.instanceCommon.singletonHost = true;
     await ctx.i.onReady();
     expect(ctx.ecp).toHaveLength(0);
     expect(ctx.i.instanceNative.bind).toBe("192.168.1.9");
-    expect(ctx.i.instanceCommon.singletonHost).toBe(true);
-    await ctx.i.onReady();
-    expect(ctx.ecp).toHaveLength(0);
     expect(ctx.i.instanceCommon.singletonHost).toBeNull();
-    expect(ctx.i.extendForeignObjectAsync).toHaveBeenCalledTimes(2);
+    expect(ctx.i.extendForeignObjectAsync).toHaveBeenCalledTimes(1);
   });
 
   it("starts anyway when the instance object cannot be read", async () => {
@@ -1047,7 +1044,7 @@ describe("Fakeroku onReady — network interface", () => {
     ctx.i.instanceCommon.singletonHost = true;
     ctx.i.extendForeignObjectAsync.mockRejectedValueOnce(new Error("write refused"));
     await ctx.i.onReady();
-    expect(ctx.i.log.warn).toHaveBeenCalledWith(expect.stringContaining("retrying on the next start"));
+    expect(ctx.i.log.warn).toHaveBeenCalledWith(expect.stringContaining("ignoring common.singletonHost"));
     expect(ctx.ecp).toHaveLength(1);
   });
 

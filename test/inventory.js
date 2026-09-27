@@ -101,6 +101,7 @@ async function dumpObjects(harness) {
 }
 
 tests.integration(ADAPTER_DIR, {
+  controllerVersion: "stable",
   defineAdditionalTests({ suite }) {
     suite("object inventory", getHarness => {
       let harness;

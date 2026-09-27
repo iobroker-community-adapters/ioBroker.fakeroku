@@ -199,7 +199,6 @@ send app launches (a Sofabaton, Home Assistant) show them in `command` as `launc
 
 ## Privacy
 
-The adapter talks only to devices in your own networks. It contacts no cloud
-service and sends no data anywhere. Optional error reporting via Sentry is off
-unless you enabled diagnostics in the ioBroker system settings; it transmits an
-anonymous installation id and the error itself, no personal data.
+The adapter talks only to devices in your own networks.
+
+Error reporting via Sentry is active by default; what it sends and how to switch it off is described in the [Sentry section of the main README](../../README.md#sentry--error-reporting).

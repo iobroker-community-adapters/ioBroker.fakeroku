@@ -60,6 +60,14 @@ const DISCOVERY_RETRY_INTERVAL_MS = 60_000;
 const DROPPED_NATIVE_KEYS: NativeKeyMigration[] = [{ drop: "HTTP_PORT" }, { drop: "MULTICAST_IP" }, { drop: "UUID" }];
 
 /**
+ * `common` keys an earlier manifest declared and this one no longer does: `license` (0.1.1, replaced
+ * by `licenseInformation`) and `singletonHost` (0.2.0, gone since 1.6.0). js-controller merges
+ * `common` on every update and never removes a key, so they stay in every installation that came
+ * from there; the fleet helper nulls them in the same single write as the settings.
+ */
+const DROPPED_COMMON_KEYS: NativeKeyMigration[] = [{ commonDrop: "license" }, { commonDrop: "singletonHost" }];
+
+/**
  * The listen address moved to `bind` (fleet listen-port standard). Which legacy key holds the
  * user's CURRENT choice depends on the versions the installation went through:
  *
@@ -82,7 +90,7 @@ function bindKeyMigrations(native: Record<string, unknown>): NativeKeyMigration[
   const bind: NativeKeyMigration[] = hasInterfaceKey
     ? [{ from: "networkInterface", to: "bind", coerce: toBindAddress }, { drop: "BIND" }]
     : [{ from: "BIND", to: "bind", coerce: toBindAddress }];
-  return [...bind, ...DROPPED_NATIVE_KEYS];
+  return [...bind, ...DROPPED_NATIVE_KEYS, ...DROPPED_COMMON_KEYS];
 }
 
 /**
@@ -183,21 +191,19 @@ export class Fakeroku extends utils.Adapter {
   }
 
   /**
-   * One-shot repair of this instance's own object — the settings keys and the leftover host claim.
+   * One-shot repair of this instance's own object — the settings keys and the leftover `common` keys.
    *
    * js-controller only ever ADDS to an existing instance object: on an update it fills missing
    * `native` keys with the manifest default, and a `common` key the manifest dropped stays behind
    * for ever. Two changes therefore never reached an existing installation on their own:
    * the listen address had to MOVE to `bind` (a read fallback finds the injected default, not the
-   * user's value), and `singletonHost` — gone from the manifest since 1.6.0 — stayed in the
-   * instance object (read by nobody: `createInstance` reads the ADAPTER object, but a dead key
-   * is still the adapter's to remove).
+   * user's value), and `license`/`singletonHost` stayed in the instance object (read by nobody:
+   * `createInstance` reads the ADAPTER object, but a dead key is still the adapter's to remove).
    *
-   * The settings go through the fleet helper (`lib/native-key-migration.ts`, byte-identical with
-   * the fleet master): it merges only the touched keys, and when the write fails it carries the
-   * migrated values into this run's config instead of starting on the injected default. The host
-   * claim is a `common` key, which the helper does not touch, so it is its own write; an
-   * installation that needs both restarts twice, once each, and never again.
+   * Everything goes through the fleet helper (`lib/native-key-migration.ts`, byte-identical with
+   * the fleet master) in ONE write, so the update costs one restart: it merges only the touched
+   * keys, and when the write fails it carries the migrated values into this run's config instead
+   * of starting on the injected default.
    *
    * @returns true when the object was written — the caller aborts its start, the host restarts
    */
@@ -213,23 +219,7 @@ export class Fakeroku extends utils.Adapter {
     if (!obj) {
       return false;
     }
-    if (await migrateNativeKeys(this, bindKeyMigrations(obj.native ?? {}), errText)) {
-      return true;
-    }
-    // `null` is the state AFTER a repair — treating it as present would rewrite on every start
-    // and restart the instance for ever.
-    const claim = obj.common?.singletonHost;
-    if (claim === undefined || claim === null) {
-      return false;
-    }
-    try {
-      await this.extendForeignObjectAsync(id, { common: { singletonHost: null } });
-    } catch (err) {
-      this.log.warn(`Settings repair could not be stored (${errText(err)}) — retrying on the next start`);
-      return false;
-    }
-    this.log.info("The instance no longer claims the whole host — it restarts once");
-    return true;
+    return migrateNativeKeys(this, bindKeyMigrations(obj.native ?? {}), errText);
   }
 
   /** Create each device's object tree, start its ECP server, then the shared SSDP responder. */

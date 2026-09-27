@@ -214,8 +214,6 @@ Fernbedienungen, die App-Starts senden (eine Sofabaton, Home Assistant), zeigen 
 
 ## Datenschutz
 
-Der Adapter spricht ausschließlich mit Geräten in deinen eigenen Netzen. Er kontaktiert keinen
-Cloud-Dienst und sendet nirgendwohin Daten. Die optionale Fehlerberichterstattung
-über Sentry ist aus, solange du in den ioBroker-Systemeinstellungen die Diagnose
-nicht eingeschaltet hast; sie überträgt eine anonyme Installations-Kennung und den
-Fehler selbst, keine personenbezogenen Daten.
+Der Adapter spricht ausschließlich mit Geräten in deinen eigenen Netzen.
+
+Die Fehlermeldung über Sentry ist ab Werk aktiv; was sie sendet und wie man sie abschaltet, steht im [Abschnitt Sentry der Haupt-README](../../README.md#sentry--error-reporting).
