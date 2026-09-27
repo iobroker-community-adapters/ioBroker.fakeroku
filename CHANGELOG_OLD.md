@@ -1,4 +1,5 @@
 # Older changes
+
 ## 1.6.0 (2026-09-07)
 
 - (krobipd) Fixed: saving a device in the admin could change its identity on the network, so a paired Harmony or Sofabaton lost it.
