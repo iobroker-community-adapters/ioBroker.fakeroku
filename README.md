@@ -100,8 +100,7 @@ becomes `true` — or watch `.command` for the last button as text.
 	Placeholder for the next version (at the beginning of the line):
 	### **WORK IN PROGRESS**
 -->
-
-### **WORK IN PROGRESS**
+### 1.8.1 (2026-09-27)
 
 - (krobipd) Improved: the note the Admin shows before an update from 0.x is short now: the apps folder is removed, app launches arrive as launch:<id> in command.
 
@@ -135,19 +134,6 @@ becomes `true` — or watch `.command` for the last button as text.
 ### 1.6.1 (2026-09-07) — stable
 
 - (krobipd) Changed: installing straight from GitHub is no longer offered — the adapter is built before publishing, so it is installed from the ioBroker repository instead.
-
-### 1.6.0 (2026-09-07)
-
-- (krobipd) Fixed: saving a device in the admin could change its identity on the network, so a paired Harmony or Sofabaton lost it.
-- (krobipd) Fixed: with the device list open twice, editing or deleting a card could hit a different emulated Roku than the one clicked.
-- (krobipd) Fixed: releasing a key was dropped while the adapter shed a flood of commands, so the key could stay pressed for half a minute.
-- (krobipd) Fixed: an ECP port still held after a restart left that device dead until you restarted the instance; it is retried every minute now.
-- (krobipd) Fixed: stopping the instance now takes the emulated Rokus out of the remote's list instead of leaving them there for up to an hour.
-- (krobipd) Fixed: an emulated Roku whose server died is no longer offered for discovery.
-- (krobipd) Fixed: a configured port no server can bind falls back to 8060 instead of leaving the device unstarted.
-- (krobipd) Changed: the device dialog refuses a reserved or colliding name right away instead of reporting it after saving.
-- (krobipd) Changed: the adapter can now run in compact mode, sharing one process with other adapters instead of claiming its own.
-- (krobipd) Changed: more than one instance may run on the same machine again; only the ports have to differ.
 
 [Older changelogs can be found there](CHANGELOG_OLD.md)
 

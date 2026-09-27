@@ -1,8 +1,21 @@
 {
   "common": {
     "name": "fakeroku",
-    "version": "1.8.0",
+    "version": "1.8.1",
     "news": {
+      "1.8.1": {
+        "en": "The note the Admin shows before an update from 0.x is short now: the apps folder is removed, app launches arrive as launch:<id> in command.",
+        "de": "Der Hinweis, den der Admin vor einem Update von 0.x zeigt, ist jetzt kurz: der Ordner apps fällt weg, App-Starts kommen als launch:<id> in command.",
+        "ru": "Уведомление, которое Admin показывает перед обновлением с 0.x, теперь короткое: папка apps удалена, запуск приложений приходит как launch:<id> в command.",
+        "pt": "A nota que o Admin mostra antes de atualizar a partir da 0.x agora é curta: a pasta apps foi removida, os inícios de apps chegam como launch:<id> em command.",
+        "nl": "De melding die de Admin vóór een update vanaf 0.x toont, is nu kort: de map apps vervalt, app-starts komen binnen als launch:<id> in command.",
+        "fr": "La note affichée par l'Admin avant une mise à jour depuis 0.x est courte : le dossier apps est supprimé, les lancements d'applis arrivent en launch:<id> dans command.",
+        "it": "La nota che l'Admin mostra prima di aggiornare dalla 0.x ora è breve: la cartella apps viene rimossa, gli avvii delle app arrivano come launch:<id> in command.",
+        "es": "El aviso que muestra el Admin antes de actualizar desde 0.x ahora es breve: se elimina la carpeta apps, los inicios de apps llegan como launch:<id> en command.",
+        "pl": "Komunikat, który Admin pokazuje przed aktualizacją z 0.x, jest teraz krótki: folder apps zostaje usunięty, uruchomienia aplikacji przychodzą jako launch:<id> w command.",
+        "uk": "Повідомлення, яке Admin показує перед оновленням з 0.x, тепер коротке: папку apps видалено, запуски застосунків надходять як launch:<id> у command.",
+        "zh-cn": "Admin 在从 0.x 升级前显示的提示现在很简短：apps 文件夹已移除，应用启动以 launch:<id> 形式出现在 command 中。"
+      },
       "1.8.0": {
         "en": "Home Assistant and openHAB can set up the emulated Roku again, keys in any upper or lower case work, and spaces typed in Home Assistant arrive as spaces\nAn upgrade from the old adapter keeps every object tree with its rooms and history, and renaming a device no longer moves its datapoints\nOnly devices in the host's own networks are answered; a chosen network interface keeps everything in its network and is never swapped for another\nAn instance started before the network is up starts its devices and adds discovery later; the device dialog greys out OK for a taken name or port\nNew: the TV profile adds power on, power, sleep and tuner input keys; new devices get their own network identity",
         "de": "Home Assistant und openHAB können den emulierten Roku wieder einrichten, Tasten in beliebiger Groß- und Kleinschreibung wirken, Leerzeichen aus Home Assistant kommen an\nEin Umstieg vom alten Adapter behält jeden Objektbaum samt Räumen und History, und Umbenennen verschiebt die Datenpunkte eines Geräts nicht mehr\nBeantwortet werden nur Geräte in den eigenen Netzen des Hosts; eine gewählte Netzwerkschnittstelle hält alles in ihrem Netz und wird nie ersetzt\nStartet die Instanz vor dem Netzwerk, laufen die Geräte trotzdem und die Erkennung folgt später; der Gerätedialog sperrt OK bei belegtem Namen oder Port\nNeu: das TV-Profil bringt die Tasten Einschalten, Ein/Aus, Sleep und Tuner-Eingang; neue Geräte erhalten eine eigene Netzwerk-Identität",
@@ -80,19 +93,6 @@
         "pl": "Usunięcie ostatniego emulowanego Roku usuwa jego punkty danych, host z Dockerem nie ogłasza już nieosiągalnego adresu, a awaria jest zgłaszana.",
         "uk": "Видалення останнього емульованого Roku прибирає його точки даних, хост із Docker не оголошує недосяжну адресу, а про відмову повідомляється.",
         "zh-cn": "删除最后一个模拟 Roku 会一并移除其数据点，运行 Docker 的主机不再公告无法访问的地址，设备失效会被报告。"
-      },
-      "1.4.0": {
-        "en": "Renaming a Roku keeps the remote paired, a stuck key is released at start-up, all datapoints get translated names, and IPv6 remotes from your network are accepted.",
-        "de": "Umbenennen behält die Kopplung der Fernbedienung, eine hängende Taste wird beim Start freigegeben, alle Datenpunkte bekommen übersetzte Namen, IPv6-Fernbedienungen werden akzeptiert.",
-        "ru": "Переименование сохраняет сопряжение пульта, зависшая кнопка сбрасывается при старте, все точки данных получают переведённые названия, IPv6-пульты принимаются.",
-        "pt": "Mudar o nome mantém o emparelhamento, uma tecla presa é libertada no arranque, todos os pontos de dados recebem nomes traduzidos, comandos IPv6 são aceites.",
-        "nl": "Hernoemen behoudt de koppeling, een blijvende toets wordt bij de start vrijgegeven, alle datapunten krijgen vertaalde namen, IPv6-afstandsbedieningen worden geaccepteerd.",
-        "fr": "Renommer conserve l'appairage, une touche bloquée est libérée au démarrage, tous les points de données ont des noms traduits, les télécommandes IPv6 sont acceptées.",
-        "it": "Rinominare mantiene l'associazione, un tasto bloccato viene rilasciato all'avvio, tutti i punti dati hanno nomi tradotti, i telecomandi IPv6 sono accettati.",
-        "es": "Renombrar mantiene el emparejamiento, una tecla atascada se libera al iniciar, todos los puntos de datos tienen nombres traducidos, se aceptan mandos IPv6.",
-        "pl": "Zmiana nazwy zachowuje parowanie, zablokowany klawisz jest zwalniany przy starcie, wszystkie punkty danych mają przetłumaczone nazwy, piloty IPv6 są akceptowane.",
-        "uk": "Перейменування зберігає сполучення, залипла кнопка звільняється під час запуску, усі точки даних мають перекладені назви, IPv6-пульти приймаються.",
-        "zh-cn": "重命名后遥控器仍保持配对，卡住的按键在启动时释放，所有数据点获得翻译后的名称，接受本网络的 IPv6 遥控器。"
       }
     },
     "titleLang": {
