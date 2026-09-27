@@ -694,28 +694,16 @@ export class Fakeroku extends utils.Adapter {
    * extendObject is what carries the name into an existing tree, so an update always lands on
    * every datapoint, not just on fresh installs.
    *
-   * It also repairs the `info` channel after a hand-edited device row named
-   * "info" turned it into a device object (see the reserved-id guard in startDevices).
+   * Only name and description: the manifest owns the rest of the shape, and js-controller writes
+   * it back on every start — the object type included (`extend(true, old, manifest)`), which is
+   * also what repairs an `info` channel a hand-edited device row named "info" once turned into a
+   * device object (see the reserved-id guard in startDevices).
    */
   private async refreshOwnObjects(): Promise<void> {
     await Promise.all([
-      this.extendObject("info", {
-        type: "channel",
-        common: { name: tName("channelInfo") },
-        native: {},
-      }),
+      this.extendObject("info", { common: { name: tName("channelInfo") } }),
       this.extendObject("info.connection", {
-        type: "state",
-        common: {
-          name: tName("connectionStatus"),
-          desc: tDesc("connectionStatusDesc"),
-          type: "boolean",
-          role: "indicator.connected",
-          read: true,
-          write: false,
-          def: false,
-        },
-        native: {},
+        common: { name: tName("connectionStatus"), desc: tDesc("connectionStatusDesc") },
       }),
     ]);
   }

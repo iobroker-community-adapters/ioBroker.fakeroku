@@ -777,13 +777,6 @@ describe("Fakeroku onReady — names and descriptions", () => {
       common: { name: { en: "connectionStatus" }, desc: { en: "connectionStatusDesc" }, role: "indicator.connected" },
     });
   });
-
-  it("repairs an info channel that a device row had turned into a device object", async () => {
-    const ctx = setup();
-    ctx.i.objects.set("info", { type: "device", common: { name: "info" }, native: {} });
-    await ctx.i.onReady();
-    expect(ctx.i.objects.get("info")?.type).toBe("channel");
-  });
 });
 
 describe("Fakeroku onReady — reserved object ids", () => {
