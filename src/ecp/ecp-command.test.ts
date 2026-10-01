@@ -4,8 +4,9 @@ describe("parseEcpCommand", () => {
   it("parses a keypress", () => {
     expect(parseEcpCommand("POST", "/keypress/Home")).toEqual({ type: "keypress", key: "Home" });
   });
-  it("normalizes a Lit_ key (URL-decode + every dot)", () => {
+  it("normalizes a Lit_ key (URL-decoded, a dot kept as typed)", () => {
     expect(parseEcpCommand("POST", "/keypress/Lit_%C3%A4")).toEqual({ type: "keypress", key: "Lit_ä" });
+    expect(parseEcpCommand("POST", "/keypress/Lit_.")).toEqual({ type: "keypress", key: "Lit_." });
   });
   it("keeps a malformed percent-escape raw instead of throwing", () => {
     // decodeURIComponent throws on "%ZZ"; inside the request handler that is an

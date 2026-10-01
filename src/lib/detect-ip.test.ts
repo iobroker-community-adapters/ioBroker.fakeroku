@@ -146,6 +146,11 @@ describe("inNet", () => {
     expect(inNet("2003:e1:1f28:9a01::42", { ...v6net, prefixLength: 56 })).toBe(true);
   });
 
+  it("a network in a form the subnet check refuses holds no address", () => {
+    expect(inNet("192.168.1.5", { ...lan, prefixLength: 33 })).toBe(false);
+    expect(inNet("192.168.1.5", { ...lan, address: "not-an-address" })).toBe(false);
+  });
+
   it("a /32 and a /128 network hold the own address only", () => {
     expect(inNet("192.168.1.5", { ...lan, prefixLength: 32 })).toBe(true);
     expect(inNet("192.168.1.6", { ...lan, prefixLength: 32 })).toBe(false);

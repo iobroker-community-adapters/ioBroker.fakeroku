@@ -34,3 +34,6 @@ export function instanceObjectId(namespace: string): string {
 
 /** The adapter's own objects below `info` — never device leftovers, never swept. */
 export const OWN_INFO_IDS: ReadonlySet<string> = new Set(["info", "info.connection"]);
+
+/** The eleven languages every ioBroker manifest and admin translation carries. */
+export const LANGUAGES = ["en", "de", "ru", "pt", "nl", "fr", "it", "es", "pl", "uk", "zh-cn"] as const;

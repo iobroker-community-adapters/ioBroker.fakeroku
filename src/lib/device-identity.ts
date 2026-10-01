@@ -5,7 +5,7 @@ import { createHash, randomBytes } from "node:crypto";
  *
  * Deterministic md5 of the name, so the emulated Roku keeps the same USN/serial
  * across restarts — unlike the old adapter, whose UUID changed between the first
- * two runs (bug A1) and re-paired the Harmony.
+ * two runs and re-paired the Harmony.
  *
  * Used only for a device that has no persisted `uuid`: the device manager stores
  * one when it CREATES a device (since 0.8.0), and main.ts adopts whatever is

@@ -190,6 +190,9 @@ if (dir) {
         left.push(`${h.constructor.name} from ${h[OWNER]}`);
       }
     }
-    fs.writeFileSync(path.join(dir, `${process.pid}.json`), JSON.stringify({ left, quiet, single: Object.fromEntries(singleReads) }));
+    fs.writeFileSync(
+      path.join(dir, `${process.pid}.json`),
+      JSON.stringify({ left, quiet, single: Object.fromEntries(singleReads) }),
+    );
   });
 }

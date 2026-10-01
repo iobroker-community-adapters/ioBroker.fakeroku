@@ -104,6 +104,14 @@ becomes `true` — or watch `.command` for the last button as text.
 	### **WORK IN PROGRESS**
 -->
 
+### **WORK IN PROGRESS**
+
+- (krobipd) Changed: a new instance starts switched off — check the settings, then switch it on.
+- (krobipd) Fixed: the README and the user documentation name admin 8.0.14, the version the adapter actually requires.
+- (krobipd) Fixed: the device manager answers right after a restart instead of failing until the translations are loaded.
+- (krobipd) Improved: a start writes only datapoints that changed and reads the key states in one request — no needless updates for history adapters.
+- (krobipd) Improved: the README links the detailed user documentation in English and German.
+
 ### 1.8.1 (2026-09-27)
 
 - (krobipd) Improved: the note the Admin shows before an update from 0.x is short now: the apps folder is removed, app launches arrive as launch:<id> in command.

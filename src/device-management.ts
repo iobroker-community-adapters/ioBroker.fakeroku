@@ -250,8 +250,7 @@ export class FakerokuDeviceManagement extends DeviceManagement {
    * the runtime gives when two names map to one object id.
    *
    * The name needs no fallback: a row without a usable one never becomes a DeviceRow
-   * (lib/device-config.ts drops it), so `Roku <n>` was a branch nothing could reach —
-   * the mutation run of 1.6.0 found it by having no test that could fail on its removal.
+   * (lib/device-config.ts drops it).
    *
    * @param device the stored device
    * @returns the card descriptor

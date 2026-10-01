@@ -352,12 +352,17 @@ export class RokuSsdpResponder {
     }
   }
 
-  /** The sockets and addresses an announcement goes out through: one per interface, or the receiver. */
-  private announcers(): { socket: dgram.Socket; address: string }[] {
+  /**
+   * The sockets and addresses an announcement goes out through: one per interface, or the receiver.
+   *
+   * @param receiver the bound receiving socket
+   * @returns the senders with their addresses
+   */
+  private announcers(receiver: dgram.Socket): { socket: dgram.Socket; address: string }[] {
     if (this.senders.size > 0) {
       return [...this.senders.values()].map(s => ({ socket: s.socket, address: s.address }));
     }
-    return this.socket ? [{ socket: this.socket, address: this.advertiseIp }] : [];
+    return [{ socket: receiver, address: this.advertiseIp }];
   }
 
   /** Send one proactive ssdp:alive burst for every device. The adapter calls this on a managed interval. */
@@ -365,7 +370,7 @@ export class RokuSsdpResponder {
     if (!this.socket) {
       return;
     }
-    for (const { socket, address } of this.announcers()) {
+    for (const { socket, address } of this.announcers(this.socket)) {
       for (const device of this.devices) {
         try {
           socket.send(Buffer.from(buildAliveNotify(device, address)), SSDP_PORT, MULTICAST_ADDR, err => {
@@ -391,7 +396,7 @@ export class RokuSsdpResponder {
    * @returns a promise that always resolves
    */
   public byebye(): Promise<void> {
-    const outs = this.socket ? this.announcers() : [];
+    const outs = this.socket ? this.announcers(this.socket) : [];
     if (outs.length === 0 || this.devices.length === 0) {
       return Promise.resolve();
     }

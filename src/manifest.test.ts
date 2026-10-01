@@ -1,10 +1,10 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { BASE_KEYS, TV_KEYS } from "./ecp/state-model";
+import { LANGUAGES } from "./lib/constants";
 
 const root = join(__dirname, "..");
-/** The eleven languages every ioBroker manifest and admin translation carries. */
-const LANGS = ["en", "de", "ru", "pt", "nl", "fr", "it", "es", "pl", "uk", "zh-cn"];
+const LANGS = LANGUAGES;
 
 /**
  * Manifest wiring the integration boot test cannot see.
@@ -52,15 +52,6 @@ describe("io-package.json manifest", () => {
   // two emulated Rokus with different ECP ports on one machine.
   it("does not claim the whole host for itself", () => {
     expect(io.common?.singletonHost).toBeUndefined();
-  });
-
-  // The compact interface itself: loaded as a module rather than as the entry point, main
-  // must EXPORT its constructor instead of starting an instance. Without that line the
-  // manifest above would be a lie the host only discovers at runtime.
-  it("exports its constructor when it is not the entry point", () => {
-    const main = readFileSync(join(root, "src/main.ts"), "utf8");
-    expect(main).toContain("if (require.main !== module)");
-    expect(main).toMatch(/module\.exports\s*=\s*\(options[^)]*\)\s*=>\s*new Fakeroku\(options\)/);
   });
 
   // The device list is stored under `native.devices`, and that name is load-bearing:

@@ -21,7 +21,7 @@ async function freePort(): Promise<number> {
 let PORT = 0;
 const debugLogs: string[] = [];
 const warnLogs: string[] = [];
-const noopLog = {
+const recordingLogger = {
   debug: (m: string): void => {
     debugLogs.push(m);
   },
@@ -43,7 +43,7 @@ function serverConfig(overrides: Partial<EcpServerConfig>): EcpServerConfig {
     friendlyName: "Test Roku",
     deviceType: "player",
     bindIp: "127.0.0.1",
-    logger: noopLog,
+    logger: recordingLogger,
     onCommand: () => true,
     onFatalError: () => {},
     isClientAllowed: a => isLanClient(a),
@@ -54,9 +54,10 @@ function serverConfig(overrides: Partial<EcpServerConfig>): EcpServerConfig {
 function request(
   method: string,
   path: string,
+  port: number = PORT,
 ): Promise<{ status: number; body: string; headers: http.IncomingHttpHeaders }> {
   return new Promise((resolve, reject) => {
-    const req = http.request({ host: "127.0.0.1", port: PORT, method, path }, res => {
+    const req = http.request({ host: "127.0.0.1", port, method, path }, res => {
       let body = "";
       res.on("data", c => (body += c));
       res.on("end", () => resolve({ status: res.statusCode ?? 0, body, headers: res.headers }));
@@ -64,6 +65,46 @@ function request(
     req.on("error", reject);
     req.end();
   });
+}
+
+/** The request fields the handler reads — a socket from a public address cannot be produced in-process. */
+interface FakeRequest {
+  socket: { remoteAddress?: string };
+  method?: string;
+  url?: string;
+}
+
+/**
+ * Drive the server's request handler directly and record what it answered.
+ *
+ * @param target the server
+ * @param req the request fields
+ * @returns status, headers and body of the answer
+ */
+function callHandle(
+  target: EcpHttpServer,
+  req: FakeRequest,
+): { status: number; headers: Record<string, string>; body: string } {
+  const out = { status: 0, headers: {} as Record<string, string>, body: "" };
+  const res = {
+    set statusCode(v: number) {
+      out.status = v;
+    },
+    get statusCode(): number {
+      return out.status;
+    },
+    setHeader: (k: string, v: string): void => {
+      out.headers[k] = v;
+    },
+    end: (b?: string | Buffer): void => {
+      out.body = b === undefined ? "" : String(b);
+    },
+  } as unknown as http.ServerResponse;
+  (target as unknown as { handle(q: http.IncomingMessage, s: http.ServerResponse): void }).handle(
+    req as unknown as http.IncomingMessage,
+    res,
+  );
+  return out;
 }
 
 describe("EcpHttpServer", () => {
@@ -75,10 +116,11 @@ describe("EcpHttpServer", () => {
    * @param c Command event received from the HTTP layer
    * @returns whether the adapter applied the command
    */
-  let onCommandImpl: (c: CommandEvent) => boolean = c => {
+  const defaultOnCommand = (c: CommandEvent): boolean => {
     commands.push(c);
     return true;
   };
+  let onCommandImpl: (c: CommandEvent) => boolean = defaultOnCommand;
   let server: EcpHttpServer;
 
   beforeAll(async () => {
@@ -89,13 +131,22 @@ describe("EcpHttpServer", () => {
         friendlyName: "Test Roku",
         deviceType: "player",
         bindIp: "127.0.0.1",
-        logger: noopLog,
+        logger: recordingLogger,
         onCommand: c => onCommandImpl(c),
       }),
     );
     await server.start();
   });
   afterAll(() => server.stop());
+  // Every test starts from the same state — the shared server's log throttle included, so no
+  // test depends on another one having used up (or not) the current minute.
+  beforeEach(() => {
+    commands.length = 0;
+    debugLogs.length = 0;
+    warnLogs.length = 0;
+    onCommandImpl = defaultOnCommand;
+    (server as unknown as { logThrottle: LogThrottle }).logThrottle = new LogThrottle(60_000);
+  });
 
   it("serves device-info with a current version, as XML", async () => {
     const r = await request("GET", "/query/device-info");
@@ -194,13 +245,11 @@ describe("EcpHttpServer", () => {
     }
   });
   it("routes a keypress to onCommand and answers 200", async () => {
-    commands.length = 0;
     const r = await request("POST", "/keypress/Home");
     expect(r.status).toBe(200);
     expect(commands).toEqual([{ type: "keypress", key: "Home" }]);
   });
   it("answers a malformed keyboard keypress instead of crashing on it", async () => {
-    commands.length = 0;
     const r = await request("POST", "/keypress/Lit_%ZZ");
     expect(r.status).toBe(200);
     expect(commands).toEqual([{ type: "keypress", key: "Lit_%ZZ" }]);
@@ -210,7 +259,6 @@ describe("EcpHttpServer", () => {
     expect(r.status).toBe(404);
   });
   it("logs the received command with the client IP at debug (so a support report has a trace)", async () => {
-    debugLogs.length = 0;
     await request("POST", "/keypress/Home");
     expect(debugLogs.some(m => /ECP keypress Home from 127\.0\.0\.1/.test(m))).toBe(true);
   });
@@ -218,34 +266,17 @@ describe("EcpHttpServer", () => {
     // A real socket from a public address cannot be produced in-process, so the
     // handler is driven directly. This is the guard that keeps a port-forwarded
     // or VLAN-crossing request from pressing keys in someone's living room.
-    commands.length = 0;
-    debugLogs.length = 0;
-    const headers: Record<string, string> = {};
-    const res = {
-      statusCode: 0,
-      setHeader: (k: string, v: string): void => {
-        headers[k] = v;
-      },
-      end: (): void => {},
-    } as unknown as http.ServerResponse;
-    const req = {
-      socket: { remoteAddress: "8.8.8.8" },
-      method: "POST",
-      url: "/keypress/Home",
-    } as unknown as http.IncomingMessage;
+    const res = callHandle(server, { socket: { remoteAddress: "8.8.8.8" }, method: "POST", url: "/keypress/Home" });
 
-    (server as unknown as { handle(q: http.IncomingMessage, s: http.ServerResponse): void }).handle(req, res);
-
-    expect(res.statusCode).toBe(403);
+    expect(res.status).toBe(403);
     expect(commands).toEqual([]);
     expect(debugLogs.some(m => m.includes("from 8.8.8.8 rejected (403)"))).toBe(true);
     // Kept alive, an outside client could hold one of the 32 connection slots for as long as it
     // keeps asking — and a remote that belongs here would be dropped at the limit.
-    expect(headers.Connection).toBe("close");
+    expect(res.headers.Connection).toBe("close");
   });
 
   it("logs a device-info pairing probe at debug", async () => {
-    debugLogs.length = 0;
     await request("GET", "/query/device-info");
     expect(debugLogs.some(m => /device-info queried from 127\.0\.0\.1/.test(m))).toBe(true);
   });
@@ -253,20 +284,10 @@ describe("EcpHttpServer", () => {
   it("handles a request without a method, url or peer address", () => {
     // http.IncomingMessage types all three as optional, and a malformed request
     // line reaches the handler with them missing. A crash here kills the adapter.
-    debugLogs.length = 0;
-    const res = { statusCode: 0, setHeader: (): void => {}, end: (): void => {} } as unknown as http.ServerResponse;
-    const req = { socket: {} } as unknown as http.IncomingMessage;
-    const h = server as unknown as {
-      handle(q: http.IncomingMessage, s: http.ServerResponse): void;
-      logThrottle: LogThrottle;
-    };
-    // The rejection line is throttled to one per minute, and an earlier test in this
-    // file already used up this minute — reset it so this test measures its own case.
-    h.logThrottle = new LogThrottle(60_000);
-    expect(() => h.handle(req, res)).not.toThrow();
+    const res = callHandle(server, { socket: {} });
     // No remote address at all is not a LAN client — a missing peer must not be
     // treated as trusted.
-    expect(res.statusCode).toBe(403);
+    expect(res.status).toBe(403);
     expect(debugLogs.some(m => m.includes("from ? rejected"))).toBe(true);
   });
 
@@ -274,28 +295,11 @@ describe("EcpHttpServer", () => {
     // A port scanner sends thousands of requests. One log line each would be the
     // very flood the rate gate exists to prevent — only on the log instead of the
     // states database. Every request is still answered with 403.
-    const h = server as unknown as {
-      handle(q: http.IncomingMessage, s: http.ServerResponse): void;
-      logThrottle: LogThrottle;
-    };
-    h.logThrottle = new LogThrottle(60_000);
-    debugLogs.length = 0;
     const statuses: number[] = [];
     for (let i = 0; i < 20; i++) {
-      const res = {
-        statusCode: 0,
-        setHeader: (): void => {},
-        end: (): void => {},
-      } as unknown as http.ServerResponse;
-      h.handle(
-        {
-          socket: { remoteAddress: "8.8.8.8" },
-          method: "POST",
-          url: "/keypress/Home",
-        } as unknown as http.IncomingMessage,
-        res,
+      statuses.push(
+        callHandle(server, { socket: { remoteAddress: "8.8.8.8" }, method: "POST", url: "/keypress/Home" }).status,
       );
-      statuses.push(res.statusCode);
     }
     expect(statuses.every(s => s === 403)).toBe(true);
     expect(debugLogs.filter(m => m.includes("rejected (403)")).length).toBe(1);
@@ -304,23 +308,12 @@ describe("EcpHttpServer", () => {
   it("treats a request without a method or url as a GET of the root description", () => {
     // Both are optional in http.IncomingMessage. A missing method would otherwise
     // fall through to 405 and a missing url would throw on url.split().
-    let body = "";
-    const res = {
-      statusCode: 0,
-      setHeader: (): void => {},
-      end: (b?: string): void => {
-        body = b ?? "";
-      },
-    } as unknown as http.ServerResponse;
-    const req = { socket: { remoteAddress: "127.0.0.1" } } as unknown as http.IncomingMessage;
-    const h = server as unknown as { handle(q: http.IncomingMessage, s: http.ServerResponse): void };
-    expect(() => h.handle(req, res)).not.toThrow();
-    expect(res.statusCode).toBe(200);
-    expect(body).toContain("urn:roku-com:device:player:1-0");
+    const res = callHandle(server, { socket: { remoteAddress: "127.0.0.1" } });
+    expect(res.status).toBe(200);
+    expect(res.body).toContain("urn:roku-com:device:player:1-0");
   });
 
   it("logs the command's argument, whichever field carries it", async () => {
-    debugLogs.length = 0;
     await request("POST", "/launch/12");
     await request("POST", "/search?keyword=news");
     // "I pressed a button and nothing happened" is only diagnosable if the log
@@ -330,7 +323,6 @@ describe("EcpHttpServer", () => {
   });
 
   it("keeps a decoded control character out of the log line", async () => {
-    debugLogs.length = 0;
     await request("POST", "/keypress/Lit_%0Ainjected");
     // A newline in the key would end the log entry early and start a fake second one.
     const line = debugLogs.find(m => m.startsWith("ECP keypress"));
@@ -340,7 +332,6 @@ describe("EcpHttpServer", () => {
   });
 
   it("logs a command that carries no argument without a trailing space", async () => {
-    debugLogs.length = 0;
     await request("POST", "/search");
     expect(debugLogs.some(m => /^ECP search from /.test(m))).toBe(true);
   });
@@ -357,7 +348,7 @@ describe("EcpHttpServer", () => {
         friendlyName: "Wohnzimmer",
         deviceType: "player",
         bindIp: "127.0.0.1",
-        logger: noopLog,
+        logger: recordingLogger,
         onCommand: () => true,
         onFatalError: e => fatals.push(e),
       }),
@@ -381,7 +372,7 @@ describe("EcpHttpServer", () => {
         friendlyName: "never started",
         deviceType: "player",
         bindIp: undefined,
-        logger: noopLog,
+        logger: recordingLogger,
         onCommand: () => true,
       }),
     );
@@ -401,7 +392,7 @@ describe("EcpHttpServer", () => {
         friendlyName: "busy",
         deviceType: "player",
         bindIp: "127.0.0.1",
-        logger: noopLog,
+        logger: recordingLogger,
         onCommand: () => true,
       }),
     );
@@ -425,18 +416,20 @@ describe("EcpHttpServer", () => {
         friendlyName: "held",
         deviceType: "player",
         bindIp: "127.0.0.1",
-        logger: noopLog,
+        logger: recordingLogger,
         onCommand: () => true,
       }),
     );
     await held.start();
+    const inner = (held as unknown as { server: http.Server }).server;
+    const accepted = new Promise(resolve => inner.once("connection", resolve));
     const socket = net.connect(heldPort, "127.0.0.1");
     await new Promise<void>((resolve, reject) => {
       socket.once("connect", resolve);
       socket.once("error", reject);
     });
     socket.write("POST /keypress/Home HTTP/1.1\r\nHost: 127.0.0.1\r\n"); // no blank line: never completes
-    await new Promise(resolve => setTimeout(resolve, 50));
+    await accepted;
     const closed = new Promise<string>(resolve => socket.once("close", () => resolve("closed")));
     held.stop();
     const outcome = await Promise.race([
@@ -480,7 +473,6 @@ describe("EcpHttpServer", () => {
   });
 
   it("answers an unsupported method with 405, not a fake success", async () => {
-    commands.length = 0;
     for (const method of ["PUT", "DELETE"]) {
       const r = await request(method, "/keypress/Home");
       // A 200 tells the controller the key arrived — it never did. The user then
@@ -494,25 +486,16 @@ describe("EcpHttpServer", () => {
     // The rate gate lives in the adapter (onCommand returns false when it drops a
     // command). Logging before asking it would leave the log open to exactly the
     // flood the gate stops: 1000 lines a second while 25 commands reach the database.
-    debugLogs.length = 0;
     onCommandImpl = () => false;
-    try {
-      const r = await request("POST", "/keypress/Home");
-      expect(r.status).toBe(200);
-      expect(debugLogs.some(m => m.startsWith("ECP keypress"))).toBe(false);
-    } finally {
-      onCommandImpl = c => {
-        commands.push(c);
-        return true;
-      };
-    }
+    const r = await request("POST", "/keypress/Home");
+    expect(r.status).toBe(200);
+    expect(debugLogs.some(m => m.startsWith("ECP keypress"))).toBe(false);
   });
 
   it("caps the logged command text like the state value beside it", async () => {
     // The text comes from the request URL, which a client controls up to Node's
     // 16 KiB header limit. The `command` state is capped at 500 characters — the log
     // line must not be the way around that cap.
-    debugLogs.length = 0;
     const long = "x".repeat(400);
     const r = await request("POST", `/search?${long}`);
     expect(r.status).toBe(200);
@@ -522,23 +505,15 @@ describe("EcpHttpServer", () => {
   });
 
   it("survives a throwing command handler and still answers the remote", async () => {
-    warnLogs.length = 0;
     onCommandImpl = () => {
       throw new Error("state write failed");
     };
-    try {
-      const r = await request("POST", "/keypress/Home");
-      // The handler runs inside the HTTP callback: an escaping throw would take the
-      // whole adapter process down over one failed state write, and the controller
-      // would sit on a dead socket.
-      expect(r.status).toBe(200);
-      expect(warnLogs.some(m => m.includes("onCommand failed: state write failed"))).toBe(true);
-    } finally {
-      onCommandImpl = c => {
-        commands.push(c);
-        return true;
-      };
-    }
+    const r = await request("POST", "/keypress/Home");
+    // The handler runs inside the HTTP callback: an escaping throw would take the
+    // whole adapter process down over one failed state write, and the controller
+    // would sit on a dead socket.
+    expect(r.status).toBe(200);
+    expect(warnLogs.some(m => m.includes("onCommand failed: state write failed"))).toBe(true);
   });
 });
 
@@ -553,7 +528,7 @@ describe("EcpHttpServer — a Roku TV", () => {
         friendlyName: "TV",
         deviceType: "tv",
         bindIp: "127.0.0.1",
-        logger: noopLog,
+        logger: recordingLogger,
         onCommand: () => true,
       }),
     );
@@ -562,15 +537,7 @@ describe("EcpHttpServer — a Roku TV", () => {
   afterAll(() => server.stop());
 
   it("answers the channel list rokuecp asks a device with is-tv for — empty, no tuner", async () => {
-    const r = await new Promise<{ status: number; body: string }>((resolve, reject) => {
-      const req = http.request({ host: "127.0.0.1", port, method: "GET", path: "/query/tv-channels" }, res => {
-        let body = "";
-        res.on("data", c => (body += c));
-        res.on("end", () => resolve({ status: res.statusCode ?? 0, body }));
-      });
-      req.on("error", reject);
-      req.end();
-    });
+    const r = await request("GET", "/query/tv-channels", port);
     expect(r.status).toBe(200);
     expect(r.body).toBe("<tv-channels/>");
   });
@@ -586,7 +553,7 @@ describe("EcpHttpServer — the trust boundary is the caller's", () => {
         friendlyName: "X",
         deviceType: "player",
         bindIp: "127.0.0.1",
-        logger: noopLog,
+        logger: recordingLogger,
         onCommand: () => true,
         isClientAllowed: a => {
           seen.push(a);
@@ -594,13 +561,9 @@ describe("EcpHttpServer — the trust boundary is the caller's", () => {
         },
       }),
     );
-    const res = { statusCode: 0, setHeader: (): void => {}, end: (): void => {} } as unknown as http.ServerResponse;
-    (server as unknown as { handle(q: http.IncomingMessage, s: http.ServerResponse): void }).handle(
-      { socket: { remoteAddress: "127.0.0.1" }, method: "GET", url: "/" } as unknown as http.IncomingMessage,
-      res,
-    );
+    const res = callHandle(server, { socket: { remoteAddress: "127.0.0.1" }, method: "GET", url: "/" });
     expect(seen).toEqual(["127.0.0.1"]);
-    expect(res.statusCode).toBe(403);
+    expect(res.status).toBe(403);
   });
 
   it("logs a connection dropped at the connection limit, at most once a minute", async () => {
@@ -612,7 +575,7 @@ describe("EcpHttpServer — the trust boundary is the caller's", () => {
         friendlyName: "Y",
         deviceType: "player",
         bindIp: "127.0.0.1",
-        logger: noopLog,
+        logger: recordingLogger,
         onCommand: () => true,
       }),
     );

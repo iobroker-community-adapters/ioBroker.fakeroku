@@ -8,13 +8,11 @@ import { sanitizeId } from "./pure-helpers";
  * Reading `native.devices` — the ONE place that turns a stored config row into the values
  * the adapter works with. The runtime (main.ts) and the device manager both go through it.
  *
- * Why it has to be one place: they used to normalise separately, and the one rule they did
- * not share was the trim. The manager resolved a row's SSDP identity from the trimmed name
- * while the runtime advertised the identity of the untrimmed one, so saving a card — even
- * without changing anything — could hand the remote a different device than the one it was
- * paired with. That is bug A1 of the old adapter, in the one corner 1.4.0 left open.
+ * Why it has to be one place: two normalisers drift apart — a manager resolving a row's SSDP
+ * identity from the trimmed name while the runtime advertises the untrimmed one hands the
+ * remote a different device after a save that changed nothing.
  *
- * The rule that follows from it: what the user SEES and what gets persisted is the trimmed
+ * The rule: what the user SEES and what gets persisted is the trimmed
  * name, but everything that identifies the device — its object id and its SSDP identity —
  * is derived from the name exactly as stored. Both live in {@link DeviceRow}, so a caller
  * cannot silently pick the wrong one.

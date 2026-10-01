@@ -6,9 +6,10 @@ vi.mock("@iobroker/adapter-core", async () => ({ I18n: await import("@iobroker/a
 
 import { I18n } from "@iobroker/adapter-core";
 import { join } from "node:path";
+import { LANGUAGES } from "./constants";
 import { t, tDesc, tName, tRaw } from "./i18n";
 
-const LANGS = ["en", "de", "ru", "pt", "nl", "fr", "it", "es", "pl", "uk", "zh-cn"];
+const LANGS = LANGUAGES;
 
 describe("t() — device-manager texts from the real translation files", () => {
   beforeAll(async () => {

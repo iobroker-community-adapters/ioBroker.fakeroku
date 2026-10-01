@@ -205,8 +205,8 @@ export function stripMappedPrefix(address: string): string {
  * @returns the host's address in the remote's network, or undefined if it shares none
  */
 export function localAddressFor(remote: string, nets: readonly LocalNet[]): string | undefined {
-  const ip = stripMappedPrefix(remote);
-  return nets.find(net => net.family === "IPv4" && inNet(ip, net))?.address;
+  // An IPv4-mapped remote (`::ffff:192.168.1.5`) lies in the IPv4 network it carries — inNet answers that itself.
+  return nets.find(net => net.family === "IPv4" && inNet(remote, net))?.address;
 }
 
 /**

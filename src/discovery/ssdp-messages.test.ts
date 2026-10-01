@@ -6,16 +6,21 @@ import {
   ROKU_DEVICE_TYPE,
   rokuSearchTarget,
 } from "./ssdp-messages";
+import { MSEARCH } from "../../test/helpers/ssdp-fixtures";
 
-const MSEARCH = [
-  "M-SEARCH * HTTP/1.1",
-  "Host: 239.255.255.250:1900",
-  'MAN: "ssdp:discover"',
-  "ST: roku:ecp",
-  "MX: 3",
-  "",
-  "",
-].join("\r\n");
+describe("answersSearch + the ST of the answer", () => {
+  it("answers a targeted uuid search only for the device it names", () => {
+    const device = { uuid: "abc123", port: 8060 };
+    expect(answersSearch(device, "uuid:roku:ecp:abc123")).toBe(true);
+    expect(answersSearch(device, "uuid:roku:ecp:other")).toBe(false);
+    expect(answersSearch(device, "roku:ecp")).toBe(true);
+  });
+  it("mirrors the searched target and answers the wildcard as the Roku service", () => {
+    const device = { uuid: "abc123", port: 8060 };
+    expect(buildSearchResponse(device, "192.168.1.5", ROKU_DEVICE_TYPE)).toContain(`ST: ${ROKU_DEVICE_TYPE}`);
+    expect(buildSearchResponse(device, "192.168.1.5", "ssdp:all")).toContain("ST: roku:ecp");
+  });
+});
 
 describe("rokuSearchTarget", () => {
   it("accepts an M-SEARCH for roku:ecp", () => {
@@ -31,14 +36,6 @@ describe("rokuSearchTarget", () => {
     expect(rokuSearchTarget(MSEARCH.replace("ST: roku:ecp", `ST: ${ROKU_DEVICE_TYPE}`))).toBe(ROKU_DEVICE_TYPE);
     expect(rokuSearchTarget(MSEARCH.replace("ST: roku:ecp", "ST: uuid:roku:ecp:abc123"))).toBe("uuid:roku:ecp:abc123");
     expect(rokuSearchTarget(MSEARCH.replace("ST: roku:ecp", "ST: uuid:roku:ecp:<x>"))).toBe(null);
-  });
-  it("answers a targeted uuid search only for the device it names", () => {
-    const device = { uuid: "abc123", port: 8060 };
-    expect(answersSearch(device, "uuid:roku:ecp:abc123")).toBe(true);
-    expect(answersSearch(device, "uuid:roku:ecp:other")).toBe(false);
-    expect(answersSearch(device, "roku:ecp")).toBe(true);
-    expect(buildSearchResponse(device, "192.168.1.5", ROKU_DEVICE_TYPE)).toContain(`ST: ${ROKU_DEVICE_TYPE}`);
-    expect(buildSearchResponse(device, "192.168.1.5", "ssdp:all")).toContain("ST: roku:ecp");
   });
   it("accepts upnp:rootdevice (the generic UPnP sweep a controller may start with)", () => {
     expect(rokuSearchTarget(MSEARCH.replace("ST: roku:ecp", "ST: upnp:rootdevice"))).toBe("upnp:rootdevice");

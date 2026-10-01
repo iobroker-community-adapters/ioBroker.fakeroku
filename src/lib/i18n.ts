@@ -1,10 +1,8 @@
 import { I18n } from "@iobroker/adapter-core";
 import type translations from "../../admin/i18n/en.json";
+import { LANGUAGES } from "./constants";
 
 type I18nKey = keyof typeof translations;
-
-/** The eleven languages every ioBroker manifest and admin translation carries. */
-const LANGUAGES = ["en", "de", "ru", "pt", "nl", "fr", "it", "es", "pl", "uk", "zh-cn"] as const;
 
 /**
  * Translation object for a user-facing string, with optional `%s` interpolation.

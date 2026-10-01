@@ -1,5 +1,6 @@
 import type { Mock } from "vitest";
-import { RokuSsdpResponder } from "./ssdp-responder";
+import { RokuSsdpResponder, type RokuSsdpResponderConfig } from "./ssdp-responder";
+import { MSEARCH } from "../../test/helpers/ssdp-fixtures";
 
 // dgram is mocked so the interface handling in start() (per-interface addMembership +
 // setMulticastInterface) and the runtime socket-death path are unit-testable without a
@@ -123,13 +124,13 @@ vi.mock("node:dgram", () => ({ createSocket: (options: unknown) => dgramMock.mak
 function recordingLog(): { debug: Mock; warn: Mock; error: Mock } {
   return { debug: vi.fn(), warn: vi.fn(), error: vi.fn() };
 }
-const noopLog = recordingLog();
+const sharedLog = recordingLog();
 // Every client counts as local unless a test says otherwise — which clients are local is
 // lan-guard's question (lan-guard.test.ts), not this file's.
 const baseCfg = {
   devices: [{ uuid: "abc123", port: 8060 }],
   advertiseIp: "10.0.0.9",
-  logger: noopLog,
+  logger: sharedLog,
   isClientAllowed: (): boolean => true,
   onFatalError: (): void => {},
 };
@@ -144,24 +145,26 @@ function m(address: string): { iface: string; address: string } {
   return { iface: `if-${address}`, address };
 }
 
-/** A minimal well-formed M-SEARCH a Roku must answer. */
-const MSEARCH = ["M-SEARCH * HTTP/1.1", "HOST: 239.255.255.250:1900", 'MAN: "ssdp:discover"', "ST: roku:ecp", ""].join(
-  "\r\n",
-);
+/**
+ * A responder on the base configuration — "all interfaces", no interface known — with what a test is about on top.
+ *
+ * @param overrides the fields this test sets
+ * @returns the responder
+ */
+function responder(overrides: Partial<RokuSsdpResponderConfig> = {}): RokuSsdpResponder {
+  return new RokuSsdpResponder({ ...baseCfg, bindIp: undefined, membershipInterfaces: [], ...overrides });
+}
+
+// Every test starts on fresh sockets with no injected failure.
+beforeEach(() => {
+  dgramMock.sockets.length = 0;
+  Object.keys(dgramMock.fail).forEach(k => ((dgramMock.fail as Record<string, boolean>)[k] = false));
+  vi.clearAllMocks();
+});
 
 describe("RokuSsdpResponder", () => {
-  beforeEach(() => {
-    dgramMock.sockets.length = 0;
-    Object.keys(dgramMock.fail).forEach(k => ((dgramMock.fail as Record<string, boolean>)[k] = false));
-    vi.clearAllMocks();
-  });
-
   it("auto mode joins the group on every provided interface and does not pin egress", async () => {
-    const r = new RokuSsdpResponder({
-      ...baseCfg,
-      bindIp: undefined,
-      membershipInterfaces: [m("10.0.0.9"), m("192.168.1.5")],
-    });
+    const r = responder({ membershipInterfaces: [m("10.0.0.9"), m("192.168.1.5")] });
     await r.start();
     const s = dgramMock.sockets[0];
     expect(s.membership).toEqual(["10.0.0.9", "192.168.1.5"]);
@@ -174,7 +177,7 @@ describe("RokuSsdpResponder", () => {
   });
 
   it("a chosen interface joins on that one and pins the multicast egress to it", async () => {
-    const r = new RokuSsdpResponder({ ...baseCfg, bindIp: "10.0.0.9", membershipInterfaces: [m("10.0.0.9")] });
+    const r = responder({ bindIp: "10.0.0.9", membershipInterfaces: [m("10.0.0.9")] });
     await r.start();
     const s = dgramMock.sockets[0];
     expect(s.membership).toEqual(["10.0.0.9"]);
@@ -184,7 +187,7 @@ describe("RokuSsdpResponder", () => {
   it("binds port 1900 shareable, so another SSDP service on the host can coexist", async () => {
     // hueemu (and any UPnP stack) sits on the same port; without reuseAddr the second
     // one to start fails its bind and one of the two emulators is undiscoverable.
-    const r = new RokuSsdpResponder({ ...baseCfg, bindIp: undefined, membershipInterfaces: [] });
+    const r = responder();
     await r.start();
     expect(dgramMock.sockets[0].options).toEqual({ type: "udp4", reuseAddr: true });
     // And it binds the standard port on ALL interfaces. Binding a concrete address here
@@ -194,7 +197,7 @@ describe("RokuSsdpResponder", () => {
   });
 
   it("with no interface known joins on the OS default", async () => {
-    const r = new RokuSsdpResponder({ ...baseCfg, bindIp: undefined, membershipInterfaces: [] });
+    const r = responder();
     await r.start();
     expect(dgramMock.sockets[0].membership).toEqual([undefined]);
   });
@@ -203,7 +206,7 @@ describe("RokuSsdpResponder", () => {
     // A membership was taken on the OLD interface address — the socket stops hearing
     // M-SEARCH on the new one until it joins again. Re-joining one it already has throws
     // EADDRINUSE, which tryJoin turns into a warning, so only genuinely new ones are joined.
-    const r = new RokuSsdpResponder({ ...baseCfg, bindIp: undefined, membershipInterfaces: [m("10.0.0.9")] });
+    const r = responder({ membershipInterfaces: [m("10.0.0.9")] });
     await r.start();
     const s = dgramMock.sockets[0];
     expect(s.membership).toEqual(["10.0.0.9"]);
@@ -224,7 +227,7 @@ describe("RokuSsdpResponder", () => {
   it("refreshAdvertise with the same address and interfaces changes nothing and joins nothing", async () => {
     // It runs every five minutes for the lifetime of the instance: a re-join per pass
     // would put an EADDRINUSE warning in the log forever.
-    const r = new RokuSsdpResponder({ ...baseCfg, bindIp: undefined, membershipInterfaces: [m("10.0.0.9")] });
+    const r = responder({ membershipInterfaces: [m("10.0.0.9")] });
     await r.start();
     const s = dgramMock.sockets[0];
 
@@ -233,10 +236,29 @@ describe("RokuSsdpResponder", () => {
     expect(s.membership).toEqual(["10.0.0.9"]);
   });
 
+  it("refreshAdvertise with no interface known joins nothing again — the OS default is in the group already", async () => {
+    // A host whose interfaces vanished for a pass (a cable pulled): re-joining the default group on
+    // every pass would throw EADDRINUSE into the log every five minutes.
+    const r = responder();
+    await r.start();
+    const s = dgramMock.sockets[0];
+    const before = [...s.joinedGroups];
+
+    r.refreshAdvertise(baseCfg.advertiseIp, []);
+
+    expect(s.joinedGroups).toEqual(before);
+  });
+
+  it("refreshAdvertise before the start only remembers the address — no socket, nothing to join", () => {
+    const r = responder({ membershipInterfaces: [m("10.0.0.9")] });
+    expect(r.refreshAdvertise("10.0.0.77", [m("10.0.0.77")])).toBe(true);
+    expect(dgramMock.sockets).toHaveLength(0);
+  });
+
   it("refreshAdvertise joins an interface that came up later, even when the address stays", async () => {
     // A second card or a VLAN that appears after the start: the primary address does not move,
     // and it used to stay unjoined until someone restarted the instance.
-    const r = new RokuSsdpResponder({ ...baseCfg, bindIp: undefined, membershipInterfaces: [m("10.0.0.9")] });
+    const r = responder({ membershipInterfaces: [m("10.0.0.9")] });
     await r.start();
     const s = dgramMock.sockets[0];
 
@@ -248,11 +270,7 @@ describe("RokuSsdpResponder", () => {
   it("a DHCP change on an interface already in the group does not join it again", async () => {
     // A membership belongs to the interface; joining it again through its new address throws
     // EADDRINUSE on Linux — a warning on every pass.
-    const r = new RokuSsdpResponder({
-      ...baseCfg,
-      bindIp: undefined,
-      membershipInterfaces: [{ iface: "eth0", address: "10.0.0.9" }],
-    });
+    const r = responder({ membershipInterfaces: [{ iface: "eth0", address: "10.0.0.9" }] });
     await r.start();
     r.refreshAdvertise("10.0.0.77", [{ iface: "eth0", address: "10.0.0.77" }]);
     expect(dgramMock.sockets[0].membership).toEqual(["10.0.0.9"]);
@@ -263,12 +281,7 @@ describe("RokuSsdpResponder", () => {
     // uv__udp_recvmsg, Node dgram onMessage). Closing it would turn a passing hiccup into
     // discovery that stays off until a restart.
     const fatal = vi.fn();
-    const r = new RokuSsdpResponder({
-      ...baseCfg,
-      bindIp: undefined,
-      membershipInterfaces: [],
-      onFatalError: fatal,
-    });
+    const r = responder({ onFatalError: fatal });
     await r.start();
     const s = dgramMock.sockets[0];
     s.emit("error", new Error("ENOBUFS"));
@@ -276,17 +289,12 @@ describe("RokuSsdpResponder", () => {
     expect(fatal).not.toHaveBeenCalled();
     expect(s.closed).toBe(false);
     // Throttled: one line, not one per error.
-    expect(noopLog.warn.mock.calls.filter(c => String(c[0]).includes("SSDP socket error"))).toHaveLength(1);
+    expect(sharedLog.warn.mock.calls.filter(c => String(c[0]).includes("SSDP socket error"))).toHaveLength(1);
   });
 
   it("reports a socket that closed on its own exactly once — not one stop() closed", async () => {
     const fatal = vi.fn();
-    const r = new RokuSsdpResponder({
-      ...baseCfg,
-      bindIp: undefined,
-      membershipInterfaces: [],
-      onFatalError: fatal,
-    });
+    const r = responder({ onFatalError: fatal });
     await r.start();
     const s = dgramMock.sockets[0];
     s.emit("close");
@@ -294,7 +302,7 @@ describe("RokuSsdpResponder", () => {
     expect(fatal).toHaveBeenCalledTimes(1);
 
     const quiet = vi.fn();
-    const r2 = new RokuSsdpResponder({ ...baseCfg, bindIp: undefined, membershipInterfaces: [], onFatalError: quiet });
+    const r2 = responder({ onFatalError: quiet });
     await r2.start();
     r2.stop();
     dgramMock.sockets.at(-1)!.emit("close");
@@ -306,54 +314,51 @@ describe("RokuSsdpResponder", () => {
     // resolved instead, the adapter would announce into a dead socket and report
     // working discovery that never answers an M-SEARCH.
     dgramMock.fail.bind = true;
-    const r = new RokuSsdpResponder({ ...baseCfg, bindIp: undefined, membershipInterfaces: [] });
+    const r = responder();
     await expect(r.start()).rejects.toThrow("EADDRINUSE");
   });
 
   it("a failed group join warns but still starts", async () => {
     dgramMock.fail.join = true;
-    const r = new RokuSsdpResponder({ ...baseCfg, bindIp: undefined, membershipInterfaces: [m("10.0.0.9")] });
+    const r = responder({ membershipInterfaces: [m("10.0.0.9")] });
     // One interface out of the multicast routing table must not kill discovery on
     // the others — and a silent failure would leave "no device found" unexplainable.
     await expect(r.start()).resolves.toBeUndefined();
-    expect(noopLog.warn).toHaveBeenCalledWith(
+    expect(sharedLog.warn).toHaveBeenCalledWith(
       expect.stringContaining("multicast join failed on if-10.0.0.9 (10.0.0.9)"),
     );
   });
 
   it("names the default interface when the OS-default join fails", async () => {
     dgramMock.fail.join = true;
-    const r = new RokuSsdpResponder({ ...baseCfg, bindIp: undefined, membershipInterfaces: [] });
+    const r = responder();
     await r.start();
     // "join failed on undefined" tells the user nothing about which interface.
-    expect(noopLog.warn).toHaveBeenCalledWith(expect.stringContaining("join failed on default interface"));
+    expect(sharedLog.warn).toHaveBeenCalledWith(expect.stringContaining("join failed on default interface"));
   });
 
   it("reports a non-Error thrown by the OS binding", async () => {
     dgramMock.fail.throwString = true;
-    const r = new RokuSsdpResponder({ ...baseCfg, bindIp: undefined, membershipInterfaces: [m("10.0.0.9")] });
+    const r = responder({ membershipInterfaces: [m("10.0.0.9")] });
     await r.start();
     // node-gyp bindings can reject with a bare string; `e.message` would be
     // undefined and the warning would name no cause at all.
-    expect(noopLog.warn).toHaveBeenCalledWith(expect.stringContaining("EPERM-ish string"));
+    expect(sharedLog.warn).toHaveBeenCalledWith(expect.stringContaining("EPERM-ish string"));
   });
 
   it("a failed egress pin warns but still starts", async () => {
     dgramMock.fail.mcastIf = true;
-    const r = new RokuSsdpResponder({ ...baseCfg, bindIp: "10.0.0.9", membershipInterfaces: [m("10.0.0.9")] });
+    const r = responder({ bindIp: "10.0.0.9", membershipInterfaces: [m("10.0.0.9")] });
     await expect(r.start()).resolves.toBeUndefined();
-    expect(noopLog.warn).toHaveBeenCalledWith(expect.stringContaining("could not pin multicast egress"));
+    expect(sharedLog.warn).toHaveBeenCalledWith(expect.stringContaining("could not pin multicast egress"));
   });
 
   it("answers an M-SEARCH once per device, unicast back to the asking controller", async () => {
-    const r = new RokuSsdpResponder({
-      ...baseCfg,
+    const r = responder({
       devices: [
         { uuid: "aaa", port: 8060 },
         { uuid: "bbb", port: 8061 },
       ],
-      bindIp: undefined,
-      membershipInterfaces: [],
     });
     await r.start();
     const s = dgramMock.sockets[0];
@@ -368,28 +373,20 @@ describe("RokuSsdpResponder", () => {
   });
 
   it("ignores a search from outside the adapter's networks — no reflection towards a spoofed source", async () => {
-    const r = new RokuSsdpResponder({
-      ...baseCfg,
-      isClientAllowed: (a: string): boolean => a !== "8.8.8.8",
-      bindIp: undefined,
-      membershipInterfaces: [],
-    });
+    const r = responder({ isClientAllowed: (a: string): boolean => a !== "8.8.8.8" });
     await r.start();
     const s = dgramMock.sockets[0];
     s.emit("message", Buffer.from(MSEARCH), { address: "8.8.8.8", port: 1900 });
     // The socket listens on every interface; on a host with a public one an answer
     // would go to whatever address the datagram claims to come from.
     expect(s.sent).toEqual([]);
-    expect(noopLog.debug).toHaveBeenCalledWith(expect.stringContaining("8.8.8.8 ignored"));
+    expect(sharedLog.debug).toHaveBeenCalledWith(expect.stringContaining("8.8.8.8 ignored"));
   });
 
   it("answers each network with the host's address in THAT network", async () => {
     // Multi-homed "all interfaces": a remote in the IoT VLAN must get the host's IoT VLAN
     // address — the primary one may sit behind a firewall it cannot cross.
-    const r = new RokuSsdpResponder({
-      ...baseCfg,
-      bindIp: undefined,
-      membershipInterfaces: [],
+    const r = responder({
       advertiseFor: (remote: string) => (remote.startsWith("192.168.50.") ? "192.168.50.2" : undefined),
     });
     await r.start();
@@ -402,8 +399,7 @@ describe("RokuSsdpResponder", () => {
   });
 
   it("a chosen interface answers with its own address only", async () => {
-    const r = new RokuSsdpResponder({
-      ...baseCfg,
+    const r = responder({
       bindIp: "10.0.0.9",
       membershipInterfaces: [m("10.0.0.9")],
       advertiseFor: () => "192.168.50.2",
@@ -417,11 +413,7 @@ describe("RokuSsdpResponder", () => {
   });
 
   it("announces on every interface with that interface's address", async () => {
-    const r = new RokuSsdpResponder({
-      ...baseCfg,
-      bindIp: undefined,
-      membershipInterfaces: [m("10.0.0.9"), m("192.168.50.2")],
-    });
+    const r = responder({ membershipInterfaces: [m("10.0.0.9"), m("192.168.50.2")] });
     await r.start();
     r.announce();
     const [, first, second] = dgramMock.sockets;
@@ -437,11 +429,7 @@ describe("RokuSsdpResponder", () => {
   });
 
   it("drops the sender of an interface that went away", async () => {
-    const r = new RokuSsdpResponder({
-      ...baseCfg,
-      bindIp: undefined,
-      membershipInterfaces: [m("10.0.0.9"), m("192.168.50.2")],
-    });
+    const r = responder({ membershipInterfaces: [m("10.0.0.9"), m("192.168.50.2")] });
     await r.start();
     r.refreshAdvertise(baseCfg.advertiseIp, [m("10.0.0.9")]);
     expect(dgramMock.sockets[2].closed).toBe(true);
@@ -449,7 +437,7 @@ describe("RokuSsdpResponder", () => {
   });
 
   it("stays silent on traffic that is not a Roku search", async () => {
-    const r = new RokuSsdpResponder({ ...baseCfg, bindIp: undefined, membershipInterfaces: [] });
+    const r = responder();
     await r.start();
     const s = dgramMock.sockets[0];
     // Port 1900 carries every other device's SSDP chatter. Answering all of it
@@ -466,7 +454,7 @@ describe("RokuSsdpResponder", () => {
   });
 
   it("warns when a search answer cannot be sent — once a minute, not once per search", async () => {
-    const r = new RokuSsdpResponder({ ...baseCfg, bindIp: undefined, membershipInterfaces: [] });
+    const r = responder();
     await r.start();
     dgramMock.fail.send = true;
     dgramMock.sockets[0].emit("message", Buffer.from(MSEARCH), { address: "10.0.0.50", port: 41234 });
@@ -474,18 +462,15 @@ describe("RokuSsdpResponder", () => {
     // Warn, not throw: the send callback runs outside any try/catch, so an unhandled throw
     // here would take the adapter process down. A remote that keeps searching from an
     // unreachable address (EHOSTUNREACH) must not fill the log.
-    expect(noopLog.warn.mock.calls.filter(c => String(c[0]).includes("response send failed"))).toHaveLength(1);
+    expect(sharedLog.warn.mock.calls.filter(c => String(c[0]).includes("response send failed"))).toHaveLength(1);
   });
 
   it("announces every device to the multicast group", async () => {
-    const r = new RokuSsdpResponder({
-      ...baseCfg,
+    const r = responder({
       devices: [
         { uuid: "aaa", port: 8060 },
         { uuid: "bbb", port: 8061 },
       ],
-      bindIp: undefined,
-      membershipInterfaces: [],
     });
     await r.start();
     const s = dgramMock.sockets[0];
@@ -497,12 +482,7 @@ describe("RokuSsdpResponder", () => {
 
   it("a sender whose socket errors later is reported, and the responder keeps running", async () => {
     const log = recordingLog();
-    const r = new RokuSsdpResponder({
-      ...baseCfg,
-      logger: log,
-      bindIp: undefined,
-      membershipInterfaces: [m("10.0.0.9")],
-    });
+    const r = responder({ logger: log, membershipInterfaces: [m("10.0.0.9")] });
     await r.start();
     dgramMock.sockets[1].emit("error", new Error("ENETDOWN"));
     expect(log.warn).toHaveBeenCalledWith(expect.stringContaining("SSDP sender on if-10.0.0.9: ENETDOWN"));
@@ -512,24 +492,14 @@ describe("RokuSsdpResponder", () => {
   it("a sender that cannot pin its interface is reported, not fatal", async () => {
     const log = recordingLog();
     dgramMock.fail.mcastIf = true;
-    const r = new RokuSsdpResponder({
-      ...baseCfg,
-      logger: log,
-      bindIp: undefined,
-      membershipInterfaces: [m("10.0.0.9")],
-    });
+    const r = responder({ logger: log, membershipInterfaces: [m("10.0.0.9")] });
     await r.start();
     expect(log.warn).toHaveBeenCalledWith(expect.stringContaining("could not pin its interface: EINVAL"));
   });
 
   it("a sender that cannot be opened costs only that interface its announcement", async () => {
     const log = recordingLog();
-    const r = new RokuSsdpResponder({
-      ...baseCfg,
-      logger: log,
-      bindIp: undefined,
-      membershipInterfaces: [m("10.0.0.9")],
-    });
+    const r = responder({ logger: log, membershipInterfaces: [m("10.0.0.9")] });
     await r.start();
     dgramMock.fail.create = true;
     r.refreshAdvertise(baseCfg.advertiseIp, [m("10.0.0.9"), m("192.168.50.2")]);
@@ -543,15 +513,12 @@ describe("RokuSsdpResponder", () => {
 
   it("an announce whose socket throws on send is logged at debug, the other devices still go out", async () => {
     const log = recordingLog();
-    const r = new RokuSsdpResponder({
-      ...baseCfg,
+    const r = responder({
       logger: log,
       devices: [
         { uuid: "a", port: 8060 },
         { uuid: "b", port: 8061 },
       ],
-      bindIp: undefined,
-      membershipInterfaces: [],
     });
     await r.start();
     dgramMock.fail.sendThrows = true;
@@ -565,20 +532,15 @@ describe("RokuSsdpResponder", () => {
 
   it("names the interfaces it joined in its start line — the first thing to read when nothing is found", async () => {
     const log = recordingLog();
-    await new RokuSsdpResponder({
-      ...baseCfg,
-      logger: log,
-      bindIp: undefined,
-      membershipInterfaces: [m("10.0.0.9")],
-    }).start();
+    await responder({ logger: log, membershipInterfaces: [m("10.0.0.9")] }).start();
     expect(log.debug).toHaveBeenCalledWith(expect.stringContaining("(join: if-10.0.0.9 10.0.0.9)"));
     const quiet = recordingLog();
-    await new RokuSsdpResponder({ ...baseCfg, logger: quiet, bindIp: undefined, membershipInterfaces: [] }).start();
+    await responder({ logger: quiet, membershipInterfaces: [] }).start();
     expect(quiet.debug).toHaveBeenCalledWith(expect.stringContaining("(join: default)"));
   });
 
   it("a chosen interface opens no sender for an interface that came up later", async () => {
-    const r = new RokuSsdpResponder({ ...baseCfg, bindIp: "10.0.0.9", membershipInterfaces: [m("10.0.0.9")] });
+    const r = responder({ bindIp: "10.0.0.9", membershipInterfaces: [m("10.0.0.9")] });
     await r.start();
     r.refreshAdvertise("10.0.0.9", [m("10.0.0.9"), m("192.168.50.2")]);
     // Only the receiving socket: an announcement into another network would leave the chosen one.
@@ -586,7 +548,7 @@ describe("RokuSsdpResponder", () => {
   });
 
   it("a refresh with the same interfaces opens no second sender", async () => {
-    const r = new RokuSsdpResponder({ ...baseCfg, bindIp: undefined, membershipInterfaces: [m("10.0.0.9")] });
+    const r = responder({ membershipInterfaces: [m("10.0.0.9")] });
     await r.start();
     r.refreshAdvertise(baseCfg.advertiseIp, [m("10.0.0.9")]);
     r.refreshAdvertise(baseCfg.advertiseIp, [m("10.0.0.9")]);
@@ -594,7 +556,7 @@ describe("RokuSsdpResponder", () => {
   });
 
   it("announces nothing once the receiving socket closed on its own, even with senders still open", async () => {
-    const r = new RokuSsdpResponder({ ...baseCfg, bindIp: undefined, membershipInterfaces: [m("10.0.0.9")] });
+    const r = responder({ membershipInterfaces: [m("10.0.0.9")] });
     await r.start();
     dgramMock.sockets[0].emit("close");
     r.announce();
@@ -602,14 +564,11 @@ describe("RokuSsdpResponder", () => {
   });
 
   it("a targeted uuid search is answered by the device it names, not by every device", async () => {
-    const r = new RokuSsdpResponder({
-      ...baseCfg,
+    const r = responder({
       devices: [
         { uuid: "aaa", port: 8060 },
         { uuid: "bbb", port: 8061 },
       ],
-      bindIp: undefined,
-      membershipInterfaces: [],
     });
     await r.start();
     const s = dgramMock.sockets[0];
@@ -622,19 +581,19 @@ describe("RokuSsdpResponder", () => {
   });
 
   it("logs a failed announce at debug, not warn", async () => {
-    const r = new RokuSsdpResponder({ ...baseCfg, bindIp: undefined, membershipInterfaces: [] });
+    const r = responder();
     await r.start();
     dgramMock.fail.send = true;
     r.announce();
     // The announce runs on a timer: a warn per tick would fill the log on a host
     // that briefly loses its route. The M-SEARCH answer above IS a warn — that one
     // is a controller actively waiting for a reply.
-    expect(noopLog.debug).toHaveBeenCalledWith(expect.stringContaining("NOTIFY send failed"));
-    expect(noopLog.warn).not.toHaveBeenCalled();
+    expect(sharedLog.debug).toHaveBeenCalledWith(expect.stringContaining("NOTIFY send failed"));
+    expect(sharedLog.warn).not.toHaveBeenCalled();
   });
 
   it("announcing before start or after stop does nothing", async () => {
-    const r = new RokuSsdpResponder({ ...baseCfg, bindIp: undefined, membershipInterfaces: [] });
+    const r = responder();
     expect(() => r.announce()).not.toThrow();
     await r.start();
     const s = dgramMock.sockets[0];
@@ -648,7 +607,7 @@ describe("RokuSsdpResponder", () => {
 
   it("stop is idempotent and survives an already-dead socket", async () => {
     dgramMock.fail.close = true;
-    const r = new RokuSsdpResponder({ ...baseCfg, bindIp: undefined, membershipInterfaces: [] });
+    const r = responder();
     await r.start();
     // onUnload calls stop() synchronously; a throw there means the callback never
     // runs and js-controller SIGKILLs the adapter.
@@ -658,17 +617,11 @@ describe("RokuSsdpResponder", () => {
 });
 
 describe("RokuSsdpResponder — the device set changes while it runs", () => {
-  beforeEach(() => {
-    dgramMock.sockets.length = 0;
-    Object.keys(dgramMock.fail).forEach(k => ((dgramMock.fail as Record<string, boolean>)[k] = false));
-    vi.clearAllMocks();
-  });
-
   it("owns its list instead of aliasing the caller's array", async () => {
     // The caller's array must not be able to change what is announced behind the
     // responder's back; addDevice/removeDevice are the only doors.
     const devices = [{ uuid: "aaa", port: 8060 }];
-    const r = new RokuSsdpResponder({ ...baseCfg, devices, bindIp: undefined, membershipInterfaces: [] });
+    const r = responder({ devices, membershipInterfaces: [] });
     await r.start();
     devices.push({ uuid: "bbb", port: 8061 });
     r.announce();
@@ -676,12 +629,7 @@ describe("RokuSsdpResponder — the device set changes while it runs", () => {
   });
 
   it("announces a device that joined later", async () => {
-    const r = new RokuSsdpResponder({
-      ...baseCfg,
-      devices: [{ uuid: "aaa", port: 8060 }],
-      bindIp: undefined,
-      membershipInterfaces: [],
-    });
+    const r = responder({ devices: [{ uuid: "aaa", port: 8060 }] });
     await r.start();
     r.addDevice({ uuid: "bbb", port: 8061 });
     r.announce();
@@ -690,12 +638,7 @@ describe("RokuSsdpResponder — the device set changes while it runs", () => {
   });
 
   it("adds a device only once", async () => {
-    const r = new RokuSsdpResponder({
-      ...baseCfg,
-      devices: [{ uuid: "aaa", port: 8060 }],
-      bindIp: undefined,
-      membershipInterfaces: [],
-    });
+    const r = responder({ devices: [{ uuid: "aaa", port: 8060 }] });
     await r.start();
     r.addDevice({ uuid: "aaa", port: 8060 });
     r.announce();
@@ -704,14 +647,11 @@ describe("RokuSsdpResponder — the device set changes while it runs", () => {
 
   it("stops answering for a device whose server died", async () => {
     // Otherwise discovery keeps pointing remotes at a port nobody serves.
-    const r = new RokuSsdpResponder({
-      ...baseCfg,
+    const r = responder({
       devices: [
         { uuid: "aaa", port: 8060 },
         { uuid: "bbb", port: 8061 },
       ],
-      bindIp: undefined,
-      membershipInterfaces: [],
     });
     await r.start();
     r.removeDevice("aaa");
@@ -722,7 +662,7 @@ describe("RokuSsdpResponder — the device set changes while it runs", () => {
   });
 
   it("removing an unknown device changes nothing", async () => {
-    const r = new RokuSsdpResponder({ ...baseCfg, bindIp: undefined, membershipInterfaces: [] });
+    const r = responder();
     await r.start();
     r.removeDevice("nope");
     r.announce();
@@ -730,7 +670,7 @@ describe("RokuSsdpResponder — the device set changes while it runs", () => {
   });
 
   it("mirrors the search target so a rootdevice sweep does not discard the answer", async () => {
-    const r = new RokuSsdpResponder({ ...baseCfg, bindIp: undefined, membershipInterfaces: [] });
+    const r = responder();
     await r.start();
     dgramMock.sockets[0].emit("message", Buffer.from(MSEARCH.replace("ST: roku:ecp", "ST: upnp:rootdevice")), {
       address: "192.168.1.10",
@@ -741,21 +681,12 @@ describe("RokuSsdpResponder — the device set changes while it runs", () => {
 });
 
 describe("RokuSsdpResponder — the farewell", () => {
-  beforeEach(() => {
-    dgramMock.sockets.length = 0;
-    Object.keys(dgramMock.fail).forEach(k => ((dgramMock.fail as Record<string, boolean>)[k] = false));
-    vi.clearAllMocks();
-  });
-
   it("withdraws every device from the multicast group", async () => {
-    const r = new RokuSsdpResponder({
-      ...baseCfg,
+    const r = responder({
       devices: [
         { uuid: "aaa", port: 8060 },
         { uuid: "bbb", port: 8061 },
       ],
-      bindIp: undefined,
-      membershipInterfaces: [],
     });
     await r.start();
 
@@ -769,29 +700,27 @@ describe("RokuSsdpResponder — the farewell", () => {
   });
 
   it("resolves — never hangs teardown — when a send fails", async () => {
-    const r = new RokuSsdpResponder({ ...baseCfg, bindIp: undefined, membershipInterfaces: [] });
+    const r = responder();
     await r.start();
     dgramMock.fail.send = true;
 
     await expect(r.byebye()).resolves.toBeUndefined();
-    expect(noopLog.debug).toHaveBeenCalledWith(expect.stringContaining("byebye send failed"));
+    expect(sharedLog.debug).toHaveBeenCalledWith(expect.stringContaining("byebye send failed"));
   });
 
   it("resolves even when the socket throws the moment it is used", async () => {
     // dgram throws ERR_SOCKET_DGRAM_NOT_RUNNING synchronously on a socket that closed
     // under us — teardown must not hang on that, and must not throw out of onUnload.
-    const r = new RokuSsdpResponder({ ...baseCfg, bindIp: undefined, membershipInterfaces: [] });
+    const r = responder();
     await r.start();
-    dgramMock.sockets[0].send = () => {
-      throw new Error("ERR_SOCKET_DGRAM_NOT_RUNNING");
-    };
+    dgramMock.fail.sendThrows = true;
 
     await expect(r.byebye()).resolves.toBeUndefined();
-    expect(noopLog.debug).toHaveBeenCalledWith(expect.stringContaining("byebye send failed"));
+    expect(sharedLog.debug).toHaveBeenCalledWith(expect.stringContaining("byebye send failed"));
   });
 
   it("resolves immediately when there is no socket or no device left", async () => {
-    const r = new RokuSsdpResponder({ ...baseCfg, bindIp: undefined, membershipInterfaces: [] });
+    const r = responder();
     await expect(r.byebye()).resolves.toBeUndefined();
     await r.start();
     r.removeDevice("abc123");

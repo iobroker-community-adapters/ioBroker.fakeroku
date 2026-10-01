@@ -22,6 +22,7 @@ import {
 import { errText } from "./lib/err-text";
 import { migrateNativeKeys, type NativeKeyMigration } from "./lib/native-key-migration";
 import { tDesc, tName, tRaw } from "./lib/i18n";
+import { coveredBy, KnownObjects } from "./lib/known-objects";
 import { isLanClient } from "./lib/lan-guard";
 import { planNativePrune, planObjectCleanup } from "./lib/object-cleanup";
 
@@ -152,6 +153,8 @@ export class Fakeroku extends utils.Adapter {
   private readonly lastState = new Map<string, Pick<ioBroker.State, "val" | "ack" | "q">>();
   /** The adapter's objects as read at start, keyed relative to the namespace. */
   private ownObjects: ReadonlyMap<string, ioBroker.Object> = new Map();
+  /** The own object tree, read once at start: every object write goes through it and reaches the database only on a change. */
+  private readonly known = new KnownObjects(this);
   /** How many configured devices are expected to listen — the target info.connection compares against. */
   private expectedDevices = 0;
   /** The interface to bind to, or undefined for "all" — kept for the retry after onReady returned. */
@@ -240,6 +243,7 @@ export class Fakeroku extends utils.Adapter {
         return;
       }
 
+      await this.known.load();
       await this.primeStates();
       await this.writeIndicator("info.connection", false);
       await this.refreshOwnObjects();
@@ -548,8 +552,7 @@ export class Fakeroku extends utils.Adapter {
     try {
       // No stopping check at the entry: onUnload sets the flag and empties the queue in the
       // same synchronous block, so a call that arrives afterwards finds nothing to do, and a
-      // call already inside the loop is caught after the bind and again at the tail. A guard
-      // here could never fire — measured, it survived its own mutation needle.
+      // call already inside the loop is caught after the bind and again at the tail.
       const stillPending: DeviceRuntime[] = [];
       let recovered = false;
       for (const device of this.pending) {
@@ -578,7 +581,7 @@ export class Fakeroku extends utils.Adapter {
     } catch (e) {
       this.log.warn(`Retrying the waiting emulated Rokus failed: ${errText(e)}`);
       // No stopping check: onUnload empties the queue, and scheduleDeviceRetry arms nothing for
-      // an empty one — measured, a guard here survived its own mutation needle.
+      // an empty one.
       this.scheduleDeviceRetry();
     }
   }
@@ -701,15 +704,18 @@ export class Fakeroku extends utils.Adapter {
    * Only name and description: the manifest owns the rest of the shape, and js-controller writes
    * it back on every start — the object type included (`extend(true, old, manifest)`), which is
    * also what repairs an `info` channel a hand-edited device row named "info" once turned into a
-   * device object (see the reserved-id guard in startDevices).
+   * device object (see the reserved-id guard in startDevices). Each is written only when it
+   * differs from the object as read at start.
    */
   private async refreshOwnObjects(): Promise<void> {
-    await Promise.all([
-      this.extendObject("info", { common: { name: tName("channelInfo") } }),
-      this.extendObject("info.connection", {
-        common: { name: tName("connectionStatus"), desc: tDesc("connectionStatusDesc") },
-      }),
-    ]);
+    const info = { common: { name: tName("channelInfo") } };
+    if (!coveredBy(info, this.known.get("info"))) {
+      await this.extendObject("info", info);
+    }
+    const connection = { common: { name: tName("connectionStatus"), desc: tDesc("connectionStatusDesc") } };
+    if (!coveredBy(connection, this.known.get("info.connection"))) {
+      await this.extendObject("info.connection", connection);
+    }
   }
 
   /**
@@ -740,8 +746,8 @@ export class Fakeroku extends utils.Adapter {
     await Promise.all([
       // The device name is the user's own text — nothing to translate, but it must
       // still BE a translation object like every other common.name (tRaw).
-      this.extendObject(deviceId, { type: "device", common: { name: tRaw(friendlyName) }, native: {} }),
-      this.extendObject(`${deviceId}.command`, {
+      this.known.extend(deviceId, { type: "device", common: { name: tRaw(friendlyName) }, native: {} }),
+      this.known.extend(`${deviceId}.command`, {
         type: "state",
         common: {
           name: tName("stateLastCommand"),
@@ -754,7 +760,7 @@ export class Fakeroku extends utils.Adapter {
         },
         native: {},
       }),
-      this.extendObject(`${deviceId}.commandType`, {
+      this.known.extend(`${deviceId}.commandType`, {
         type: "state",
         common: {
           name: tName("stateLastCommandType"),
@@ -770,13 +776,13 @@ export class Fakeroku extends utils.Adapter {
         },
         native: {},
       }),
-      this.extendObject(`${deviceId}.keys`, {
+      this.known.extend(`${deviceId}.keys`, {
         type: "channel",
         common: { name: tName("channelKeys"), desc: tDesc("channelKeysDesc") },
         native: {},
       }),
       ...keys.map(key =>
-        this.extendObject(`${deviceId}.keys.${key}`, {
+        this.known.extend(`${deviceId}.keys.${key}`, {
           type: "state",
           // "sensor" = generic boolean read-only (active/inactive). The docs suggest
           // button.press for a keypress-as-state, but the repochecker requires button.press to
@@ -863,13 +869,9 @@ export class Fakeroku extends utils.Adapter {
    * Run the orphan sweep for the current configuration — from EVERY exit of
    * onReady, which is the point of it existing as its own method.
    *
-   * The sweep used to sit on the happy path only, so removing the last emulated
-   * Roku (or a host without a routable address) left its device object, its
-   * `command` / `commandType` and its 16–31 key states behind with nothing that
-   * would ever remove them: the user deletes a device in the admin and keeps its
-   * datapoints forever. The adapter answers for its own datapoints
-   * (`feedback_adapter_verantwortet_datenpunkte`), so the sweep runs whenever the
-   * configuration could be read.
+   * Nothing else removes a device tree: on an exit without the sweep, a device the user
+   * deleted in the admin (the manager writes an empty list for the last one) would keep its
+   * datapoints forever. So the sweep runs whenever the configuration could be read.
    *
    * `configured === null` is that condition, and it is not pedantry: with no `devices`
    * key at all (a never-configured instance, or a config we could not read) an
@@ -989,12 +991,10 @@ export class Fakeroku extends utils.Adapter {
    * exactly what was read with `native` emptied — `common` included, because that is where
    * `common.custom` lives, the user's own history/chart configuration.
    *
-   * It used to be a `delObject` followed by an `extendObject`. That pair replaces an object,
-   * but it is the wrong tool here: `delObject` on a state ALSO deletes the state's value and
-   * removes its id from every enum it belongs to. Repairing a dead attribute that way cost
-   * the user the recorded value and the room the datapoint was sorted into — and the
-   * re-created object came back carrying `common.def` as its value, which reads like data
-   * rather than like a loss. `setForeignObject` touches neither. (The discouraged call is
+   * Not `delObject` + `extendObject`: `delObject` on a state ALSO deletes the state's value
+   * and removes its id from every enum it belongs to — the recorded value and the room — and
+   * the re-created object would come back carrying `common.def` as its value.
+   * `setForeignObject` touches neither. (The discouraged call is
    * `setObject`, repochecker S5054, and only because a blind full write overwrites what the
    * user changed; writing back what was just read does not.)
    *
@@ -1148,12 +1148,9 @@ export class Fakeroku extends utils.Adapter {
    * instead of the datapoint (js-controller#3472). So if the final write is
    * lost, the instance shows "connected" while the adapter is off.
    *
-   * A fire-and-forget write plus an immediate callback is a race, not a
-   * guaranteed loss — measured on 1.1.0, it still arrived, because without
-   * `common.supportedMessages.stopInstance` the process ends in an orderly way
-   * and flushes what is pending. Waiting closes the race for the slow or busy
-   * case, and it is safe for the same reason: no `stopInstance` means the host
-   * grants the full `common.stopTimeout` instead of killing the process.
+   * A fire-and-forget write plus an immediate callback is a race; waiting closes it for the
+   * slow or busy case. It is safe because without `common.supportedMessages.stopInstance` the
+   * host grants the full `common.stopTimeout` instead of killing the process.
    *
    * The farewell (`ssdp:byebye`) rides in the same wait: without it a controller keeps the
    * emulated Roku in its list for up to the announced hour and sends key presses into a

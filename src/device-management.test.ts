@@ -3,7 +3,7 @@ import type { Mock } from "vitest";
 // t() returns something identifiable instead of a translation object, so the
 // tests assert on the message CHOICE, not on wording; keys with arguments keep
 // the arguments visible.
-vi.mock("./lib/i18n", () => ({ t: (key: string, ...args: unknown[]) => (args.length ? { key, args } : key) }));
+vi.mock("./lib/i18n", () => vi.importActual("../test/helpers/i18n-double"));
 
 import { FakerokuDeviceManagement, buildDeviceForm, cleanDevice } from "./device-management";
 import { toDeviceRows } from "./lib/device-config";
@@ -55,7 +55,7 @@ describe("cleanDevice", () => {
  * @param devices Device list stored in native.devices
  * @param objects The adapter's object tree, keyed relative to the namespace
  */
-function mockAdapter(devices: unknown = [], objects: Record<string, { type: string }> = {}): any {
+function mockAdapter(devices: unknown = [], objects: Record<string, { type: string }> = {}): MockAdapter {
   let stored: unknown = devices;
   return {
     namespace: "fakeroku.0",
@@ -76,6 +76,16 @@ function mockAdapter(devices: unknown = [], objects: Record<string, { type: stri
     }),
     _stored: () => stored as RokuDeviceConfig[],
   };
+}
+
+/** The adapter members the manager uses, plus a look at what it stored. */
+interface MockAdapter {
+  namespace: string;
+  on: Mock;
+  getAdapterObjectsAsync: Mock;
+  getForeignObjectAsync: Mock;
+  extendForeignObjectAsync: Mock;
+  _stored: () => RokuDeviceConfig[];
 }
 
 /**
@@ -115,7 +125,7 @@ interface DmAction {
   id: string;
   icon: string;
   description: unknown;
-  handler: (...args: any[]) => Promise<unknown>;
+  handler: (...args: unknown[]) => Promise<unknown>;
 }
 interface Card {
   id: string;
@@ -132,7 +142,7 @@ describe("FakerokuDeviceManagement", () => {
 
   function make(devices: unknown = [], objects: Record<string, { type: string }> = {}): DmInternals {
     adapter = mockAdapter(devices, objects);
-    dm = new FakerokuDeviceManagement(adapter);
+    dm = new FakerokuDeviceManagement(adapter as unknown as ConstructorParameters<typeof FakerokuDeviceManagement>[0]);
     return internalOf(dm);
   }
 
@@ -297,9 +307,9 @@ describe("FakerokuDeviceManagement", () => {
       const ctx = mockContext({ form: undefined });
       await i.addDevice(ctx);
       const options = ctx.showForm.mock.calls[0][1] as { applyDisabledRule: string };
-      expect(evaluateRule(options.applyDisabledRule, { name: "Living room", port: 9000 })).toBe(true);
-      expect(evaluateRule(options.applyDisabledRule, { name: "Bedroom", port: 8060 })).toBe(true);
-      expect(evaluateRule(options.applyDisabledRule, { name: "Bedroom", port: 9000 })).toBe(false);
+      expect(evaluate(options.applyDisabledRule, { name: "Living room", port: 9000 })).toBe(true);
+      expect(evaluate(options.applyDisabledRule, { name: "Bedroom", port: 8060 })).toBe(true);
+      expect(evaluate(options.applyDisabledRule, { name: "Bedroom", port: 9000 })).toBe(false);
     });
 
     it("passes the names and ports already in use into the form validator", async () => {
@@ -309,10 +319,12 @@ describe("FakerokuDeviceManagement", () => {
       const schema = ctx.showForm.mock.calls[0][0] as FormSchema;
       // The greyed-out OK button is the user's only in-dialog feedback; it works
       // off these literal lists, so an empty list means every clash gets through.
-      expect(schema.items.name.validator).toContain('"living room"');
-      expect(schema.items.name.validator).toContain('"kitchen"');
-      expect(schema.items.port.validator).toContain("8060");
-      expect(schema.items.port.validator).toContain("8061");
+      expect(evaluate(schema.items.name.validator!, { name: "Living Room" })).toBe(false);
+      expect(evaluate(schema.items.name.validator!, { name: "kitchen" })).toBe(false);
+      expect(evaluate(schema.items.name.validator!, { name: "Bedroom" })).toBe(true);
+      expect(evaluate(schema.items.port.validator!, { port: 8060 })).toBe(false);
+      expect(evaluate(schema.items.port.validator!, { port: 8061 })).toBe(false);
+      expect(evaluate(schema.items.port.validator!, { port: 9000 })).toBe(true);
     });
 
     it("writes nothing when the dialog is cancelled", async () => {
@@ -362,12 +374,6 @@ describe("FakerokuDeviceManagement", () => {
       expect(adapter._stored()).toEqual([
         { name: "Lounge", port: 8060, type: "player", uuid: "keep-me", objectId: "Living_room" },
       ]);
-    });
-
-    it("derives a uuid for a device stored without one", async () => {
-      const i = make([{ name: "Old", port: 8060, type: "player" }]);
-      await i.editDevice(deriveUuid("Old"), mockContext({ form: { name: "Old", port: 8060, type: "player" } }));
-      expect(adapter._stored()[0].uuid).toBe(deriveUuid("Old"));
     });
 
     it("derives the uuid of a row without one from its OLD name, so a rename keeps the identity", async () => {
@@ -470,7 +476,7 @@ describe("FakerokuDeviceManagement", () => {
       const schema = ctx.showForm.mock.calls[0][0] as FormSchema;
       expect(schema.items.name.validator).not.toContain("Living_room");
       // A name whose id another device occupies is fine for a rename: the id does not move.
-      expect(evaluateValidator(schema.items.name.validator!, { name: "Living*room" })).toBe(true);
+      expect(evaluate(schema.items.name.validator!, { name: "Living*room" })).toBe(true);
     });
 
     it("leaves the edited device out of the dialog's in-use lists", async () => {
@@ -480,10 +486,10 @@ describe("FakerokuDeviceManagement", () => {
       const schema = ctx.showForm.mock.calls[0][0] as FormSchema;
       // Otherwise opening a device and pressing OK without changing anything greys
       // the button out: it clashes with itself and the user cannot edit at all.
-      expect(schema.items.name.validator).not.toContain('"kitchen"');
-      expect(schema.items.name.validator).toContain('"living room"');
-      expect(schema.items.port.validator).not.toContain("8061");
-      expect(schema.items.port.validator).toContain("8060");
+      expect(evaluate(schema.items.name.validator!, { name: "Kitchen" })).toBe(true);
+      expect(evaluate(schema.items.name.validator!, { name: "Living room" })).toBe(false);
+      expect(evaluate(schema.items.port.validator!, { port: 8061 })).toBe(true);
+      expect(evaluate(schema.items.port.validator!, { port: 8060 })).toBe(false);
     });
 
     it("feeds the dialog the object ids the RUNTIME will use, not ids of display names", async () => {
@@ -497,8 +503,9 @@ describe("FakerokuDeviceManagement", () => {
       const ctx = mockContext({ form: undefined });
       await i.addDevice(ctx);
       const schema = ctx.showForm.mock.calls[0][0] as FormSchema;
-      expect(schema.items.name.validator).toContain('"_Roku_"');
-      expect(schema.items.name.validator).not.toContain('"Roku"');
+      // "_Roku_" is taken by the spaced row's tree; "Roku2" builds an id nobody has.
+      expect(evaluate(schema.items.name.validator!, { name: "_Roku_" })).toBe(false);
+      expect(evaluate(schema.items.name.validator!, { name: "Roku2" })).toBe(true);
     });
 
     it("does not clash a device with its own name and port", async () => {
@@ -571,30 +578,18 @@ interface FormSchema {
 }
 
 /**
- * Run the OK rule the way dm-gui-components does (`Function('data', 'return ' + rule)`).
+ * Run a dialog expression (validator, OK rule, `hidden`) the way the admin does: as JavaScript over the form `data`.
  *
- * @param rule the applyDisabledRule expression
- * @param data the form values
- * @returns true = OK is disabled
- */
-function evaluateRule(rule: string, data: Record<string, unknown>): boolean {
-  return runInNewContext(`(${rule})`, { data }) as boolean;
-}
-
-/**
- * Run a validator expression the way the admin does: as JavaScript over the form `data`.
+ * The expression is a STRING in the shipped panel — no test learns anything by looking at it, which is exactly how a
+ * wrong decision stays green (a text-pattern test passes while the dialog lets the clash through). An isolated
+ * context is the honest stand-in for the admin's evaluation.
  *
- * The expression is a STRING in the shipped panel — no test executes it by looking at it,
- * which is exactly how a wrong decision stays green (a text-pattern test passes while the
- * dialog lets the clash through). An isolated context is the honest stand-in for the
- * admin's evaluation.
- *
- * @param validator the validator expression from the schema
+ * @param expression the expression from the schema
  * @param data the form values to evaluate it against
- * @returns what the admin would get: true = valid, false = show the error and block saving
+ * @returns the expression's value: for a validator true = valid, for the OK rule true = OK disabled
  */
-function evaluateValidator(validator: string, data: Record<string, unknown>): boolean {
-  return runInNewContext(`(${validator})`, { data }) as boolean;
+function evaluate(expression: string, data: Record<string, unknown>): boolean {
+  return runInNewContext(`(${expression})`, { data }) as boolean;
 }
 
 describe("buildDeviceForm", () => {
@@ -618,7 +613,7 @@ describe("buildDeviceForm", () => {
     // say why.
     const form = buildDeviceForm(["A"], [8060], ["A"]).schema as unknown as FormSchema;
     const shown = (item: string, data: Record<string, unknown>): boolean =>
-      !(runInNewContext(`(${form.items[item].hidden as string})`, { data }) as boolean);
+      !evaluate(form.items[item].hidden as string, data);
     expect(shown("_nameRejected", { name: "a", port: 9000 })).toBe(true);
     expect(shown("_nameRejected", { name: "B", port: 9000 })).toBe(false);
     // An empty field is not an error yet — nothing typed, nothing to explain.
@@ -629,8 +624,8 @@ describe("buildDeviceForm", () => {
 
   it("switches OK off for an empty name as well", () => {
     const { applyDisabledRule } = buildDeviceForm([], [], []);
-    expect(evaluateRule(applyDisabledRule, { name: "", port: 9000 })).toBe(true);
-    expect(evaluateRule(applyDisabledRule, { name: "X", port: 9000 })).toBe(false);
+    expect(evaluate(applyDisabledRule, { name: "", port: 9000 })).toBe(true);
+    expect(evaluate(applyDisabledRule, { name: "X", port: 9000 })).toBe(false);
   });
 
   it("marks a clash on the field as well as switching OK off", () => {
@@ -643,7 +638,7 @@ describe("buildDeviceForm", () => {
 
   it("compares names trimmed and lower-cased, so a re-typed name still clashes", () => {
     const form = buildDeviceForm(["  Living Room "], [8060], []).schema as unknown as FormSchema;
-    expect(form.items.name.validator).toContain('["living room"]');
+    expect(evaluate(form.items.name.validator!, { name: " LIVING room" })).toBe(false);
   });
 
   it("keeps the validator valid code when a name carries quotes or backslashes", () => {
@@ -669,7 +664,7 @@ describe("buildDeviceForm", () => {
       rows.map(r => r.port),
       rows.map(r => r.objectId),
     ).schema as unknown as FormSchema;
-    const check = (name: unknown): boolean => evaluateValidator(form.items.name.validator!, { name });
+    const check = (name: unknown): boolean => evaluate(form.items.name.validator!, { name });
 
     it("accepts a free name", () => {
       expect(check("Bedroom")).toBe(true);
@@ -715,8 +710,7 @@ describe("buildDeviceForm", () => {
 
   it("compares ports as numbers, so a typed '8060' is caught", () => {
     const form = buildDeviceForm([], [8060], []).schema as unknown as FormSchema;
-    expect(form.items.port.validator).toBe("(![8060].includes(Number(data.port)))");
-    expect(evaluateValidator(form.items.port.validator!, { port: "8060" })).toBe(false);
-    expect(evaluateValidator(form.items.port.validator!, { port: 8061 })).toBe(true);
+    expect(evaluate(form.items.port.validator!, { port: "8060" })).toBe(false);
+    expect(evaluate(form.items.port.validator!, { port: 8061 })).toBe(true);
   });
 });

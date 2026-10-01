@@ -1,6 +1,6 @@
 // t() returns something identifiable instead of a translation object, so the tests assert
 // on the message CHOICE, not on wording.
-vi.mock("./i18n", () => ({ t: (key: string, ...args: unknown[]) => (args.length ? { key, args } : key) }));
+vi.mock("./i18n", () => vi.importActual("../../test/helpers/i18n-double"));
 
 import {
   deviceTreeOf,
@@ -269,9 +269,9 @@ describe("findClash", () => {
   });
 
   it("judges the id of the STORED name, not of the name the list displays", () => {
-    // A hand-edited row " Roku " displays as "Roku" but occupies "Roku_" in the object tree,
+    // A hand-edited row " Roku " displays as "Roku" but occupies "_Roku_" in the object tree,
     // because the tree is built from the stored name. Comparing the displayed name let a new
-    // device literally called "Roku_" pass both the dialog and this check — and the start
+    // device literally called "_Roku_" pass both the dialog and this check — and the start
     // then skipped it as a duplicate object id, leaving info.connection false for good.
     const stored = toDeviceRows([{ name: " Roku ", port: 8060, type: "player" }])!;
     expect(stored[0].objectId).toBe("_Roku_");
