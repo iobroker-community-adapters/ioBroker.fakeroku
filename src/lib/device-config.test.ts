@@ -3,7 +3,6 @@
 vi.mock("./i18n", () => ({ t: (key: string, ...args: unknown[]) => (args.length ? { key, args } : key) }));
 
 import {
-  deviceObjectId,
   deviceTreeOf,
   findClash,
   isUsableObjectId,
@@ -116,20 +115,20 @@ describe("toDeviceRows", () => {
   });
 });
 
-describe("deviceObjectId", () => {
+describe("the object id of a row", () => {
   it("is built from the stored name when nothing else is known", () => {
-    expect(deviceObjectId(toDeviceRow({ name: " Roku " })!)).toBe("_Roku_");
-    expect(deviceObjectId(toDeviceRow({ name: "My Roku!" })!)).toBe("My_Roku_");
+    expect(toDeviceRow({ name: " Roku " })!.objectId).toBe("_Roku_");
+    expect(toDeviceRow({ name: "My Roku!" })!.objectId).toBe("My_Roku_");
   });
 
   it("is the stored objectId once there is one — a rename never moves the tree", () => {
     const row = toDeviceRow({ name: "Lounge", port: 8060, type: "player", objectId: "Living_room" })!;
-    expect(deviceObjectId(row)).toBe("Living_room");
+    expect(row.objectId).toBe("Living_room");
   });
 
   it("ignores a stored objectId that cannot be an object id segment", () => {
     const row = toDeviceRow({ name: "Roku", port: 8060, type: "player", objectId: "a.b" })!;
-    expect(deviceObjectId(row)).toBe("Roku");
+    expect(row.objectId).toBe("Roku");
   });
 
   it("keeps the tree the OLD adapter built for a name with an umlaut, a bracket or two spaces", () => {
@@ -143,18 +142,18 @@ describe("deviceObjectId", () => {
     ]) {
       expect(legacyObjectId(name)).toBe(legacy);
       const tree = deviceTreeOf([legacy], () => "device");
-      expect(deviceObjectId(toDeviceRow({ name, port: 9093 }, tree)!), name).toBe(legacy);
+      expect(toDeviceRow({ name, port: 9093 }, tree)!.objectId, name).toBe(legacy);
     }
   });
 
   it("prefers today's id when the tree already lives there", () => {
     const tree = deviceTreeOf(["K_che", "Küche"], () => "device");
-    expect(deviceObjectId(toDeviceRow({ name: "Küche" }, tree)!)).toBe("K_che");
+    expect(toDeviceRow({ name: "Küche" }, tree)!.objectId).toBe("K_che");
   });
 
   it("counts only device objects as a tree, not a state that happens to carry the name", () => {
     const tree = deviceTreeOf(["Küche"], () => "state");
-    expect(deviceObjectId(toDeviceRow({ name: "Küche" }, tree)!)).toBe("K_che");
+    expect(toDeviceRow({ name: "Küche" }, tree)!.objectId).toBe("K_che");
   });
 });
 
@@ -167,7 +166,7 @@ describe("the object tree the rows are resolved against", () => {
   it("never takes over an old tree whose id js-controller would refuse today", () => {
     // Every object below such an id would fail to be created; the row starts under a clean id.
     const tree = deviceTreeOf(["a*b"], () => "device");
-    expect(deviceObjectId(toDeviceRow({ name: "a*b", port: 8060, type: "player" }, tree)!)).toBe("a_b");
+    expect(toDeviceRow({ name: "a*b", port: 8060, type: "player" }, tree)!.objectId).toBe("a_b");
   });
 });
 
@@ -275,7 +274,7 @@ describe("findClash", () => {
     // device literally called "Roku_" pass both the dialog and this check — and the start
     // then skipped it as a duplicate object id, leaving info.connection false for good.
     const stored = toDeviceRows([{ name: " Roku ", port: 8060, type: "player" }])!;
-    expect(deviceObjectId(stored[0])).toBe("_Roku_");
+    expect(stored[0].objectId).toBe("_Roku_");
     expect(findClash(stored, { name: "_Roku_", port: 9000 }, -1)).toBe("deviceNameInvalid");
     // The displayed name is still free — that is a different question and stays answerable.
     expect(findClash(stored, { name: "Kitchen", port: 9000 }, -1)).toBeNull();

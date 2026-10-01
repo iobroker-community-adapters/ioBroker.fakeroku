@@ -2,6 +2,7 @@ import * as dgram from "node:dgram";
 import type { Membership } from "../lib/detect-ip";
 import { errText } from "../lib/err-text";
 import { isLanClient } from "../lib/lan-guard";
+import { LogThrottle } from "../lib/log-throttle";
 import type { AdapterLogger } from "../lib/logger";
 import {
   answersSearch,
@@ -89,8 +90,8 @@ export class RokuSsdpResponder {
   private readonly joined = new Set<string>();
   /** The per-interface NOTIFY senders of the auto case. */
   private readonly senders = new Map<string, Sender>();
-  /** When a repeating problem was last logged, per kind. */
-  private readonly problemLoggedAt = new Map<string, number>();
+  /** Repeating problems, logged at most once per minute and kind. */
+  private readonly problems = new LogThrottle(PROBLEM_LOG_INTERVAL_MS);
   /**
    * The devices this responder answers for — its OWN list, not the caller's array. A device whose
    * port was busy at start-up joins when its retry succeeds, one whose server died leaves;
@@ -325,9 +326,7 @@ export class RokuSsdpResponder {
    * @param line the log line
    */
   private logProblem(kind: string, line: string): void {
-    const now = Date.now();
-    if (now - (this.problemLoggedAt.get(kind) ?? 0) >= PROBLEM_LOG_INTERVAL_MS) {
-      this.problemLoggedAt.set(kind, now);
+    if (this.problems.due(kind)) {
       this.config.logger.warn(line);
     }
   }

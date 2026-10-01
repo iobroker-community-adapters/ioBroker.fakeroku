@@ -6,7 +6,7 @@ import type { Mock } from "vitest";
 vi.mock("./lib/i18n", () => ({ t: (key: string, ...args: unknown[]) => (args.length ? { key, args } : key) }));
 
 import { FakerokuDeviceManagement, buildDeviceForm, cleanDevice } from "./device-management";
-import { deviceObjectId, toDeviceRows } from "./lib/device-config";
+import { toDeviceRows } from "./lib/device-config";
 import { deriveUuid, resolveDeviceUuid } from "./lib/device-identity";
 
 /** A random identity as the manager hands one to a new device: 32 lower-case hex digits. */
@@ -657,7 +657,7 @@ describe("buildDeviceForm", () => {
 
   describe("the name validator, evaluated the way the admin evaluates it", () => {
     // Fed the way the manager feeds it: displayed names from the rows, object ids from
-    // deviceObjectId. The two are not the same function of the same string — one row here
+    // each row's objectId. The two are not the same function of the same string — one row here
     // is stored with edge spaces, exactly the case that used to slip through.
     const rows = toDeviceRows([
       { name: "Living room", port: 8060, type: "player" },
@@ -667,7 +667,7 @@ describe("buildDeviceForm", () => {
     const form = buildDeviceForm(
       rows.map(r => r.name),
       rows.map(r => r.port),
-      rows.map(deviceObjectId),
+      rows.map(r => r.objectId),
     ).schema as unknown as FormSchema;
     const check = (name: unknown): boolean => evaluateValidator(form.items.name.validator!, { name });
 
@@ -698,7 +698,7 @@ describe("buildDeviceForm", () => {
       // Judging the displayed name let a device literally called "_Roku_" through here, and
       // the start then skipped it as a duplicate id — the instance stayed red with no
       // message pointing at the dialog that accepted it.
-      expect(deviceObjectId(rows[2])).toBe("_Roku_");
+      expect(rows[2].objectId).toBe("_Roku_");
       expect(check("_Roku_")).toBe(false);
       // Its trimmed display name is refused too, but by the older name rule — the two
       // questions are separate, and only the id one reaches the tree.

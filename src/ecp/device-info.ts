@@ -107,9 +107,9 @@ export function buildDescXml(device: RokuAdvert, friendlyName: string, type: Dev
 }
 
 /**
- * The `/query/device-info` payload — read by controllers at pairing time and
- * checked for a current version. The `is-tv` / `supports-*` flags follow the
- * device type so a controller (e.g. Harmony) offers the matching key set.
+ * The `/query/device-info` payload — read by controllers at pairing time. The `is-tv` /
+ * `supports-*` flags follow the device type so a controller (e.g. Harmony) offers the
+ * matching key set.
  *
  * @param device the emulated Roku
  * @param friendlyName the configured device name

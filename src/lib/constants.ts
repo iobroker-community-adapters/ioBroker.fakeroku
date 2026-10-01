@@ -4,9 +4,9 @@
  */
 
 /**
- * The real-Roku ECP port and this adapter's default. A controller reads the
- * actual port from the SSDP advertisement, so any free port works; 8060 is the
- * risk-free default (it also covers controllers that assume the standard port).
+ * The real-Roku ECP port and this adapter's default. Harmony and Sofabaton read the port
+ * from the SSDP advertisement; Home Assistant (rokuecp) and Homey always use 8060, so
+ * 8060 belongs to the Roku they should control.
  */
 export const DEFAULT_ECP_PORT = 8060;
 
@@ -21,6 +21,16 @@ export const DEFAULT_ECP_PORT = 8060;
  * (expert mode, CLI) and can carry what the dialog never allowed.
  */
 export const RESERVED_IDS: ReadonlySet<string> = new Set(["info"]);
+
+/**
+ * The id of this instance's own object — where `native.devices` and the settings live.
+ *
+ * @param namespace the adapter namespace, e.g. `fakeroku.0`
+ * @returns `system.adapter.<namespace>`
+ */
+export function instanceObjectId(namespace: string): string {
+  return `system.adapter.${namespace}`;
+}
 
 /** The adapter's own objects below `info` — never device leftovers, never swept. */
 export const OWN_INFO_IDS: ReadonlySet<string> = new Set(["info", "info.connection"]);

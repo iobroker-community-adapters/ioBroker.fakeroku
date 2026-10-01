@@ -3,6 +3,7 @@ import * as net from "node:net";
 import type { CommandEvent } from "./ecp-command";
 import { SOFTWARE_VERSION } from "./device-info";
 import { EcpHttpServer } from "./ecp-http-server";
+import { LogThrottle } from "../lib/log-throttle";
 
 /** A port the OS just had free — fixed numbers collide with whatever else runs on the machine. */
 async function freePort(): Promise<number> {
@@ -235,11 +236,11 @@ describe("EcpHttpServer", () => {
     const req = { socket: {} } as unknown as http.IncomingMessage;
     const h = server as unknown as {
       handle(q: http.IncomingMessage, s: http.ServerResponse): void;
-      nonLanLoggedAt: number;
+      logThrottle: LogThrottle;
     };
     // The rejection line is throttled to one per minute, and an earlier test in this
     // file already used up this minute — reset it so this test measures its own case.
-    h.nonLanLoggedAt = 0;
+    h.logThrottle = new LogThrottle(60_000);
     expect(() => h.handle(req, res)).not.toThrow();
     // No remote address at all is not a LAN client — a missing peer must not be
     // treated as trusted.
@@ -253,9 +254,9 @@ describe("EcpHttpServer", () => {
     // states database. Every request is still answered with 403.
     const h = server as unknown as {
       handle(q: http.IncomingMessage, s: http.ServerResponse): void;
-      nonLanLoggedAt: number;
+      logThrottle: LogThrottle;
     };
-    h.nonLanLoggedAt = 0;
+    h.logThrottle = new LogThrottle(60_000);
     debugLogs.length = 0;
     const statuses: number[] = [];
     for (let i = 0; i < 20; i++) {

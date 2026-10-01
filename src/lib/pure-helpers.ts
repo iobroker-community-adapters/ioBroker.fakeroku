@@ -3,6 +3,9 @@
  * kept isolated so they can be unit-tested on their own.
  */
 
+/** Every character an object-id segment of this adapter may not carry — each one becomes `_`. */
+export const UNSAFE_ID_CHAR = /[^A-Za-z0-9\-_]/g;
+
 /**
  * Make a string safe as an ioBroker object-id segment: every character outside
  * `[A-Za-z0-9-_]` becomes `_`.
@@ -11,7 +14,7 @@
  * @returns the id-safe string
  */
 export function sanitizeId(raw: string): string {
-  return raw.replace(/[^A-Za-z0-9\-_]/g, "_");
+  return raw.replace(UNSAFE_ID_CHAR, "_");
 }
 
 /**

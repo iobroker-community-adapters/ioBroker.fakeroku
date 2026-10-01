@@ -5,9 +5,8 @@ import {
   type DeviceLoadContext,
   type JsonFormSchema,
 } from "@iobroker/dm-utils";
-import { RESERVED_IDS } from "./lib/constants";
+import { instanceObjectId, RESERVED_IDS } from "./lib/constants";
 import {
-  deviceObjectId,
   deviceTreeOf,
   findClash,
   nextFreePort,
@@ -18,7 +17,7 @@ import {
 } from "./lib/device-config";
 import { randomIdentity } from "./lib/device-identity";
 import { t } from "./lib/i18n";
-import { sanitizeId } from "./lib/pure-helpers";
+import { sanitizeId, UNSAFE_ID_CHAR } from "./lib/pure-helpers";
 
 /**
  * One emulated Roku as stored in the adapter's native.devices — the manifest's own
@@ -33,11 +32,10 @@ type InstanceResult = { refresh: boolean };
 type DeviceResult = { refresh: "devices" };
 
 /**
- * The object id a name would take, as JavaScript the admin evaluates inside a validator.
- * Mirrors `sanitizeId` (lib/pure-helpers.ts) — the dialog has to answer the same question
- * as the runtime, and it cannot call into the adapter's code.
+ * The object id a name would take, as JavaScript the admin evaluates inside a validator — built from the same pattern
+ * as `sanitizeId`, because the dialog has to answer the same question as the runtime and cannot call into its code.
  */
-const ID_EXPRESSION = "(data.name||'').trim().replace(/[^A-Za-z0-9\\-_]/g,'_')";
+const ID_EXPRESSION = `(data.name||'').trim().replace(/${UNSAFE_ID_CHAR.source}/g,'_')`;
 
 /** The add/edit form for one emulated Roku, and the rule that keeps its OK button off. */
 export interface DeviceForm {
@@ -159,7 +157,7 @@ export function cleanDevice(raw: Record<string, unknown>): Omit<RokuDeviceConfig
  */
 export class FakerokuDeviceManagement extends DeviceManagement {
   private get objId(): string {
-    return `system.adapter.${this.adapter.namespace}`;
+    return instanceObjectId(this.adapter.namespace);
   }
 
   /**
@@ -295,8 +293,8 @@ export class FakerokuDeviceManagement extends DeviceManagement {
   }
 
   /**
-   * Manual add: pre-select a free port, show the form, and append the device with
-   * a stable derived uuid.
+   * Manual add: pre-select a free port, show the form, and append the device with its own
+   * random identity and a fixed object id.
    *
    * @param context the action context
    * @returns a directive to reload the manager
@@ -305,7 +303,7 @@ export class FakerokuDeviceManagement extends DeviceManagement {
     const devices = await this.readDevices();
     const usedNames = devices.map(d => d.name);
     const usedPorts = devices.map(d => d.port);
-    const usedIds = devices.map(deviceObjectId);
+    const usedIds = devices.map(d => d.objectId);
     const form = buildDeviceForm(usedNames, usedPorts, usedIds);
     const data = await context.showForm(form.schema, {
       title: t("dmAdd"),

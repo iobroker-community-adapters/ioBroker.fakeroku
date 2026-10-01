@@ -233,16 +233,6 @@ export function toDeviceRows(devices: unknown, tree: DeviceTree = EMPTY_TREE): D
 }
 
 /**
- * The object-id path segment of a row — fixed once known, see {@link DeviceRow.objectId}.
- *
- * @param row the normalised row
- * @returns the device's object id
- */
-export function deviceObjectId(row: DeviceRow): string {
-  return row.objectId;
-}
-
-/**
  * The lowest free ECP port at or above the real-Roku default, so a newly added device never
  * pre-selects a port another emulated Roku already uses.
  *
@@ -260,8 +250,8 @@ export function nextFreePort(usedPorts: readonly number[]): number {
 
 /**
  * A name/port clash against the other devices, as a ready-to-show message — the backend
- * safety net behind the form validator (the dialog validator may not fire in every admin
- * version; this never lets a duplicate through).
+ * safety net behind the dialog's OK rule, for anyone who writes the configuration another way
+ * (expert mode, CLI); this never lets a duplicate through.
  *
  * The object id is judged only for a NEW device: an existing one keeps the id it has, whatever
  * it is renamed to.
@@ -278,14 +268,15 @@ export function findClash(
   candidate: { name: string; port: number },
   exceptIndex: number,
 ): ioBroker.StringOrTranslated | null {
-  const name = candidate.name.trim().toLowerCase();
-  if (candidate.name.trim() === "") {
+  const trimmed = candidate.name.trim();
+  if (trimmed === "") {
     return t("deviceNameInvalid");
   }
+  const name = trimmed.toLowerCase();
   // A new device's tree is built from its name: guard the two ways that can go wrong — a
   // reserved id ("info" would collide with the adapter's own channel), and a different name
   // that maps to an id another device already occupies ("My Roku" and "My*Roku" → "My_Roku").
-  const id = exceptIndex === -1 ? sanitizeId(candidate.name.trim()) : null;
+  const id = exceptIndex === -1 ? sanitizeId(trimmed) : null;
   if (id !== null && (id === "" || RESERVED_IDS.has(id))) {
     return t("deviceNameInvalid");
   }
@@ -298,10 +289,10 @@ export function findClash(
     }
     // The other device's REAL object id — built from its stored name, taken over from the old
     // adapter, or stored — not an id derived from the name the list displays.
-    if (id !== null && deviceObjectId(devices[i]) === id) {
+    if (id !== null && devices[i].objectId === id) {
       return t("deviceNameInvalid");
     }
-    if (Number(devices[i].port) === candidate.port) {
+    if (devices[i].port === candidate.port) {
       return t("devicePortInUse");
     }
   }

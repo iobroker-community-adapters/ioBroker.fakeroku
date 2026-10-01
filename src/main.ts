@@ -8,8 +8,8 @@ import { DEFAULT_APPS } from "./ecp/device-info";
 import { COMMAND_TYPES, type CommandEvent } from "./ecp/ecp-command";
 import { EcpHttpServer } from "./ecp/ecp-http-server";
 import { commandToStateWrite, type DeviceType, keysForType } from "./ecp/state-model";
-import { RESERVED_IDS } from "./lib/constants";
-import { deviceObjectId, deviceTreeOf, toDeviceRows, type DeviceRow } from "./lib/device-config";
+import { instanceObjectId, RESERVED_IDS } from "./lib/constants";
+import { deviceTreeOf, toDeviceRows, type DeviceRow } from "./lib/device-config";
 import { randomIdentity } from "./lib/device-identity";
 import {
   detectLocalIPv4s,
@@ -24,6 +24,7 @@ import { migrateNativeKeys, type NativeKeyMigration } from "./lib/native-key-mig
 import { tDesc, tName, tRaw } from "./lib/i18n";
 import { isLanClient } from "./lib/lan-guard";
 import { planNativePrune, planObjectCleanup } from "./lib/object-cleanup";
+import { LogThrottle } from "./lib/log-throttle";
 import { RateGate } from "./lib/rate-gate";
 
 /** Managed timeout for a stuck SSDP start (a busy port 1900 must not hang onReady). */
@@ -133,8 +134,8 @@ export class Fakeroku extends utils.Adapter {
   private readonly deviceKeys = new Map<string, ReadonlySet<string>>();
   /** Per device, its command rate gate — the write-flood protection for the states database. */
   private readonly commandGates = new Map<string, RateGate>();
-  /** Per device, when the dropped-commands warning was last written. */
-  private readonly rateWarnedAt = new Map<string, number>();
+  /** Per device, the dropped-commands warning — at most once per RATE_WARN_INTERVAL_MS. */
+  private readonly rateWarnings = new LogThrottle(RATE_WARN_INTERVAL_MS);
   /** Per device id, the name the user gave it — for log lines the user can recognise. */
   private readonly deviceNames = new Map<string, string>();
   /** The devices that are actually listening — the basis for info.connection. */
@@ -215,7 +216,7 @@ export class Fakeroku extends utils.Adapter {
    * @returns true when the object was written — the caller aborts its start, the host restarts
    */
   private async repairInstanceObject(): Promise<boolean> {
-    const id = `system.adapter.${this.namespace}`;
+    const id = instanceObjectId(this.namespace);
     let obj: { common?: Record<string, unknown>; native?: Record<string, unknown> } | null | undefined;
     try {
       obj = await this.getForeignObjectAsync(id);
@@ -427,7 +428,7 @@ export class Fakeroku extends utils.Adapter {
       if (this.stopping) {
         return;
       }
-      const deviceId = deviceObjectId(row);
+      const deviceId = row.objectId;
       // Two configured names can sanitize to the same object id — the admin guards
       // against it, but a hand-edited config could still carry it. Skip the duplicate
       // instead of letting two devices fight over one object tree.
@@ -889,7 +890,7 @@ export class Fakeroku extends utils.Adapter {
     if (!configured) {
       return;
     }
-    await this.cleanupOrphans(new Set(configured.map(row => deviceObjectId(row))));
+    await this.cleanupOrphans(new Set(configured.map(row => row.objectId)));
   }
 
   /**
@@ -941,7 +942,7 @@ export class Fakeroku extends utils.Adapter {
       objectId: row.objectId,
     }));
     try {
-      await this.extendForeignObjectAsync(`system.adapter.${this.namespace}`, { native: { devices } });
+      await this.extendForeignObjectAsync(instanceObjectId(this.namespace), { native: { devices } });
     } catch (e) {
       // Not fatal: the device starts with the identity derived from its name, as before.
       this.log.warn(`New emulated Roku could not get its own identity (${errText(e)}) — trying again next start`);
@@ -1058,7 +1059,7 @@ export class Fakeroku extends utils.Adapter {
     // The release of a key that is actually HELD never passes through the rate gate.
     // Dropping a keypress costs one event; dropping the keyup of a held key leaves it true
     // until the 30 s watchdog, so the flood protection would be the thing that falsifies
-    // the tree. It also costs one write instead of four, so it is not what the gate exists
+    // the tree. It also costs three writes instead of four, so it is not what the gate exists
     // to stop.
     // The exemption asks whether there is something to release, not what the request looks
     // like: without the watchdog check a flood of keyup requests for a key nobody is holding
@@ -1147,8 +1148,7 @@ export class Fakeroku extends utils.Adapter {
     if (gate.allow(now)) {
       return true;
     }
-    if (now - (this.rateWarnedAt.get(deviceId) ?? 0) >= RATE_WARN_INTERVAL_MS) {
-      this.rateWarnedAt.set(deviceId, now);
+    if (this.rateWarnings.due(deviceId, now)) {
       this.log.warn(
         `Emulated Roku "${this.deviceNames.get(deviceId) ?? deviceId}" receives more than ${MAX_COMMANDS_PER_SECOND} commands per second — dropping the excess (a misbehaving controller?)`,
       );
@@ -1308,7 +1308,6 @@ export class Fakeroku extends utils.Adapter {
       this.deviceKeys.clear();
       this.deviceNames.clear();
       this.commandGates.clear();
-      this.rateWarnedAt.clear();
       this.running.length = 0;
       this.pending = [];
       // The SSDP socket is the one thing that cannot close yet — the farewell goes out
