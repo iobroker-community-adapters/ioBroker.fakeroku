@@ -6,6 +6,9 @@
 
 **Support:** [![Ko-fi](https://img.shields.io/badge/Ko--fi-Support-ff5e5b?logo=ko-fi)](https://ko-fi.com/krobipd) [![PayPal](https://img.shields.io/badge/Donate-PayPal-blue.svg)](https://paypal.me/krobipd)
 
+> [!IMPORTANT]
+> This adapter cannot be installed from github
+
 Emulates one or more **[Roku](https://www.roku.com/) devices** on your LAN so that ECP/SSDP remotes and
 controllers — a Logitech Harmony Hub, a Sofabaton X1/X2, Home Assistant's Roku integration,
 openHAB — can trigger events in ioBroker. It is the **input** counterpart to the Logitech
