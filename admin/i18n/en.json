@@ -32,6 +32,14 @@
   "stateLastCommandDesc": "The most recent command this emulated Roku received, as plain text.",
   "stateLastCommandType": "Last command type",
   "stateLastCommandTypeDesc": "What kind of command it was: a key press, a key held or released, an app launch or install, a text input or a search.",
+  "commandType_none": "No command yet",
+  "commandType_keypress": "Key press",
+  "commandType_keydown": "Key held",
+  "commandType_keyup": "Key released",
+  "commandType_launch": "App launch",
+  "commandType_install": "App install",
+  "commandType_input": "Text input",
+  "commandType_search": "Search",
   "channelKeys": "Remote keys",
   "channelKeysDesc": "One state per remote key this device offers; a key press pulses it briefly."
 }

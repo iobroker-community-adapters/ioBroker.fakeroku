@@ -215,6 +215,8 @@ class Adapter {
 export const I18n = {
   init: vi.fn(() => Promise.resolve()),
   getTranslatedObject: vi.fn((key: string) => ({ en: key, de: key })),
+  // translate is what tText calls for a label in the system language: the key itself, for the same reason.
+  translate: vi.fn((key: string) => key),
 };
 
 export { Adapter };

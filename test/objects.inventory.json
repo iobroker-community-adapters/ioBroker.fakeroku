@@ -150,13 +150,14 @@
       "write": false,
       "def": "",
       "states": {
-        "keypress": "keypress",
-        "keydown": "keydown",
-        "keyup": "keyup",
-        "launch": "launch",
-        "install": "install",
-        "input": "input",
-        "search": "search"
+        "": "No command yet",
+        "keypress": "Key press",
+        "keydown": "Key held",
+        "keyup": "Key released",
+        "launch": "App launch",
+        "install": "App install",
+        "input": "Text input",
+        "search": "Search"
       }
     },
     "native": {},
@@ -688,13 +689,14 @@
       "write": false,
       "def": "",
       "states": {
-        "keypress": "keypress",
-        "keydown": "keydown",
-        "keyup": "keyup",
-        "launch": "launch",
-        "install": "install",
-        "input": "input",
-        "search": "search"
+        "": "No command yet",
+        "keypress": "Key press",
+        "keydown": "Key held",
+        "keyup": "Key released",
+        "launch": "App launch",
+        "install": "App install",
+        "input": "Text input",
+        "search": "Search"
       }
     },
     "native": {},

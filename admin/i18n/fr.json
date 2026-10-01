@@ -32,6 +32,14 @@
   "stateLastCommandDesc": "La commande la plus récente reçue par ce Roku émulé, en texte brut.",
   "stateLastCommandType": "Type de la dernière commande",
   "stateLastCommandTypeDesc": "De quel type de commande il s'agissait : appui sur une touche, touche maintenue ou relâchée, lancement ou installation d'une application, saisie de texte ou recherche.",
+  "commandType_none": "Aucune commande pour l'instant",
+  "commandType_keypress": "Appui sur une touche",
+  "commandType_keydown": "Touche maintenue",
+  "commandType_keyup": "Touche relâchée",
+  "commandType_launch": "Lancement d'appli",
+  "commandType_install": "Installation d'appli",
+  "commandType_input": "Saisie de texte",
+  "commandType_search": "Recherche",
   "channelKeys": "Touches de la télécommande",
   "channelKeysDesc": "Un état par touche proposée par cet appareil ; un appui le met brièvement à vrai."
 }

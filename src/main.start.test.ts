@@ -79,14 +79,22 @@ describe("Fakeroku onReady — device wiring", () => {
     });
   });
 
-  it("commandType carries the fixed verb list as plain-string labels", async () => {
+  it("commandType lists every value it can hold, labelled in the system language", async () => {
     const ctx = setup();
     await ctx.i.onReady();
     const states = (ctx.i.objects.get("Wohnzimmer.commandType") as { common: { states: Record<string, unknown> } })
       .common.states;
-    expect(Object.keys(states).sort()).toEqual(
-      ["input", "install", "keydown", "keypress", "keyup", "launch", "search"].sort(),
-    );
+    // The empty start value is a value too — a list without it marks every fresh tree as wrong.
+    expect(states).toEqual({
+      "": "commandType_none",
+      keypress: "commandType_keypress",
+      keydown: "commandType_keydown",
+      keyup: "commandType_keyup",
+      launch: "commandType_launch",
+      install: "commandType_install",
+      input: "commandType_input",
+      search: "commandType_search",
+    });
     // A translation object as a value is React error #31 in the admin's object view.
     for (const v of Object.values(states)) {
       expect(typeof v).toBe("string");

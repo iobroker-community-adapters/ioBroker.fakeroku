@@ -32,6 +32,14 @@
   "stateLastCommandDesc": "De meest recente opdracht die deze geëmuleerde Roku ontving, als platte tekst.",
   "stateLastCommandType": "Type laatste opdracht",
   "stateLastCommandTypeDesc": "Wat voor soort opdracht het was: een toetsdruk, een toets ingedrukt of losgelaten, een app starten of installeren, tekstinvoer of zoeken.",
+  "commandType_none": "Nog geen opdracht",
+  "commandType_keypress": "Toetsdruk",
+  "commandType_keydown": "Toets vastgehouden",
+  "commandType_keyup": "Toets losgelaten",
+  "commandType_launch": "App starten",
+  "commandType_install": "App installeren",
+  "commandType_input": "Tekstinvoer",
+  "commandType_search": "Zoeken",
   "channelKeys": "Afstandsbedieningstoetsen",
   "channelKeysDesc": "Eén status per toets die dit apparaat biedt; een toetsdruk zet hem kort op waar."
 }

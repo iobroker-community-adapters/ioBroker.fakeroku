@@ -32,6 +32,14 @@
   "stateLastCommandDesc": "Последняя команда, полученная этим эмулированным Roku, в виде текста.",
   "stateLastCommandType": "Тип последней команды",
   "stateLastCommandTypeDesc": "Какого рода была команда: нажатие кнопки, удержание или отпускание, запуск или установка приложения, ввод текста или поиск.",
+  "commandType_none": "Команд ещё не было",
+  "commandType_keypress": "Нажатие клавиши",
+  "commandType_keydown": "Клавиша удерживается",
+  "commandType_keyup": "Клавиша отпущена",
+  "commandType_launch": "Запуск приложения",
+  "commandType_install": "Установка приложения",
+  "commandType_input": "Ввод текста",
+  "commandType_search": "Поиск",
   "channelKeys": "Кнопки пульта",
   "channelKeysDesc": "По одному состоянию на каждую кнопку пульта этого устройства; нажатие кратко переводит его в истину."
 }

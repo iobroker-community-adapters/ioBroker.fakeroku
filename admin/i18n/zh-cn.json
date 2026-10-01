@@ -32,6 +32,14 @@
   "stateLastCommandDesc": "该模拟 Roku 最近收到的命令，以纯文本表示。",
   "stateLastCommandType": "最后一条命令的类型",
   "stateLastCommandTypeDesc": "命令的种类：按键、按住或松开按键、启动或安装应用、输入文本或搜索。",
+  "commandType_none": "尚无命令",
+  "commandType_keypress": "按键",
+  "commandType_keydown": "按住按键",
+  "commandType_keyup": "松开按键",
+  "commandType_launch": "启动应用",
+  "commandType_install": "安装应用",
+  "commandType_input": "文本输入",
+  "commandType_search": "搜索",
   "channelKeys": "遥控器按键",
   "channelKeysDesc": "该设备提供的每个遥控器按键各有一个状态；按下时会短暂置为真。"
 }
