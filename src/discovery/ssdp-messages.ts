@@ -19,7 +19,20 @@ export interface RokuAdvert {
 const SERVER_SIG = "Roku UPnP/1.0 MiniUPnPd/1.4";
 const MAX_AGE = 3600;
 
-/** The device type every Roku announces — players and Roku TVs alike. */
+/**
+ * The unique service name of one emulated Roku — Roku's own form, the plain identity with no `::<device>` suffix.
+ *
+ * @param uuid the device identity
+ * @returns the USN, also the UDN of the description
+ */
+export function usnOf(uuid: string): string {
+  return `uuid:roku:ecp:${uuid}`;
+}
+
+/**
+ * The device type every Roku announces — players and Roku TVs alike (a TCL or onn. Roku TV serves exactly this URN;
+ * `…:tv:1-0` exists nowhere, and Home Assistant's SSDP filter never matched it).
+ */
 export const ROKU_DEVICE_TYPE = "urn:roku-com:device:player:1-0";
 
 /** The fixed search targets this responder answers; a `uuid:roku:ecp:<id>` search is answered too. */
@@ -67,7 +80,7 @@ export function rokuSearchTarget(message: string): SearchTarget | null {
  * @returns true if this device answers
  */
 export function answersSearch(device: RokuAdvert, target: SearchTarget): boolean {
-  return !target.startsWith("uuid:") || target === `uuid:roku:ecp:${device.uuid}`;
+  return !target.startsWith("uuid:") || target === usnOf(device.uuid);
 }
 
 /**
@@ -95,7 +108,7 @@ export function buildSearchResponse(
     // The wildcard is answered as the Roku service, which is the only thing this responder is;
     // every other target is mirrored, since a control point discards an answer naming another.
     `ST: ${target === "ssdp:all" ? "roku:ecp" : target}`,
-    `USN: uuid:roku:ecp:${device.uuid}`,
+    `USN: ${usnOf(device.uuid)}`,
     "Ext: ",
     `Server: ${SERVER_SIG}`,
     `LOCATION: http://${advertiseIp}:${device.port}/`,
@@ -119,7 +132,7 @@ export function buildByebyeNotify(device: RokuAdvert): string {
     "Host: 239.255.255.250:1900",
     "NT: roku:ecp",
     "NTS: ssdp:byebye",
-    `USN: uuid:roku:ecp:${device.uuid}`,
+    `USN: ${usnOf(device.uuid)}`,
     "",
     "",
   ].join("\r\n");
@@ -142,7 +155,7 @@ export function buildAliveNotify(device: RokuAdvert, advertiseIp: string): strin
     "NT: roku:ecp",
     "NTS: ssdp:alive",
     `Server: ${SERVER_SIG}`,
-    `USN: uuid:roku:ecp:${device.uuid}`,
+    `USN: ${usnOf(device.uuid)}`,
     "",
     "",
   ].join("\r\n");

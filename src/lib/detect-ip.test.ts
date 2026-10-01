@@ -87,14 +87,15 @@ describe("listLocalNets", () => {
     ]);
   });
 
-  it("derives the prefix from the netmask when the OS gives no cidr", () => {
+  it("takes a netmask Node could not turn into a prefix (cidr null) as the address alone", () => {
+    // Node sets cidr to null only for a netmask that is not contiguous; there is no prefix to take.
     const nets = listLocalNets({
       eth0: [
-        { address: "10.1.2.3", family: "IPv4", internal: false, netmask: "255.255.0.0" } as never,
-        { address: "fd00::1", family: "IPv6", internal: false, netmask: "ffff:ffff:ffff:ff00::" } as never,
+        { address: "10.1.2.3", family: "IPv4", internal: false, netmask: "255.0.255.0", cidr: null } as never,
+        { address: "fd00::1", family: "IPv6", internal: false, netmask: "ffff:0:ffff::", cidr: null } as never,
       ],
     });
-    expect(nets.map(n => n.prefixLength)).toEqual([16, 56]);
+    expect(nets.map(n => n.prefixLength)).toEqual([32, 128]);
   });
 
   it("drops a zone suffix, and counts an entry without a prefix as the address alone", () => {
@@ -143,6 +144,22 @@ describe("inNet", () => {
     expect(inNet("2003:00E1:1F28:9A00::42%eth0", v6net)).toBe(true);
     expect(inNet("2003:e1:1f28:9a01::42", v6net)).toBe(false);
     expect(inNet("2003:e1:1f28:9a01::42", { ...v6net, prefixLength: 56 })).toBe(true);
+  });
+
+  it("a /32 and a /128 network hold the own address only", () => {
+    expect(inNet("192.168.1.5", { ...lan, prefixLength: 32 })).toBe(true);
+    expect(inNet("192.168.1.6", { ...lan, prefixLength: 32 })).toBe(false);
+    expect(inNet("2003:e1:1f28:9a00::5", { ...v6net, prefixLength: 128 })).toBe(true);
+    expect(inNet("2003:e1:1f28:9a00::6", { ...v6net, prefixLength: 128 })).toBe(false);
+  });
+
+  it("takes an IPv4-mapped address for the IPv4 address it carries", () => {
+    expect(inNet("::ffff:192.168.1.77", lan)).toBe(true);
+    expect(inNet("::ffff:192.168.2.77", lan)).toBe(false);
+  });
+
+  it("ignores a zone suffix on the network's own address", () => {
+    expect(inNet("fe80::2", { ...v6net, address: "fe80::1%en0", prefixLength: 64 })).toBe(true);
   });
 
   it("refuses a malformed IPv6 value instead of guessing", () => {

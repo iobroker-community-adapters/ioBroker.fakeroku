@@ -1,3 +1,4 @@
+import { BlockList, isIPv4, isIPv6 } from "node:net";
 import { networkInterfaces, type NetworkInterfaceInfo } from "node:os";
 
 /** The OS network-interface map (the `os.networkInterfaces()` shape). */
@@ -50,26 +51,15 @@ function isVirtual(iface: string, address: string): boolean {
 }
 
 /**
- * The prefix length of an interface address: from `cidr` when the OS gives it, else counted from
- * the netmask.
+ * The prefix length of an interface address, from `cidr`. Node computes `cidr` from the netmask itself and sets it to
+ * null only for a netmask that is not contiguous — then there is no prefix to take.
  *
  * @param addr one entry of an os.networkInterfaces() list
- * @returns the prefix length, or null when neither is usable
+ * @returns the prefix length, or null when the OS gives none
  */
 function prefixLengthOf(addr: NetworkInterfaceInfo): number | null {
-  const fromCidr = typeof addr.cidr === "string" ? Number(addr.cidr.split("/")[1]) : NaN;
-  if (Number.isInteger(fromCidr)) {
-    return fromCidr;
-  }
-  if (addr.family === "IPv4" && typeof addr.netmask === "string") {
-    const bits = ipv4ToInt(addr.netmask);
-    return bits === null ? null : bits.toString(2).replace(/0/g, "").length;
-  }
-  if (addr.family === "IPv6" && typeof addr.netmask === "string") {
-    const groups = expandIPv6(addr.netmask);
-    return groups ? groups.reduce((n, g) => n + parseInt(g, 16).toString(2).replace(/0/g, "").length, 0) : null;
-  }
-  return null;
+  const bits = typeof addr.cidr === "string" ? Number(addr.cidr.split("/")[1]) : NaN;
+  return Number.isInteger(bits) ? bits : null;
 }
 
 /**
@@ -195,6 +185,17 @@ export function netsOfInterface(address: string, nets: readonly LocalNet[]): Loc
 }
 
 /**
+ * An address as the socket reports it, without the IPv4-mapped prefix a dual-stack socket puts in front of an IPv4
+ * client (`::ffff:192.168.1.5` → `192.168.1.5`).
+ *
+ * @param address the socket address
+ * @returns the plain address
+ */
+export function stripMappedPrefix(address: string): string {
+  return address.replace(/^::ffff:/i, "");
+}
+
+/**
  * The host's own IPv4 address in the network a remote sits in — the address that remote can
  * reach. On a host with several networks a search from the IoT VLAN must be answered with the
  * host's IoT VLAN address, not with the address of another network the remote cannot route to.
@@ -204,76 +205,30 @@ export function netsOfInterface(address: string, nets: readonly LocalNet[]): Loc
  * @returns the host's address in the remote's network, or undefined if it shares none
  */
 export function localAddressFor(remote: string, nets: readonly LocalNet[]): string | undefined {
-  const ip = remote.replace(/^::ffff:/i, "");
+  const ip = stripMappedPrefix(remote);
   return nets.find(net => net.family === "IPv4" && inNet(ip, net))?.address;
 }
 
 /**
- * Is an address inside one of the host's networks (by the network's prefix length)?
+ * Is an address inside one of the host's networks (by the network's prefix length)? Node's own subnet check decides;
+ * anything that is not a plain IPv4 or IPv6 address is in no network.
  *
  * @param address the address to test (IPv4, or IPv6 with an optional zone suffix)
  * @param net the network
  * @returns true if the address lies in the network
  */
 export function inNet(address: string, net: LocalNet): boolean {
-  if (net.family === "IPv4") {
-    const a = ipv4ToInt(address);
-    const n = ipv4ToInt(net.address);
-    if (a === null || n === null) {
-      return false;
-    }
-    const mask = net.prefixLength === 0 ? 0 : (~0 << (32 - net.prefixLength)) >>> 0;
-    return (a & mask) >>> 0 === (n & mask) >>> 0;
-  }
-  const a = expandIPv6(address);
-  const n = expandIPv6(net.address);
-  if (!a || !n) {
+  const ip = address.split("%")[0];
+  const type = isIPv4(ip) ? "ipv4" : isIPv6(ip) ? "ipv6" : undefined;
+  if (!type) {
     return false;
   }
-  const bits = (groups: string[]): string => groups.map(g => parseInt(g, 16).toString(2).padStart(16, "0")).join("");
-  return bits(a).slice(0, net.prefixLength) === bits(n).slice(0, net.prefixLength);
-}
-
-/**
- * An IPv4 address as an unsigned 32-bit number, or null if it is not a dotted quad.
- *
- * @param address the address text
- * @returns the number, or null
- */
-function ipv4ToInt(address: string): number | null {
-  const parts = address.split(".");
-  if (parts.length !== 4 || parts.some(p => !/^\d{1,3}$/.test(p) || Number(p) > 255)) {
-    return null;
+  try {
+    const list = new BlockList();
+    list.addSubnet(net.address, net.prefixLength, net.family === "IPv4" ? "ipv4" : "ipv6");
+    return list.check(ip, type);
+  } catch {
+    // A network the OS reported in a form the check refuses holds no address.
+    return false;
   }
-  return parts.reduce((n, p) => ((n << 8) | Number(p)) >>> 0, 0);
-}
-
-/**
- * Expand an IPv6 address to its eight four-digit groups, resolving the `::`
- * shorthand and dropping a `%zone` suffix. Returns null for anything that is not
- * a plain IPv6 address (an IPv4-mapped form, a malformed value).
- *
- * @param address the IPv6 address text
- * @returns the eight normalised groups, or null
- */
-function expandIPv6(address: string): string[] | null {
-  const bare = address.toLowerCase().split("%")[0];
-  if (!bare.includes(":") || bare.includes(".")) {
-    return null; // not IPv6, or an IPv4-mapped/embedded form
-  }
-  const halves = bare.split("::");
-  if (halves.length > 2) {
-    return null;
-  }
-  const head = halves[0] ? halves[0].split(":") : [];
-  const tail = halves.length === 2 ? (halves[1] ? halves[1].split(":") : []) : [];
-  const fill = 8 - head.length - tail.length;
-  if (halves.length === 2 && fill < 1) {
-    return null;
-  }
-  const groups = halves.length === 2 ? [...head, ...Array<string>(fill).fill("0"), ...tail] : head;
-  if (groups.length !== 8 || groups.some(g => !/^[0-9a-f]{1,4}$/.test(g))) {
-    return null;
-  }
-  return groups.map(g => g.padStart(4, "0"));
 }

@@ -1,4 +1,4 @@
-import type { RokuAdvert } from "../discovery/ssdp-messages";
+import { ROKU_DEVICE_TYPE, type RokuAdvert, usnOf } from "../discovery/ssdp-messages";
 import type { DeviceType } from "./state-model";
 
 /**
@@ -19,7 +19,6 @@ const SOFTWARE_BUILD = "4200";
 interface DeviceProfile {
   modelName: string;
   modelNumber: string;
-  deviceType: string;
   isTv: boolean;
   supportsTvPowerControl: boolean;
   supportsAudioVolumeControl: boolean;
@@ -34,7 +33,6 @@ const PROFILES: Record<DeviceType, DeviceProfile> = {
   player: {
     modelName: "Roku Ultra",
     modelNumber: "4800X",
-    deviceType: "urn:roku-com:device:player:1-0",
     isTv: false,
     supportsTvPowerControl: false,
     supportsAudioVolumeControl: false,
@@ -42,9 +40,6 @@ const PROFILES: Record<DeviceType, DeviceProfile> = {
   tv: {
     modelName: "Roku TV",
     modelNumber: "C4A4X",
-    // Roku TVs announce themselves as a player too (a TCL or onn. Roku TV serves exactly this
-    // URN); `...:tv:1-0` exists nowhere else, and Home Assistant's SSDP filter never matched it.
-    deviceType: "urn:roku-com:device:player:1-0",
     isTv: true,
     supportsTvPowerControl: true,
     supportsAudioVolumeControl: true,
@@ -91,13 +86,13 @@ export function buildDescXml(device: RokuAdvert, friendlyName: string, type: Dev
 <root xmlns="urn:schemas-upnp-org:device-1-0">
   <specVersion><major>1</major><minor>0</minor></specVersion>
   <device>
-    <deviceType>${p.deviceType}</deviceType>
+    <deviceType>${ROKU_DEVICE_TYPE}</deviceType>
     <friendlyName>${xmlEscape(friendlyName)}</friendlyName>
     <manufacturer>Roku</manufacturer>
     <modelName>${p.modelName}</modelName>
     <modelNumber>${p.modelNumber}</modelNumber>
     <serialNumber>${device.uuid}</serialNumber>
-    <UDN>uuid:roku:ecp:${device.uuid}</UDN>
+    <UDN>${usnOf(device.uuid)}</UDN>
     <serviceList>
       <service>
         <serviceType>urn:roku-com:service:ecp:1</serviceType>

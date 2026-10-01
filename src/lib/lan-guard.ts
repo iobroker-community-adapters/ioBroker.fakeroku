@@ -1,4 +1,4 @@
-import { detectLocalNets, inNet, type LocalNet } from "./detect-ip";
+import { detectLocalNets, inNet, type LocalNet, stripMappedPrefix } from "./detect-ip";
 
 /**
  * The trust boundary of both network services (ECP HTTP + SSDP): only a client in one of the
@@ -29,7 +29,7 @@ export function isLanClient(
   if (!remoteAddress) {
     return false;
   }
-  const ip = remoteAddress.replace(/^::ffff:/i, "").toLowerCase();
+  const ip = stripMappedPrefix(remoteAddress).toLowerCase();
   if (/^127\./.test(ip) || ip === "::1") {
     return true;
   }

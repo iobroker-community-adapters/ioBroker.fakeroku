@@ -1,5 +1,6 @@
 import * as http from "node:http";
 import type { RokuAdvert } from "../discovery/ssdp-messages";
+import { stripMappedPrefix } from "../lib/detect-ip";
 import { errText } from "../lib/err-text";
 import { isLanClient } from "../lib/lan-guard";
 import type { AdapterLogger } from "../lib/logger";
@@ -152,7 +153,7 @@ export class EcpHttpServer {
   }
 
   private handle(req: http.IncomingMessage, res: http.ServerResponse): void {
-    const peer = (req.socket.remoteAddress ?? "").replace(/^::ffff:/, "") || "?";
+    const peer = stripMappedPrefix(req.socket.remoteAddress ?? "") || "?";
     const allowed = this.config.isClientAllowed ?? ((a: string | undefined): boolean => isLanClient(a));
     if (!allowed(req.socket.remoteAddress)) {
       // Debug (not warn): a stray WAN scanner must not spam the log, but when a
