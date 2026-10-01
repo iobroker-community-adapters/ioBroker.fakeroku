@@ -80,19 +80,6 @@
         "pl": "Zapis zachowuje tożsamość sieciową, zajęty port ECP jest próbowany ponownie, zatrzymana instancja usuwa swoje Roku, a adapter może działać w trybie kompaktowym.",
         "uk": "Збереження не змінює мережевий ідентифікатор, зайнятий порт ECP перевіряється повторно, зупинений екземпляр прибирає свої Roku, адаптер може працювати в компактному режимі.",
         "zh-cn": "保存设备保留其网络标识，被占用的 ECP 端口会重试，停止的实例会注销其模拟 Roku，适配器支持精简模式。"
-      },
-      "1.5.0": {
-        "en": "Deleting the last emulated Roku now removes its datapoints, a host running Docker no longer announces an unreachable address, and a failed device is reported.",
-        "de": "Das Löschen des letzten emulierten Roku entfernt jetzt seine Datenpunkte, ein Rechner mit Docker kündigt keine unerreichbare Adresse mehr an, ein Ausfall wird gemeldet.",
-        "ru": "Удаление последнего эмулируемого Roku теперь удаляет его точки данных, хост с Docker не объявляет недоступный адрес, а об отказе устройства сообщается.",
-        "pt": "Eliminar o último Roku emulado remove agora os seus pontos de dados, um sistema com Docker não anuncia um endereço inacessível e uma falha é comunicada.",
-        "nl": "Het verwijderen van de laatste geëmuleerde Roku wist nu zijn datapunten, een host met Docker kondigt geen onbereikbaar adres meer aan en een uitval wordt gemeld.",
-        "fr": "La suppression du dernier Roku émulé retire ses points de données, un hôte avec Docker n'annonce plus une adresse injoignable et une panne est signalée.",
-        "it": "L'eliminazione dell'ultimo Roku emulato rimuove i suoi punti dati, un host con Docker non annuncia più un indirizzo irraggiungibile e un guasto viene segnalato.",
-        "es": "Al eliminar el último Roku emulado se borran sus puntos de datos, un equipo con Docker ya no anuncia una dirección inalcanzable y se informa de un fallo.",
-        "pl": "Usunięcie ostatniego emulowanego Roku usuwa jego punkty danych, host z Dockerem nie ogłasza już nieosiągalnego adresu, a awaria jest zgłaszana.",
-        "uk": "Видалення останнього емульованого Roku прибирає його точки даних, хост із Docker не оголошує недосяжну адресу, а про відмову повідомляється.",
-        "zh-cn": "删除最后一个模拟 Roku 会一并移除其数据点，运行 Docker 的主机不再公告无法访问的地址，设备失效会被报告。"
       }
     },
     "titleLang": {
