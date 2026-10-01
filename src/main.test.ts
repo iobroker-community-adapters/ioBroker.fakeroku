@@ -70,11 +70,11 @@ vi.mock("@iobroker/adapter-core", () => {
     // The double needs it because delObject strips an id from every enum it belongs to, which
     // is how a user's room/function assignment disappears without anything saying so.
     public enums = new Map<string, Set<string>>();
-    // The ids a write actually REACHED the store for. setStateChanged skips a value that is
-    // already there, so counting CALLS cannot tell a real write from a skipped one.
+    // The ids a write actually REACHED the store for — the start-up reset skips a value that is
+    // already there, so counting CALLS alone cannot tell a real write from a skipped one.
     // Both writers append here, setState included — so in a test that also applies a command
     // this list carries the pulse writes as well. Assert on it for the start-up reset, or
-    // filter it; do not read "absent from this list" as "setStateChanged skipped it".
+    // filter it.
     public written: string[] = [];
     // The instance object's native settings. js-controller builds `config` from exactly this,
     // so the key-migration reads and merges HERE — a double that kept only `config` would let a
@@ -110,19 +110,6 @@ vi.mock("@iobroker/adapter-core", () => {
       const key = id.replace(`${this.namespace}.`, "");
       this.states.set(key, { val: s?.val, ack: s?.ack === true });
       this.written.push(key);
-      return Promise.resolve();
-    });
-    // Writes only where the value actually differs — the js-controller contract the
-    // startup key reset relies on, so a test can tell a real reset from a blind write.
-    // js-controller's `_setStateChangedHelper` writes when val, ack OR q differ — not only val.
-    public setStateChangedAsync = vi.fn((id: string, state: unknown) => {
-      const s = state as { val?: unknown; ack?: boolean; q?: number };
-      const key = id.replace(`${this.namespace}.`, "");
-      const had: { val: unknown; ack: boolean; q?: number } | undefined = this.states.get(key);
-      if (!had || had.val !== s?.val || had.ack !== (s?.ack === true) || (had.q ?? 0) !== (s?.q ?? 0)) {
-        this.states.set(key, { val: s?.val, ack: s?.ack === true });
-        this.written.push(key);
-      }
       return Promise.resolve();
     });
     // Deep merge, not a flat spread: js-controller merges with node.extend(true, …), so an
@@ -175,6 +162,18 @@ vi.mock("@iobroker/adapter-core", () => {
         // the LIVE reference would make an in-place mutation that never reaches the database
         // look like a success in every test that reads the dump back.
         out[`${this.namespace}.${k}`] = structuredClone(v);
+      }
+      return Promise.resolve(out);
+    });
+    // The bulk read of the own namespace: copies with full ids, like getStatesAsync(`<ns>.*`).
+    public getStatesAsync = vi.fn((pattern: string) => {
+      const prefix = pattern.replace(/\*$/, "");
+      const out: Record<string, unknown> = {};
+      for (const [k, v] of this.states) {
+        const full = `${this.namespace}.${k}`;
+        if (full.startsWith(prefix)) {
+          out[full] = structuredClone(v);
+        }
       }
       return Promise.resolve(out);
     });
@@ -282,7 +281,8 @@ function internalOf(adapter: Fakeroku): {
   pulseTimers: Set<unknown>;
   holdTimers: Map<string, unknown>;
   setState: ReturnType<typeof vi.fn>;
-  setStateChangedAsync: ReturnType<typeof vi.fn>;
+  getStatesAsync: ReturnType<typeof vi.fn>;
+  lastState: Map<string, { val: unknown; ack: boolean; q?: number }>;
   extendObject: ReturnType<typeof vi.fn>;
   setForeignObject: ReturnType<typeof vi.fn>;
   instanceNative: Record<string, unknown>;
@@ -853,7 +853,7 @@ describe("Fakeroku onReady — key states are released at start-up", () => {
   });
 
   it("touches no key that is already false", async () => {
-    // setStateChanged semantics: a healthy tree must not get 27 pointless writes
+    // Compared against the start's bulk read: a healthy tree must not get 27 pointless writes
     // (and 27 fresh timestamps) on every single adapter start.
     const ctx = setup();
     ctx.i.states.set("Wohnzimmer.keys.Home", { val: false, ack: true });
@@ -872,11 +872,12 @@ describe("Fakeroku onReady — key states are released at start-up", () => {
 
   it("resets only the keys the device type actually carries", async () => {
     const ctx = setup({ devices: [{ name: "Wohnzimmer", port: 8060, type: "player" }] });
+    ctx.i.states.set("Wohnzimmer.keys.Home", { val: true, ack: true });
+    ctx.i.states.set("Wohnzimmer.keys.VolumeUp", { val: true, ack: true });
     await ctx.i.onReady();
-    const ids = ctx.i.setStateChangedAsync.mock.calls.map((c: unknown[]) => c[0] as string);
-    expect(ids).toContain("Wohnzimmer.keys.Home");
+    expect(ctx.i.written).toContain("Wohnzimmer.keys.Home");
     // VolumeUp is a TV key — a player has no such object, so nothing may be written to it.
-    expect(ids).not.toContain("Wohnzimmer.keys.VolumeUp");
+    expect(ctx.i.written).not.toContain("Wohnzimmer.keys.VolumeUp");
   });
 
   it("resets every configured device, not just the first", async () => {
@@ -1617,15 +1618,21 @@ describe("Fakeroku onUnload", () => {
 });
 
 describe("Fakeroku collaborator wiring", () => {
-  it("wires the device manager — the only thing that makes the admin's device list work", () => {
-    // Nothing else in the adapter ever reads this field — it exists purely for its
-    // constructor's side effect of registering the manager. Deleting the assignment
-    // outright is caught by the type check (TS2564, no definite assignment), but every
-    // variant that keeps the field satisfied is not: making it optional, assigning it
-    // lazily, or handing it something else. Then the admin's device list silently stops
-    // doing anything while lint, tsc and the rest of this suite stay green.
-    const i = internalOf(new Fakeroku());
-    expect(i.deviceManagement).toBeInstanceOf(FakerokuDeviceManagement);
+  it("wires the device manager — only once the translations are loaded", async () => {
+    // Nothing else in the adapter ever reads this field — it exists purely for its constructor's
+    // side effect of registering the manager, so dropping it would leave the admin's device list
+    // dead while lint and tsc stay green. It must come AFTER I18n.init: js-controller delivers
+    // messages before `ready`, and a card text built before the translations are loaded throws.
+    const ctx = setup();
+    let builtBeforeInit: unknown = "not called";
+    vi.mocked(I18n.init).mockImplementationOnce(() => {
+      builtBeforeInit = ctx.i.deviceManagement;
+      return Promise.resolve();
+    });
+    expect(ctx.i.deviceManagement).toBeUndefined();
+    await ctx.i.onReady();
+    expect(builtBeforeInit).toBeUndefined();
+    expect(ctx.i.deviceManagement).toBeInstanceOf(FakerokuDeviceManagement);
   });
 
   it("builds the real collaborators when nothing replaces the seams", () => {
@@ -1699,7 +1706,7 @@ describe("Fakeroku collaborator wiring", () => {
 
     const onFatal = ctx.ecp[0].options.onFatalError as () => void;
     expect(() => onFatal()).not.toThrow();
-    await Promise.resolve();
+    await new Promise(r => setImmediate(r));
 
     expect(ctx.i.log.debug).toHaveBeenCalledWith(expect.stringContaining("states db closed"));
   });
@@ -2595,6 +2602,8 @@ describe("Fakeroku — the late discovery start (all interfaces, no address at f
 
   it("reports a failed status write instead of an unhandled rejection", async () => {
     const { ctx, fire } = await waiting();
+    // The status is written only on a change; a value the adapter does not know forces the write here.
+    ctx.i.lastState.delete("info.connection");
     ctx.i.setState.mockImplementationOnce(() => Promise.reject(new Error("states db gone")));
     fire();
     await vi.waitFor(() => expect(ctx.i.log.warn).toHaveBeenCalledWith(expect.stringContaining("states db gone")));

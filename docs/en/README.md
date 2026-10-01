@@ -18,15 +18,16 @@ controlling a device, a device controls ioBroker.
 
 - Node.js 22 or newer
 - js-controller 7.2.2 or newer
-- admin 8.0.11 or newer
+- admin 8.0.14 or newer
 - A remote or hub on the **same local network** as your ioBroker host
 
 ## Setting it up
 
 ### 1. Create the instance
 
-Install the adapter and create one instance. It works out of the box: the instance
-comes with one emulated Roku already configured, named "Roku" on port 8060.
+Install the adapter and create one instance. A new instance starts switched off: check
+the settings below, then switch it on. It comes with one emulated Roku already configured,
+named "Roku" on port 8060.
 
 ### 2. Choose the network interface (usually: don't)
 

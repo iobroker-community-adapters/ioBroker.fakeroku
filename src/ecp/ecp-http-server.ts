@@ -1,6 +1,6 @@
 import * as http from "node:http";
 import type { RokuAdvert } from "../discovery/ssdp-messages";
-import { errText } from "../lib/errors";
+import { errText } from "../lib/err-text";
 import { isLanClient } from "../lib/lan-guard";
 import type { AdapterLogger } from "../lib/logger";
 import { type CommandEvent, parseEcpCommand } from "./ecp-command";

@@ -152,7 +152,7 @@
     "connectionType": "local",
     "dataSource": "push",
     "type": "multimedia",
-    "enabled": true,
+    "enabled": false,
     "authors": [
       "krobi <krobi@power-dreams.com>",
       "Pmant <patrickmo@gmx.de>",

@@ -1,3 +1,5 @@
+// Fleet master — the release run copies this file byte for byte into every adapter; change it in
+// Entwicklung/.consistency-master, never in an adapter.
 import config from "@iobroker/eslint-config";
 
 export default [
@@ -5,10 +7,11 @@ export default [
   {
     languageOptions: {
       parserOptions: {
-        // `test/standards/*.test.ts` is NOT listed here: the root tsconfig includes
-        // `test/**/*.ts` (the ioBroker standard), so the file is a real project member.
-        // Listing it in both places is a parsing error.
-        projectService: { allowDefaultProject: ["*.mjs", "vitest.config.mts"] },
+        projectService: {
+          // Only files no tsconfig covers stand here — typescript-eslint refuses a file that is in both. The root
+          // tsconfig covers src/ and test/**/*.ts, test/tsconfig.json the test hooks (*.cjs, *.mjs).
+          allowDefaultProject: ["*.mjs", "*.mts", "scripts/*.mjs"],
+        },
         tsconfigRootDir: import.meta.dirname,
       },
     },
@@ -20,22 +23,21 @@ export default [
   },
   {
     ignores: [
-      // The remember tool keeps a timestamp marker at .remember/tmp/last-ndc.ts; ESLint does
-      // not read .gitignore, so without this it lints that marker as TypeScript.
+      // Session files of the note-taking hook: its cooldown marker tmp/last-ndc.ts is a timestamp, not TypeScript.
       ".remember/**",
       ".dev-server/",
       ".vscode/",
       "*.test.js",
-      // The ioBroker template files under test/ (integration.js, package.js, inventory.js)
-      // are shipped as-is and stay out; test/standards/ is our own vitest suite and is
-      // linted like every other suite (fleet rule since 2026-09-02).
+      // The ioBroker template files and the mocha inventory harness under test/ run outside the TypeScript project.
       "test/*.js",
-      "test/fixtures/**",
       "*.config.mjs",
+      "tasks.js",
       "build",
       // Generated coverage report (npm run coverage) — never lint it.
       "coverage",
       "admin",
+      // The admin component is its own project with its own eslint.config.mjs.
+      "src-admin",
       "node_modules",
       "**/adapter-config.d.ts",
     ],

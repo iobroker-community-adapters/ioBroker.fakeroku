@@ -23,6 +23,8 @@ so they accept the emulated device instead of giving up on it.
 > implement. Use a Harmony hub or a Sofabaton — those speak the classic ECP this
 > adapter serves.
 
+[🇺🇸 Documentation](./docs/en/README.md) · [🇩🇪 Dokumentation](./docs/de/README.md)
+
 ## Features
 
 - Emulates one or more Roku devices on the LAN — the Roku control protocol (ECP) over HTTP plus SSDP discovery on port 1900.
@@ -40,13 +42,11 @@ For details and how to disable it, see the [Sentry plugin documentation](https:/
 
 - Node.js >= 22
 - js-controller >= 7.2.2
-- admin >= 8.0.11
-
-> The adapter CANNOT be installed via GitHub: The adapter must be installed via the ioBroker repository (stable or latest).
+- admin >= 8.0.14
 
 ## Ports
 
-- **TCP 8060 (listening, one per emulated Roku, configurable)** — the Roku control protocol (ECP): the remote sends its key presses here. A Harmony or Sofabaton reads the port from the discovery announcement; Home Assistant and Homey always use 8060.
+- **TCP 8060 (listening, one per emulated Roku, configurable)** — the Roku control protocol (ECP): the remote sends its key presses here.
 - **UDP 1900 (multicast, listening and outgoing)** — SSDP discovery, so a Harmony hub or Sofabaton finds the emulated Rokus; fixed by the UPnP standard.
 
 ## Configuration

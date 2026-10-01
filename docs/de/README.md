@@ -18,15 +18,16 @@ ein Gerät steuert, steuert ein Gerät den ioBroker.
 
 - Node.js 22 oder neuer
 - js-controller 7.2.2 oder neuer
-- admin 8.0.11 oder neuer
+- admin 8.0.14 oder neuer
 - Eine Fernbedienung bzw. ein Hub im **selben Heimnetz** wie der ioBroker-Rechner
 
 ## Einrichtung
 
 ### 1. Instanz anlegen
 
-Adapter installieren und eine Instanz anlegen. Er läuft sofort: Die Instanz bringt
-bereits einen emulierten Roku mit, Name „Roku", Anschluss 8060.
+Adapter installieren und eine Instanz anlegen. Eine neue Instanz startet ausgeschaltet:
+die Einstellungen unten prüfen, dann einschalten. Sie bringt bereits einen emulierten Roku
+mit, Name „Roku", Anschluss 8060.
 
 ### 2. Netzwerkschnittstelle wählen (meistens: nicht)
 

@@ -1,3 +1,5 @@
+// Fleet master — the release run requires this file byte for byte in every adapter; change it in
+// Entwicklung/.consistency-master, never in an adapter.
 /**
  * One readable line for anything a `catch` receives — never `[object Object]`, never without the reason.
  *

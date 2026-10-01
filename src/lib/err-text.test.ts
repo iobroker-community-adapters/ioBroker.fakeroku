@@ -1,6 +1,8 @@
+// Fleet master — the release run requires this file byte for byte in every adapter; change it in
+// Entwicklung/.consistency-master, never in an adapter.
 import http from "node:http";
 import net from "node:net";
-import { errText } from "./errors";
+import { errText } from "./err-text";
 
 /** A port nothing listens on. */
 async function closedPort(): Promise<number> {

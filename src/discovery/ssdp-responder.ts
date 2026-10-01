@@ -1,6 +1,6 @@
 import * as dgram from "node:dgram";
 import type { Membership } from "../lib/detect-ip";
-import { errText } from "../lib/errors";
+import { errText } from "../lib/err-text";
 import { isLanClient } from "../lib/lan-guard";
 import type { AdapterLogger } from "../lib/logger";
 import {

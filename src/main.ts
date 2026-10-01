@@ -19,7 +19,7 @@ import {
   localAddressFor,
   netsOfInterface,
 } from "./lib/detect-ip";
-import { errText } from "./lib/errors";
+import { errText } from "./lib/err-text";
 import { migrateNativeKeys, type NativeKeyMigration } from "./lib/native-key-migration";
 import { tDesc, tName, tRaw } from "./lib/i18n";
 import { isLanClient } from "./lib/lan-guard";
@@ -153,6 +153,15 @@ export class Fakeroku extends utils.Adapter {
    * an already-cleared map and write info.connection TRUE after the closing FALSE.
    */
   private stopping = false;
+  /**
+   * The read-only states this adapter writes outside the command hot path (`info.connection`, the key reset at
+   * start), as last known, keyed relative to the namespace. Primed once at start by one bulk read, so a restart writes
+   * nothing blindly and no such state is ever read one by one; `info.connection` is kept current by
+   * {@link writeIndicator}.
+   */
+  private readonly lastState = new Map<string, Pick<ioBroker.State, "val" | "ack" | "q">>();
+  /** The adapter's objects as read at start, keyed relative to the namespace. */
+  private ownObjects: ReadonlyMap<string, ioBroker.Object> = new Map();
   /** How many configured devices are expected to listen — the target info.connection compares against. */
   private expectedDevices = 0;
   /** The interface to bind to, or undefined for "all" — kept for the retry after onReady returned. */
@@ -160,12 +169,11 @@ export class Fakeroku extends utils.Adapter {
   /**
    * Device-manager backend: the emulated Rokus as cards with add/edit/delete.
    *
-   * Nothing reads this field, and that is not an oversight: dm-utils subscribes to
-   * the adapter's `message` event from its own constructor, so creating the object
-   * IS the wiring. The field keeps it visible — and owned — instead of leaving a
-   * bare `new` in the constructor that reads like a mistake.
+   * dm-utils subscribes to the adapter's `message` event from its own constructor, so creating the object IS the
+   * wiring — and it happens in onReady right after `I18n.init`: js-controller delivers messages before `ready`, and a
+   * card or dialog text built before the translations are loaded throws.
    */
-  private readonly deviceManagement: FakerokuDeviceManagement;
+  private deviceManagement: FakerokuDeviceManagement | undefined;
 
   // Construction seams for the two network-facing collaborators. Production uses
   // the real classes; the orchestration tests swap them for fakes so onReady's
@@ -187,7 +195,6 @@ export class Fakeroku extends utils.Adapter {
 
     this.on("ready", this.onReady.bind(this));
     this.on("unload", this.onUnload.bind(this));
-    this.deviceManagement = new FakerokuDeviceManagement(this);
   }
 
   /**
@@ -225,19 +232,23 @@ export class Fakeroku extends utils.Adapter {
   /** Create each device's object tree, start its ECP server, then the shared SSDP responder. */
   private async onReady(): Promise<void> {
     try {
+      await I18n.init(join(this.adapterDir, "admin"), this);
+      this.deviceManagement = new FakerokuDeviceManagement(this);
+
       // Repair what an update leaves behind in the instance object, before anything binds a port.
       // The write restarts this instance, so nothing may start before it.
       if (await this.repairInstanceObject()) {
         return;
       }
 
-      await this.setState("info.connection", { val: false, ack: true });
-      await I18n.init(join(this.adapterDir, "admin"), this);
+      await this.primeStates();
+      await this.writeIndicator("info.connection", false);
       await this.refreshOwnObjects();
 
       // The object tree as it is before this start touches it: the rows resolve their object id
       // and — for a row from before 0.7.0 — their type against it.
       const owned = await this.readOwnObjects();
+      this.ownObjects = owned;
       if (this.stopping) {
         return;
       }
@@ -671,7 +682,7 @@ export class Fakeroku extends utils.Adapter {
    */
   private async reportConnectionState(advertiseIp: string): Promise<void> {
     const allStarted = this.running.length === this.expectedDevices;
-    await this.setState("info.connection", { val: allStarted, ack: true });
+    await this.writeIndicator("info.connection", allStarted);
     // The retry path can hand in an empty address (detectPrimaryIPv4 found nothing), and
     // "advertising on  (discovery off)" reads like a truncated line rather than a finding.
     const where = `advertising on ${advertiseIp || "no routable IPv4"}${this.ssdp ? "" : " (discovery off)"}`;
@@ -721,12 +732,12 @@ export class Fakeroku extends utils.Adapter {
    * the database for good, and a rule watching for the next press never sees an
    * edge again. The reset belongs on STARTUP, not into onUnload: only startup also
    * covers the crash, and up to 31 writes per device would eat the shutdown budget that
-   * today comfortably carries a single one. setStateChanged writes only where the
-   * value actually differs, so a healthy tree costs nothing.
+   * today comfortably carries a single one. The reset compares against the values read in
+   * the start's one bulk read and writes only a key that is not false — a healthy tree costs
+   * no write and no read.
    *
-   * The writes go out together: they address different objects, and doing 20 (a player)
-   * or 35 (a TV) of them strictly one after another made start-up wait for one round trip
-   * per datapoint — the key reset right below has always been parallel.
+   * The writes go out together: they address different objects, and doing them strictly
+   * one after another would make start-up wait for one round trip per datapoint.
    *
    * @param deviceId the id-safe device path segment
    * @param friendlyName the configured device name
@@ -788,7 +799,71 @@ export class Fakeroku extends utils.Adapter {
         }),
       ),
     ]);
-    await Promise.all(keys.map(key => this.setStateChangedAsync(`${deviceId}.keys.${key}`, { val: false, ack: true })));
+    await Promise.all(
+      keys
+        .map(key => `${deviceId}.keys.${key}`)
+        .filter(id => this.needsKeyReset(id))
+        .map(id => this.resetKey(id)),
+    );
+  }
+
+  /**
+   * Whether a key state has to be written back to false at start: a key whose value from the bulk read is not false.
+   * A key without any value is written only when its object already existed — js-controller seeds the value of a
+   * newly created state from its `common.def`, and only where no value exists yet.
+   *
+   * @param id the key state id relative to the namespace
+   * @returns true if the key needs the write
+   */
+  private needsKeyReset(id: string): boolean {
+    const last = this.lastState.get(id);
+    return last ? last.val !== false : this.ownObjects.has(id);
+  }
+
+  /**
+   * Write one key state back to false and remember it.
+   *
+   * @param id the key state id relative to the namespace
+   */
+  private async resetKey(id: string): Promise<void> {
+    await this.setState(id, { val: false, ack: true });
+    this.lastState.set(id, { val: false, ack: true, q: 0 });
+  }
+
+  /**
+   * Fill {@link lastState} with ONE bulk read of the adapter's own states.
+   */
+  private async primeStates(): Promise<void> {
+    const states = await this.getStatesAsync(`${this.namespace}.*`);
+    const prefix = `${this.namespace}.`;
+    this.lastState.clear();
+    for (const [id, state] of Object.entries(states ?? {})) {
+      if (state && id.startsWith(prefix)) {
+        this.lastState.set(id.slice(prefix.length), { val: state.val, ack: state.ack, q: state.q });
+      }
+    }
+  }
+
+  /**
+   * Write a read-only indicator only when it differs from what it holds (`val` strictly, `ack`, `q` — the fields
+   * js-controller's own changed-check compares). The one place `info.connection` is written. The value is remembered
+   * before the write, so two calls in a row write once; a failed write is forgotten again so the next call retries.
+   *
+   * @param id the state id relative to the namespace
+   * @param val the value to show
+   */
+  private async writeIndicator(id: string, val: boolean): Promise<void> {
+    const last = this.lastState.get(id);
+    if (last && last.val === val && last.ack && !last.q) {
+      return;
+    }
+    this.lastState.set(id, { val, ack: true, q: 0 });
+    try {
+      await this.setState(id, { val, ack: true });
+    } catch (e) {
+      this.lastState.delete(id);
+      throw e;
+    }
   }
 
   /**
@@ -1125,7 +1200,7 @@ export class Fakeroku extends utils.Adapter {
       this.running.splice(at, 1);
     }
     this.ssdp?.removeDevice(device.advert.uuid);
-    this.setState("info.connection", { val: false, ack: true }).catch((e: unknown) => {
+    this.writeIndicator("info.connection", false).catch((e: unknown) => {
       this.log.debug(`Connection state write failed: ${errText(e)}`);
     });
   }
@@ -1239,7 +1314,7 @@ export class Fakeroku extends utils.Adapter {
       // The SSDP socket is the one thing that cannot close yet — the farewell goes out
       // through it. It is closed in the callback below, whichever way that arrives.
       const farewell = this.ssdp ? this.ssdp.byebye() : Promise.resolve();
-      const connection = this.setState("info.connection", { val: false, ack: true })
+      const connection = this.writeIndicator("info.connection", false)
         // A rejected write must not become an unhandled rejection — that is a
         // crash (exit code 6) instead of an orderly stop. The trace stays at
         // debug: it explains a stale "connected" afterwards, and nobody can act
