@@ -1,7 +1,6 @@
 import * as dgram from "node:dgram";
 import type { Membership } from "../lib/detect-ip";
 import { errText } from "../lib/err-text";
-import { isLanClient } from "../lib/lan-guard";
 import { LogThrottle } from "../lib/log-throttle";
 import type { AdapterLogger } from "../lib/logger";
 import {
@@ -38,10 +37,10 @@ export interface RokuSsdpResponderConfig {
   /** Logger. */
   logger: AdapterLogger;
   /**
-   * Whether a searching client may be answered (default: {@link isLanClient} against all the
-   * host's networks). The adapter narrows it to the chosen interface's network.
+   * Whether a searching client may be answered — the adapter's trust boundary (`lib/lan-guard.ts`), narrowed to the
+   * chosen interface's network when there is one.
    */
-  isClientAllowed?: (address: string) => boolean;
+  isClientAllowed: (address: string) => boolean;
   /**
    * The host's own address in the network of a searching client (auto case). An answer must carry
    * an address the asking remote can reach — on a host with several networks that is the address
@@ -52,7 +51,7 @@ export interface RokuSsdpResponderConfig {
    * Called at most once if the socket closes AFTER a successful start without {@link stop} being
    * called — discovery is gone and the adapter should stop announcing into it.
    */
-  onFatalError?: (err: Error) => void;
+  onFatalError: (err: Error) => void;
 }
 
 /** A socket that sends the NOTIFY/byebye of ONE interface, with that interface's address. */
@@ -98,12 +97,18 @@ export class RokuSsdpResponder {
    * {@link addDevice} and {@link removeDevice} are the only ways in and out.
    */
   private readonly devices: RokuAdvert[];
+  /** The address announced when nothing more specific is known — follows the host in the auto case. */
+  private advertiseIp: string;
+  /** The interfaces the host has now — follows the host in the auto case. */
+  private memberships: Membership[];
 
   /**
    * @param config responder configuration
    */
-  public constructor(private readonly config: RokuSsdpResponderConfig) {
+  public constructor(private readonly config: Readonly<RokuSsdpResponderConfig>) {
     this.devices = [...config.devices];
+    this.advertiseIp = config.advertiseIp;
+    this.memberships = [...config.membershipInterfaces];
   }
 
   /**
@@ -139,7 +144,7 @@ export class RokuSsdpResponder {
       socket.once("error", onBindError);
       socket.bind(SSDP_PORT, () => {
         socket.removeListener("error", onBindError);
-        this.joinMulticast(socket);
+        this.joinMulticast(socket, this.memberships);
         // Pin OUTGOING multicast (NOTIFY) to the chosen interface. Binding the socket only sets
         // the source address; the multicast egress interface is IP_MULTICAST_IF (Node dgram
         // docs), so without this a NOTIFY can leave the wrong NIC on a multi-homed host.
@@ -159,15 +164,11 @@ export class RokuSsdpResponder {
       });
     });
     if (!this.config.bindIp) {
-      this.openSenders(this.config.membershipInterfaces);
+      this.openSenders(this.memberships);
     }
 
-    const join = this.config.membershipInterfaces.length
-      ? this.config.membershipInterfaces.map(m => `${m.iface} ${m.address}`).join(", ")
-      : "default";
-    this.config.logger.debug(
-      `Roku SSDP responder on :${SSDP_PORT}, advertising ${this.config.advertiseIp} (join: ${join})`,
-    );
+    const join = this.memberships.length ? this.memberships.map(m => `${m.iface} ${m.address}`).join(", ") : "default";
+    this.config.logger.debug(`Roku SSDP responder on :${SSDP_PORT}, advertising ${this.advertiseIp} (join: ${join})`);
   }
 
   /**
@@ -181,14 +182,12 @@ export class RokuSsdpResponder {
    * @returns true if the fallback address actually changed
    */
   public refreshAdvertise(advertiseIp: string, membershipInterfaces: Membership[]): boolean {
-    const changed = advertiseIp !== this.config.advertiseIp;
-    this.config.advertiseIp = advertiseIp;
-    this.config.membershipInterfaces = [...membershipInterfaces];
+    const changed = advertiseIp !== this.advertiseIp;
+    this.advertiseIp = advertiseIp;
+    this.memberships = [...membershipInterfaces];
     if (this.socket) {
-      for (const m of membershipInterfaces) {
-        if (!this.joined.has(m.iface)) {
-          this.tryJoin(this.socket, m);
-        }
+      if (membershipInterfaces.length > 0) {
+        this.joinMulticast(this.socket, membershipInterfaces);
       }
       if (!this.config.bindIp) {
         const present = new Set(membershipInterfaces.map(m => `${m.iface}|${m.address}`));
@@ -204,12 +203,12 @@ export class RokuSsdpResponder {
   }
 
   /**
-   * Join the multicast group on each selected interface, or on the OS default when none is known.
+   * Join the multicast group on each interface not joined yet, or on the OS default when none is known.
    *
    * @param socket the bound SSDP socket
+   * @param ifaces the interfaces to be in the group on
    */
-  private joinMulticast(socket: dgram.Socket): void {
-    const ifaces = this.config.membershipInterfaces;
+  private joinMulticast(socket: dgram.Socket, ifaces: readonly Membership[]): void {
     if (ifaces.length === 0) {
       this.tryJoin(socket, undefined);
       return;
@@ -311,10 +310,9 @@ export class RokuSsdpResponder {
       return;
     }
     this.socket = undefined;
-    const notify = this.config.onFatalError;
-    if (notify && !this.fatalReported) {
+    if (!this.fatalReported) {
       this.fatalReported = true;
-      notify(new Error("SSDP socket closed"));
+      this.config.onFatalError(new Error("SSDP socket closed"));
     }
   }
 
@@ -339,12 +337,11 @@ export class RokuSsdpResponder {
     // Port 1900 is bound on every interface. A search from outside the adapter's networks gets
     // no answer: the ECP server would refuse that client anyway, and replying to a spoofed
     // source would make the emulator a small reflection amplifier.
-    const allowed = this.config.isClientAllowed ?? ((a: string): boolean => isLanClient(a));
-    if (!allowed(address)) {
+    if (!this.config.isClientAllowed(address)) {
       this.config.logger.debug(`SSDP search from ${address} ignored — not in the adapter's networks`);
       return;
     }
-    const location = this.config.bindIp ?? this.config.advertiseFor?.(address) ?? this.config.advertiseIp;
+    const location = this.config.bindIp ?? this.config.advertiseFor?.(address) ?? this.advertiseIp;
     for (const device of this.devices.filter(d => answersSearch(d, target))) {
       const response = Buffer.from(buildSearchResponse(device, location, target));
       this.socket?.send(response, port, address, err => {
@@ -360,7 +357,7 @@ export class RokuSsdpResponder {
     if (this.senders.size > 0) {
       return [...this.senders.values()].map(s => ({ socket: s.socket, address: s.address }));
     }
-    return this.socket ? [{ socket: this.socket, address: this.config.advertiseIp }] : [];
+    return this.socket ? [{ socket: this.socket, address: this.advertiseIp }] : [];
   }
 
   /** Send one proactive ssdp:alive burst for every device. The adapter calls this on a managed interval. */

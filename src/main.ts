@@ -4,7 +4,6 @@ import { join } from "node:path";
 import { FakerokuDeviceManagement } from "./device-management";
 import type { RokuAdvert } from "./discovery/ssdp-messages";
 import { RokuSsdpResponder } from "./discovery/ssdp-responder";
-import { DEFAULT_APPS } from "./ecp/device-info";
 import { COMMAND_TYPES, type CommandEvent } from "./ecp/ecp-command";
 import { EcpHttpServer } from "./ecp/ecp-http-server";
 import { commandToStateWrite, type DeviceType, keysForType } from "./ecp/state-model";
@@ -490,7 +489,6 @@ export class Fakeroku extends utils.Adapter {
       server = this.makeEcpServer({
         device: device.advert,
         friendlyName: device.friendlyName,
-        apps: DEFAULT_APPS,
         deviceType: device.deviceType,
         bindIp: this.bindIp,
         logger: this.log,

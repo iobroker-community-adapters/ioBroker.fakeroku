@@ -2,7 +2,8 @@ import * as http from "node:http";
 import * as net from "node:net";
 import type { CommandEvent } from "./ecp-command";
 import { SOFTWARE_VERSION } from "./device-info";
-import { EcpHttpServer } from "./ecp-http-server";
+import { EcpHttpServer, type EcpServerConfig } from "./ecp-http-server";
+import { isLanClient } from "../lib/lan-guard";
 import { LogThrottle } from "../lib/log-throttle";
 
 /** A port the OS just had free — fixed numbers collide with whatever else runs on the machine. */
@@ -29,6 +30,26 @@ const noopLog = {
   },
   error: (): void => {},
 };
+
+/**
+ * A complete server configuration — every callback the adapter always hands in; a test overrides only what it is about.
+ *
+ * @param overrides the fields this test sets
+ * @returns the configuration
+ */
+function serverConfig(overrides: Partial<EcpServerConfig>): EcpServerConfig {
+  return {
+    device: { uuid: "abc123", port: 0 },
+    friendlyName: "Test Roku",
+    deviceType: "player",
+    bindIp: "127.0.0.1",
+    logger: noopLog,
+    onCommand: () => true,
+    onFatalError: () => {},
+    isClientAllowed: a => isLanClient(a),
+    ...overrides,
+  };
+}
 
 function request(
   method: string,
@@ -62,15 +83,16 @@ describe("EcpHttpServer", () => {
 
   beforeAll(async () => {
     PORT = await freePort();
-    server = new EcpHttpServer({
-      device: { uuid: "abc123", port: PORT },
-      friendlyName: "Test Roku",
-      apps: [{ id: "12", name: "Netflix" }],
-      deviceType: "player",
-      bindIp: "127.0.0.1",
-      logger: noopLog,
-      onCommand: c => onCommandImpl(c),
-    });
+    server = new EcpHttpServer(
+      serverConfig({
+        device: { uuid: "abc123", port: PORT },
+        friendlyName: "Test Roku",
+        deviceType: "player",
+        bindIp: "127.0.0.1",
+        logger: noopLog,
+        onCommand: c => onCommandImpl(c),
+      }),
+    );
     await server.start();
   });
   afterAll(() => server.stop());
@@ -329,16 +351,17 @@ describe("EcpHttpServer", () => {
     // the instance still looks connected. Reported once, not per event.
     const port = await freePort();
     const fatals: Error[] = [];
-    const dying = new EcpHttpServer({
-      device: { uuid: "dying", port },
-      friendlyName: "Wohnzimmer",
-      apps: [],
-      deviceType: "player",
-      bindIp: "127.0.0.1",
-      logger: noopLog,
-      onCommand: () => true,
-      onFatalError: e => fatals.push(e),
-    });
+    const dying = new EcpHttpServer(
+      serverConfig({
+        device: { uuid: "dying", port },
+        friendlyName: "Wohnzimmer",
+        deviceType: "player",
+        bindIp: "127.0.0.1",
+        logger: noopLog,
+        onCommand: () => true,
+        onFatalError: e => fatals.push(e),
+      }),
+    );
     await dying.start();
     try {
       const inner = (dying as unknown as { server: http.Server }).server;
@@ -352,15 +375,16 @@ describe("EcpHttpServer", () => {
   });
 
   it("stop is safe before start and when called twice", () => {
-    const idle = new EcpHttpServer({
-      device: { uuid: "zzz", port: 1 },
-      friendlyName: "never started",
-      apps: [],
-      deviceType: "player",
-      bindIp: undefined,
-      logger: noopLog,
-      onCommand: () => true,
-    });
+    const idle = new EcpHttpServer(
+      serverConfig({
+        device: { uuid: "zzz", port: 1 },
+        friendlyName: "never started",
+        deviceType: "player",
+        bindIp: undefined,
+        logger: noopLog,
+        onCommand: () => true,
+      }),
+    );
     // onUnload calls stop() unconditionally, including for a device whose start
     // threw on a busy port — a throw there costs the callback and means SIGKILL.
     expect(() => idle.stop()).not.toThrow();
@@ -371,15 +395,16 @@ describe("EcpHttpServer", () => {
     const busyPort = await freePort();
     const blocker = http.createServer();
     await new Promise<void>(resolve => blocker.listen(busyPort, "127.0.0.1", resolve));
-    const busy = new EcpHttpServer({
-      device: { uuid: "busy", port: busyPort },
-      friendlyName: "busy",
-      apps: [],
-      deviceType: "player",
-      bindIp: "127.0.0.1",
-      logger: noopLog,
-      onCommand: () => true,
-    });
+    const busy = new EcpHttpServer(
+      serverConfig({
+        device: { uuid: "busy", port: busyPort },
+        friendlyName: "busy",
+        deviceType: "player",
+        bindIp: "127.0.0.1",
+        logger: noopLog,
+        onCommand: () => true,
+      }),
+    );
     try {
       await expect(busy.start()).rejects.toThrow(/EADDRINUSE/);
       // main.ts closes the failed server; a throw here would abort the device loop.
@@ -394,15 +419,16 @@ describe("EcpHttpServer", () => {
     // (headersTimeout, 60 s) and the synchronous onUnload runs into the host's 1 s
     // kill; closeAllConnections() ends it now.
     const heldPort = await freePort();
-    const held = new EcpHttpServer({
-      device: { uuid: "held", port: heldPort },
-      friendlyName: "held",
-      apps: [],
-      deviceType: "player",
-      bindIp: "127.0.0.1",
-      logger: noopLog,
-      onCommand: () => true,
-    });
+    const held = new EcpHttpServer(
+      serverConfig({
+        device: { uuid: "held", port: heldPort },
+        friendlyName: "held",
+        deviceType: "player",
+        bindIp: "127.0.0.1",
+        logger: noopLog,
+        onCommand: () => true,
+      }),
+    );
     await held.start();
     const socket = net.connect(heldPort, "127.0.0.1");
     await new Promise<void>((resolve, reject) => {
@@ -521,15 +547,16 @@ describe("EcpHttpServer — a Roku TV", () => {
   let port = 0;
   beforeAll(async () => {
     port = await freePort();
-    server = new EcpHttpServer({
-      device: { uuid: "tv1", port },
-      friendlyName: "TV",
-      apps: [],
-      deviceType: "tv",
-      bindIp: "127.0.0.1",
-      logger: noopLog,
-      onCommand: () => true,
-    });
+    server = new EcpHttpServer(
+      serverConfig({
+        device: { uuid: "tv1", port },
+        friendlyName: "TV",
+        deviceType: "tv",
+        bindIp: "127.0.0.1",
+        logger: noopLog,
+        onCommand: () => true,
+      }),
+    );
     await server.start();
   });
   afterAll(() => server.stop());
@@ -553,19 +580,20 @@ describe("EcpHttpServer — the trust boundary is the caller's", () => {
   it("asks the check it is handed, not the default guard", () => {
     // The adapter narrows the boundary to a chosen interface's network.
     const seen: (string | undefined)[] = [];
-    const server = new EcpHttpServer({
-      device: { uuid: "x", port: 0 },
-      friendlyName: "X",
-      apps: [],
-      deviceType: "player",
-      bindIp: "127.0.0.1",
-      logger: noopLog,
-      onCommand: () => true,
-      isClientAllowed: a => {
-        seen.push(a);
-        return false;
-      },
-    });
+    const server = new EcpHttpServer(
+      serverConfig({
+        device: { uuid: "x", port: 0 },
+        friendlyName: "X",
+        deviceType: "player",
+        bindIp: "127.0.0.1",
+        logger: noopLog,
+        onCommand: () => true,
+        isClientAllowed: a => {
+          seen.push(a);
+          return false;
+        },
+      }),
+    );
     const res = { statusCode: 0, setHeader: (): void => {}, end: (): void => {} } as unknown as http.ServerResponse;
     (server as unknown as { handle(q: http.IncomingMessage, s: http.ServerResponse): void }).handle(
       { socket: { remoteAddress: "127.0.0.1" }, method: "GET", url: "/" } as unknown as http.IncomingMessage,
@@ -578,15 +606,16 @@ describe("EcpHttpServer — the trust boundary is the caller's", () => {
   it("logs a connection dropped at the connection limit, at most once a minute", async () => {
     const port = await freePort();
     debugLogs.length = 0;
-    const server = new EcpHttpServer({
-      device: { uuid: "y", port },
-      friendlyName: "Y",
-      apps: [],
-      deviceType: "player",
-      bindIp: "127.0.0.1",
-      logger: noopLog,
-      onCommand: () => true,
-    });
+    const server = new EcpHttpServer(
+      serverConfig({
+        device: { uuid: "y", port },
+        friendlyName: "Y",
+        deviceType: "player",
+        bindIp: "127.0.0.1",
+        logger: noopLog,
+        onCommand: () => true,
+      }),
+    );
     await server.start();
     const inner = (server as unknown as { server: http.Server }).server;
     inner.emit("drop", { remoteAddress: "192.168.1.66" });

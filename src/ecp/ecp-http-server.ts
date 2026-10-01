@@ -2,13 +2,11 @@ import * as http from "node:http";
 import type { RokuAdvert } from "../discovery/ssdp-messages";
 import { stripMappedPrefix } from "../lib/detect-ip";
 import { errText } from "../lib/err-text";
-import { isLanClient } from "../lib/lan-guard";
 import { LogThrottle } from "../lib/log-throttle";
 import type { AdapterLogger } from "../lib/logger";
 import { type CommandEvent, parseEcpCommand } from "./ecp-command";
 import {
   APP_ICON_PNG,
-  type AppEntry,
   buildActiveAppXml,
   buildAppsXml,
   buildDescXml,
@@ -16,6 +14,7 @@ import {
   buildMediaPlayerXml,
   buildScpdXml,
   buildTvChannelsXml,
+  DEFAULT_APPS,
 } from "./device-info";
 import type { DeviceType } from "./state-model";
 
@@ -25,8 +24,6 @@ export interface EcpServerConfig {
   device: RokuAdvert;
   /** Display name shown in the description / device-info. */
   friendlyName: string;
-  /** Apps advertised at /query/apps. */
-  apps: AppEntry[];
   /** The emulated device type (player / tv) — drives the device-info response. */
   deviceType: DeviceType;
   /** Interface IP to bind the HTTP server to, or `undefined` to bind all interfaces (auto). */
@@ -46,12 +43,12 @@ export interface EcpServerConfig {
    * `info.connection` means "EVERY configured Roku is listening". Mirrors the SSDP
    * responder, which has carried this callback since 1.1.0.
    */
-  onFatalError?: (err: Error) => void;
+  onFatalError: (err: Error) => void;
   /**
-   * Whether a client may talk to this Roku (default: {@link isLanClient} against all the host's
-   * networks). The adapter narrows it to the chosen interface's network.
+   * Whether a client may talk to this Roku — the adapter's trust boundary (`lib/lan-guard.ts`), narrowed to the chosen
+   * interface's network when there is one.
    */
-  isClientAllowed?: (address: string | undefined) => boolean;
+  isClientAllowed: (address: string | undefined) => boolean;
 }
 
 /**
@@ -142,17 +139,15 @@ export class EcpHttpServer {
    */
   private onRuntimeError(err: Error): void {
     this.config.logger.error(`ECP server "${this.config.friendlyName}" error: ${errText(err)}`);
-    const notify = this.config.onFatalError;
-    if (notify && !this.fatalReported) {
+    if (!this.fatalReported) {
       this.fatalReported = true;
-      notify(err);
+      this.config.onFatalError(err);
     }
   }
 
   private handle(req: http.IncomingMessage, res: http.ServerResponse): void {
     const peer = stripMappedPrefix(req.socket.remoteAddress ?? "") || "?";
-    const allowed = this.config.isClientAllowed ?? ((a: string | undefined): boolean => isLanClient(a));
-    if (!allowed(req.socket.remoteAddress)) {
+    if (!this.config.isClientAllowed(req.socket.remoteAddress)) {
       // Debug (not warn): a stray WAN scanner must not spam the log, but when a
       // remote sits on the wrong subnet/VLAN this is the only trace of "why rejected".
       // Throttled: a scanner sends thousands of requests, and every one of them
@@ -233,7 +228,7 @@ export class EcpHttpServer {
       case "/query/device-info":
         return xml(buildDeviceInfoXml(this.config.device, this.config.friendlyName, this.config.deviceType));
       case "/query/apps":
-        return xml(buildAppsXml(this.config.apps));
+        return xml(buildAppsXml(DEFAULT_APPS));
       // Asked on every update by Home Assistant (rokuecp) and openHAB; a 404 failed the whole
       // setup there. See device-info.ts for what each answer says.
       case "/query/active-app":
@@ -249,7 +244,7 @@ export class EcpHttpServer {
         return xml(buildScpdXml());
     }
     const icon = /^\/query\/icon\/([^/]+)$/.exec(path);
-    if (icon && this.config.apps.some(app => app.id === icon[1])) {
+    if (icon && DEFAULT_APPS.some(app => app.id === icon[1])) {
       return { body: APP_ICON_PNG, type: "image/png" };
     }
     return null;

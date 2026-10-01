@@ -131,6 +131,7 @@ const baseCfg = {
   advertiseIp: "10.0.0.9",
   logger: noopLog,
   isClientAllowed: (): boolean => true,
+  onFatalError: (): void => {},
 };
 
 /**
@@ -380,15 +381,6 @@ describe("RokuSsdpResponder", () => {
     // would go to whatever address the datagram claims to come from.
     expect(s.sent).toEqual([]);
     expect(noopLog.debug).toHaveBeenCalledWith(expect.stringContaining("8.8.8.8 ignored"));
-  });
-
-  it("uses the lan guard when no check is handed in", async () => {
-    const { isClientAllowed: _unused, ...cfg } = baseCfg;
-    const r = new RokuSsdpResponder({ ...cfg, bindIp: undefined, membershipInterfaces: [] });
-    await r.start();
-    const s = dgramMock.sockets[0];
-    s.emit("message", Buffer.from(MSEARCH), { address: "8.8.8.8", port: 1900 });
-    expect(s.sent).toEqual([]);
   });
 
   it("answers each network with the host's address in THAT network", async () => {
