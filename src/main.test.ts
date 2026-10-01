@@ -275,11 +275,10 @@ function internalOf(adapter: Fakeroku): {
   clearInterval: ReturnType<typeof vi.fn>;
   ssdp: FakeSsdp | undefined;
   running: { uuid: string; port: number }[];
-  pending: { deviceId: string; friendlyName: string }[];
+  pending: { id: string; name: string }[];
   retryPendingDevices(): Promise<void>;
-  deviceKeys: Map<string, ReadonlySet<string>>;
-  pulseTimers: Set<unknown>;
-  holdTimers: Map<string, unknown>;
+  devices: Map<string, { keys: ReadonlySet<string>; server?: unknown }>;
+  commands: { pulseTimers: Set<unknown>; holdTimers: Map<string, unknown> };
   setState: ReturnType<typeof vi.fn>;
   getStatesAsync: ReturnType<typeof vi.fn>;
   lastState: Map<string, { val: unknown; ack: boolean; q?: number }>;
@@ -551,7 +550,7 @@ describe("Fakeroku onReady — device wiring", () => {
     // Nothing is listening, so there is nothing to announce — but the device is queued
     // for a retry rather than written off (a port taken at boot is usually a restart race).
     expect(ctx.ssdps).toHaveLength(0);
-    expect(ctx.i.pending.map(p => p.friendlyName)).toEqual(["Wohnzimmer"]);
+    expect(ctx.i.pending.map(p => p.name)).toEqual(["Wohnzimmer"]);
   });
 
   it("gives up only when no device is startable at all, and says why", async () => {
@@ -1345,20 +1344,20 @@ describe("Fakeroku applyCommand", () => {
     const ctx = await ready();
     ctx.i.setTimeout.mockClear();
     ctx.i.applyCommand("Wohnzimmer", { type: "keypress", key: "Home" });
-    expect(ctx.i.pulseTimers.size).toBe(1);
+    expect(ctx.i.commands.pulseTimers.size).toBe(1);
     (ctx.i.setTimeout.mock.calls.at(-1)![0] as () => void)();
     // Every keypress adds one entry; without the removal a busy remote grows the
     // set for the lifetime of the instance.
-    expect(ctx.i.pulseTimers.size).toBe(0);
+    expect(ctx.i.commands.pulseTimers.size).toBe(0);
   });
 
   it("forgets a watchdog once it has fired", async () => {
     const ctx = await ready();
     ctx.i.setTimeout.mockClear();
     ctx.i.applyCommand("Wohnzimmer", { type: "keydown", key: "Select" });
-    expect(ctx.i.holdTimers.size).toBe(1);
+    expect(ctx.i.commands.holdTimers.size).toBe(1);
     (ctx.i.setTimeout.mock.calls.at(-1)![0] as () => void)();
-    expect(ctx.i.holdTimers.size).toBe(0);
+    expect(ctx.i.commands.holdTimers.size).toBe(0);
   });
 
   it("a pulse is far shorter than the hold watchdog — a keypress must not look like a held key", async () => {
@@ -1857,7 +1856,7 @@ describe("Fakeroku — a key release is never dropped", () => {
     pulse();
 
     expect(ctx.i.states.get("Wohnzimmer.keys.Home")).toEqual({ val: true, ack: true });
-    expect(ctx.i.holdTimers.has("Wohnzimmer.keys.Home")).toBe(true);
+    expect(ctx.i.commands.holdTimers.has("Wohnzimmer.keys.Home")).toBe(true);
     // The keyup still ends it — the hold is intact, not orphaned.
     ctx.i.applyCommand("Wohnzimmer", { type: "keyup", key: "Home" });
     expect(ctx.i.states.get("Wohnzimmer.keys.Home")).toEqual({ val: false, ack: true });
@@ -1888,11 +1887,11 @@ describe("Fakeroku — a key release is never dropped", () => {
     const ctx = setup();
     await ctx.i.onReady();
     ctx.i.applyCommand("Wohnzimmer", { type: "keydown", key: "Home" });
-    expect(ctx.i.holdTimers.has("Wohnzimmer.keys.Home")).toBe(true);
+    expect(ctx.i.commands.holdTimers.has("Wohnzimmer.keys.Home")).toBe(true);
 
     ctx.i.applyCommand("Wohnzimmer", { type: "keypress", key: "Home" });
 
-    expect(ctx.i.holdTimers.has("Wohnzimmer.keys.Home")).toBe(false);
+    expect(ctx.i.commands.holdTimers.has("Wohnzimmer.keys.Home")).toBe(false);
     expect(ctx.i.clearTimeout).toHaveBeenCalled();
   });
 });
@@ -1910,7 +1909,7 @@ describe("Fakeroku — a device whose port was busy is retried", () => {
     );
     await ctx.i.onReady();
 
-    expect(ctx.i.pending.map(p => p.friendlyName)).toEqual(["Kueche"]);
+    expect(ctx.i.pending.map(p => p.name)).toEqual(["Kueche"]);
     expect(ctx.i.running).toHaveLength(1);
     expect(ctx.i.states.get("info.connection")).toEqual({ val: false, ack: true });
     // The objects of the waiting device exist — only its server is missing.
@@ -1951,7 +1950,7 @@ describe("Fakeroku — a device whose port was busy is retried", () => {
     scheduled();
     await vi.waitFor(() => expect(ctx.i.setTimeout).toHaveBeenCalledWith(expect.any(Function), 60_000));
 
-    expect(ctx.i.pending.map(p => p.friendlyName)).toEqual(["Kueche"]);
+    expect(ctx.i.pending.map(p => p.name)).toEqual(["Kueche"]);
     expect(ctx.i.states.get("info.connection")).toEqual({ val: false, ack: true });
   });
 
@@ -2168,7 +2167,7 @@ describe("Fakeroku — the farewell on shutdown", () => {
 
     await new Promise<void>(resolve => ctx.i.onUnload(resolve));
 
-    expect(ctx.i.deviceKeys.size).toBe(0);
+    expect(ctx.i.devices.size).toBe(0);
     expect(ctx.i.running).toHaveLength(0);
     expect(ctx.i.pending).toHaveLength(0);
   });
@@ -2195,7 +2194,7 @@ describe("Fakeroku — two instances in one process (compact mode)", () => {
     expect([...a.i.objects.keys()].some(k => k.startsWith("Kueche"))).toBe(false);
     expect([...b.i.objects.keys()].some(k => k.startsWith("Wohnzimmer"))).toBe(false);
     // A TV carries more keys than a player — proof the two trees are really separate.
-    expect(b.i.deviceKeys.get("Kueche")!.size).toBeGreaterThan(a.i.deviceKeys.get("Wohnzimmer")!.size);
+    expect(b.i.devices.get("Kueche")!.keys.size).toBeGreaterThan(a.i.devices.get("Wohnzimmer")!.keys.size);
   });
 
   it("unloading one instance leaves the other running", async () => {
@@ -2207,12 +2206,12 @@ describe("Fakeroku — two instances in one process (compact mode)", () => {
     await new Promise<void>(resolve => a.i.onUnload(resolve));
 
     // The one that stopped let go of everything …
-    expect(a.i.deviceKeys.size).toBe(0);
+    expect(a.i.devices.size).toBe(0);
     expect(a.i.running).toHaveLength(0);
     expect(a.ecp[0].stop).toHaveBeenCalledTimes(1);
     expect(a.ssdps[0].stop).toHaveBeenCalledTimes(1);
     // … and the other one noticed nothing: in one shared process this is the whole game.
-    expect(b.i.deviceKeys.size).toBe(1);
+    expect(b.i.devices.size).toBe(1);
     expect(b.i.running).toHaveLength(1);
     expect(b.ecp[0].stop).not.toHaveBeenCalled();
     expect(b.ssdps[0].stop).not.toHaveBeenCalled();
@@ -2229,11 +2228,11 @@ describe("Fakeroku — two instances in one process (compact mode)", () => {
     await new Promise<void>(resolve => b.i.onUnload(resolve));
 
     for (const ctx of [a, b]) {
-      expect(ctx.i.deviceKeys.size).toBe(0);
+      expect(ctx.i.devices.size).toBe(0);
       expect(ctx.i.running).toHaveLength(0);
       expect(ctx.i.pending).toHaveLength(0);
-      expect(ctx.i.pulseTimers.size).toBe(0);
-      expect(ctx.i.holdTimers.size).toBe(0);
+      expect(ctx.i.commands.pulseTimers.size).toBe(0);
+      expect(ctx.i.commands.holdTimers.size).toBe(0);
     }
   });
 
@@ -2247,8 +2246,8 @@ describe("Fakeroku — two instances in one process (compact mode)", () => {
 
     a.i.applyCommand("Wohnzimmer", { type: "keydown", key: "Home" });
 
-    expect(a.i.holdTimers.size).toBe(1);
-    expect(b.i.holdTimers.size).toBe(0);
+    expect(a.i.commands.holdTimers.size).toBe(1);
+    expect(b.i.commands.holdTimers.size).toBe(0);
     // Same object id in both instances — held down in one, at rest in the other.
     expect(a.i.states.get("Wohnzimmer.keys.Home")).toEqual({ val: true, ack: true });
     expect(b.i.states.get("Wohnzimmer.keys.Home")).toEqual({ val: false, ack: true });

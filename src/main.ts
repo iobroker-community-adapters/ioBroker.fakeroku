@@ -4,9 +4,10 @@ import { join } from "node:path";
 import { FakerokuDeviceManagement } from "./device-management";
 import type { RokuAdvert } from "./discovery/ssdp-messages";
 import { RokuSsdpResponder } from "./discovery/ssdp-responder";
+import { CommandHandler } from "./command-handler";
 import { COMMAND_TYPES, type CommandEvent } from "./ecp/ecp-command";
 import { EcpHttpServer } from "./ecp/ecp-http-server";
-import { commandToStateWrite, type DeviceType, keysForType } from "./ecp/state-model";
+import { type DeviceType, keysForType } from "./ecp/state-model";
 import { instanceObjectId, RESERVED_IDS } from "./lib/constants";
 import { deviceTreeOf, toDeviceRows, type DeviceRow } from "./lib/device-config";
 import { randomIdentity } from "./lib/device-identity";
@@ -23,21 +24,11 @@ import { migrateNativeKeys, type NativeKeyMigration } from "./lib/native-key-mig
 import { tDesc, tName, tRaw } from "./lib/i18n";
 import { isLanClient } from "./lib/lan-guard";
 import { planNativePrune, planObjectCleanup } from "./lib/object-cleanup";
-import { LogThrottle } from "./lib/log-throttle";
-import { RateGate } from "./lib/rate-gate";
 
 /** Managed timeout for a stuck SSDP start (a busy port 1900 must not hang onReady). */
 const SSDP_START_TIMEOUT_MS = 5000;
 /** Proactive ssdp:alive interval so controllers find the device without searching. */
 const SSDP_NOTIFY_INTERVAL_MS = 300_000;
-/** How long a keypress pulses its keys.<Key> state true before falling back to false. */
-const KEY_PULSE_MS = 50;
-/** Safety cap for a held key: a keydown with no matching keyup resets after this. */
-const HOLD_MAX_MS = 30_000;
-/** Commands accepted per second and emulated Roku; the excess is dropped (see lib/rate-gate.ts). */
-const MAX_COMMANDS_PER_SECOND = 25;
-/** How often at most the dropped-commands warning repeats per device. */
-const RATE_WARN_INTERVAL_MS = 60_000;
 /** How long to wait before trying a device whose ECP port was busy at start-up again. */
 const DEVICE_RETRY_INTERVAL_MS = 60_000;
 /** How often a chosen interface address that is missing at start-up is looked for again. */
@@ -103,16 +94,20 @@ function toBindAddress(old: unknown): string {
   return typeof old === "string" && old.trim() ? old.trim() : "0.0.0.0";
 }
 
-/** An emulated Roku whose ECP server did not come up yet — its objects exist, only the server is missing. */
-interface PendingDevice {
+/** One configured emulated Roku at runtime — its object tree exists; it listens while it has a server. */
+interface DeviceRuntime {
   /** The id-safe device path segment. */
-  deviceId: string;
+  readonly id: string;
   /** The configured device name, for log lines the user can act on. */
-  friendlyName: string;
-  /** The advert (identity + port) this device would answer under. */
-  advert: RokuAdvert;
+  readonly name: string;
+  /** The advert (identity + port) this device answers under. */
+  readonly advert: RokuAdvert;
   /** The emulated device type. */
-  deviceType: DeviceType;
+  readonly type: DeviceType;
+  /** The key names its type carries — only those have a state. */
+  readonly keys: ReadonlySet<string>;
+  /** Its ECP server while it listens; none while it waits for a retry or after its server died. */
+  server?: EcpHttpServer;
 }
 
 /**
@@ -125,22 +120,17 @@ interface PendingDevice {
 export class Fakeroku extends utils.Adapter {
   private ssdp: RokuSsdpResponder | undefined;
   private notifyTimer: ioBroker.Interval | undefined;
-  private readonly ecpServers = new Map<string, EcpHttpServer>();
-  private readonly pulseTimers = new Set<ioBroker.Timeout>();
-  /** Per held key id, its watchdog timer — so a keydown without a keyup cannot pin it true forever. */
-  private readonly holdTimers = new Map<string, ioBroker.Timeout>();
-  /** Per device, the key names it exposes — so a keypress only writes keys this device carries. */
-  private readonly deviceKeys = new Map<string, ReadonlySet<string>>();
-  /** Per device, its command rate gate — the write-flood protection for the states database. */
-  private readonly commandGates = new Map<string, RateGate>();
-  /** Per device, the dropped-commands warning — at most once per RATE_WARN_INTERVAL_MS. */
-  private readonly rateWarnings = new LogThrottle(RATE_WARN_INTERVAL_MS);
-  /** Per device id, the name the user gave it — for log lines the user can recognise. */
-  private readonly deviceNames = new Map<string, string>();
-  /** The devices that are actually listening — the basis for info.connection. */
-  private readonly running: RokuAdvert[] = [];
+  /** Every configured emulated Roku whose object tree this start created, by device id. */
+  private readonly devices = new Map<string, DeviceRuntime>();
   /** Devices whose ECP server did not start; retried on a timer until they come up. */
-  private pending: PendingDevice[] = [];
+  private pending: DeviceRuntime[] = [];
+  /** Turns the remotes' commands into state writes. */
+  private readonly commands = new CommandHandler({
+    writeState: (id, val) => this.writeState(id, val),
+    setTimeout: (callback, ms) => this.setTimeout(callback, ms),
+    clearTimeout: timer => this.clearTimeout(timer),
+    warn: message => this.log.warn(message),
+  });
   /** The retry timer for {@link pending}, armed only while something is waiting. */
   private retryTimer: ioBroker.Timeout | undefined;
   /** The timer that starts discovery once the host has an address ("all interfaces" only). */
@@ -195,6 +185,15 @@ export class Fakeroku extends utils.Adapter {
 
     this.on("ready", this.onReady.bind(this));
     this.on("unload", this.onUnload.bind(this));
+  }
+
+  /**
+   * The adverts of the devices that are actually listening — the basis for info.connection and discovery.
+   *
+   * @returns the listening devices' adverts
+   */
+  private get running(): RokuAdvert[] {
+    return [...this.devices.values()].filter(d => d.server).map(d => d.advert);
   }
 
   /**
@@ -458,14 +457,14 @@ export class Fakeroku extends utils.Adapter {
         this.log.warn(`Emulated Roku "${row.name}" could not be created: ${errText(e)} — skipping it.`);
         continue;
       }
-      this.deviceKeys.set(deviceId, new Set(keys));
-      this.deviceNames.set(deviceId, row.name);
-      const device: PendingDevice = {
-        deviceId,
-        friendlyName: row.name,
+      const device: DeviceRuntime = {
+        id: deviceId,
+        name: row.name,
         advert: { uuid: row.identity, port: row.port },
-        deviceType: row.type,
+        type: row.type,
+        keys: new Set(keys),
       };
+      this.devices.set(deviceId, device);
       if (!(await this.startDeviceServer(device, "start")) && !this.stopping) {
         this.pending.push(device);
       }
@@ -479,7 +478,7 @@ export class Fakeroku extends utils.Adapter {
    * @param phase whether this is the initial start (warn) or a retry (debug — the warning was written once)
    * @returns true if the server is listening
    */
-  private async startDeviceServer(device: PendingDevice, phase: "start" | "retry"): Promise<boolean> {
+  private async startDeviceServer(device: DeviceRuntime, phase: "start" | "retry"): Promise<boolean> {
     // The host said stop while this device's objects were being created: bind nothing.
     if (this.stopping) {
       return false;
@@ -488,26 +487,25 @@ export class Fakeroku extends utils.Adapter {
     try {
       server = this.makeEcpServer({
         device: device.advert,
-        friendlyName: device.friendlyName,
-        deviceType: device.deviceType,
+        friendlyName: device.name,
+        deviceType: device.type,
         bindIp: this.bindIp,
         logger: this.log,
-        onCommand: cmd => this.applyCommand(device.deviceId, cmd),
+        onCommand: cmd => this.applyCommand(device.id, cmd),
         onFatalError: () => this.onEcpFatal(device),
         isClientAllowed: this.isOwnClient,
       });
       await server.start();
-      // The host may have said stop while we were binding. Registering now would put the
-      // server into a map onUnload has already emptied — nothing would ever close it.
+      // The host may have said stop while we were binding. Registering now would hand the
+      // server to a device onUnload has already let go of — nothing would ever close it.
       if (this.stopping) {
         server.stop();
         return false;
       }
-      this.ecpServers.set(device.deviceId, server);
-      this.running.push(device.advert);
+      device.server = server;
       this.ssdp?.addDevice(device.advert);
       if (phase === "retry") {
-        this.log.info(`Emulated Roku "${device.friendlyName}" is listening on port ${device.advert.port} again.`);
+        this.log.info(`Emulated Roku "${device.name}" is listening on port ${device.advert.port} again.`);
       }
       return true;
     } catch (e) {
@@ -516,13 +514,9 @@ export class Fakeroku extends utils.Adapter {
       server?.stop();
       const detail = `${errText(e)} — retrying every ${DEVICE_RETRY_INTERVAL_MS / 1000} s`;
       if (phase === "start") {
-        this.log.warn(
-          `Emulated Roku "${device.friendlyName}" could not start on port ${device.advert.port}: ${detail}`,
-        );
+        this.log.warn(`Emulated Roku "${device.name}" could not start on port ${device.advert.port}: ${detail}`);
       } else {
-        this.log.debug(
-          `Emulated Roku "${device.friendlyName}" still cannot start on port ${device.advert.port}: ${detail}`,
-        );
+        this.log.debug(`Emulated Roku "${device.name}" still cannot start on port ${device.advert.port}: ${detail}`);
       }
       return false;
     }
@@ -556,7 +550,7 @@ export class Fakeroku extends utils.Adapter {
       // same synchronous block, so a call that arrives afterwards finds nothing to do, and a
       // call already inside the loop is caught after the bind and again at the tail. A guard
       // here could never fire — measured, it survived its own mutation needle.
-      const stillPending: PendingDevice[] = [];
+      const stillPending: DeviceRuntime[] = [];
       let recovered = false;
       for (const device of this.pending) {
         if (await this.startDeviceServer(device, "retry")) {
@@ -969,7 +963,8 @@ export class Fakeroku extends utils.Adapter {
     // below writes an object back whole, and a dump from before the start would write the
     // names and descriptions of the previous version back over the ones just set.
     const owned = await this.readOwnObjects();
-    const toDelete = planObjectCleanup([...owned.keys()], configuredDeviceIds, this.deviceKeys);
+    const keysByDevice = new Map([...this.devices.values()].map(d => [d.id, d.keys]));
+    const toDelete = planObjectCleanup([...owned.keys()], configuredDeviceIds, keysByDevice);
     for (const id of toDelete) {
       await this.delObjectAsync(id, { recursive: true }).catch((e: unknown) => {
         this.log.debug(`cleanup: could not delete ${id}: ${errText(e)}`);
@@ -1042,116 +1037,15 @@ export class Fakeroku extends utils.Adapter {
   }
 
   /**
-   * Apply a received ECP command to this device's states: record it in `command`
-   * / `commandType`, and pulse or hold the standard key if it is one.
-   *
-   * Returns whether the command was applied: the ECP server logs only what got
-   * through, so the rate gate covers the log as well as the states database.
+   * Apply a received ECP command to one emulated Roku — the wiring target of its ECP server.
    *
    * @param deviceId the id-safe device path segment
    * @param cmd the parsed ECP command
-   * @returns true if the command was applied, false if the rate gate dropped it
+   * @returns true if the command was applied, false if the rate gate dropped it or the device is gone
    */
   private applyCommand(deviceId: string, cmd: CommandEvent): boolean {
-    const write = commandToStateWrite(cmd);
-    // The release of a key that is actually HELD never passes through the rate gate.
-    // Dropping a keypress costs one event; dropping the keyup of a held key leaves it true
-    // until the 30 s watchdog, so the flood protection would be the thing that falsifies
-    // the tree. It also costs three writes instead of four, so it is not what the gate exists
-    // to stop.
-    // The exemption asks whether there is something to release, not what the request looks
-    // like: without the watchdog check a flood of keyup requests for a key nobody is holding
-    // would bypass the gate entirely - and since the server logs only what was applied, it
-    // would take a log line with it on every request.
-    const releaseOf = write.holdKey?.value === false ? `${deviceId}.keys.${write.holdKey.key}` : null;
-    const isRelease = releaseOf !== null && this.holdTimers.has(releaseOf);
-    if (!isRelease && !this.admitCommand(deviceId)) {
-      return false;
-    }
-    this.writeState(`${deviceId}.command`, write.command);
-    this.writeState(`${deviceId}.commandType`, write.commandType);
-    // Only write keys.<Key> if THIS device's type carries the key — a player has no
-    // TV key objects, so a stray TV keypress lands in `command` only, never a missing state.
-    const keys = this.deviceKeys.get(deviceId);
-    if (write.pulseKey && keys?.has(write.pulseKey)) {
-      const id = `${deviceId}.keys.${write.pulseKey}`;
-      // A keypress on a key that is currently HELD ends the hold: its watchdog would
-      // otherwise fire later and write a release for a key the pulse already released.
-      this.clearHoldTimer(id);
-      this.writeState(id, true);
-      const timer = this.setTimeout(() => {
-        if (timer) {
-          this.pulseTimers.delete(timer);
-        }
-        // A keydown that arrived inside the pulse window owns the key now: ECP defines a
-        // keypress as pressing down AND releasing, so it is a finished act and a later
-        // keydown starts a new one. Writing the pulse's release here would end a hold that
-        // is still going on, while its watchdog stays armed. The keyup writes the release.
-        if (!this.holdTimers.has(id)) {
-          this.writeState(id, false);
-        }
-      }, KEY_PULSE_MS);
-      if (timer) {
-        this.pulseTimers.add(timer);
-      }
-    } else if (write.holdKey && keys?.has(write.holdKey.key)) {
-      const id = `${deviceId}.keys.${write.holdKey.key}`;
-      this.writeState(id, write.holdKey.value);
-      // A keydown holds the key true until its keyup. Arm a watchdog so a lost keyup
-      // (controller disconnects mid-press) cannot pin the key true forever; a keyup
-      // clears it, and a repeated keydown re-arms it.
-      this.clearHoldTimer(id);
-      if (write.holdKey.value) {
-        const timer = this.setTimeout(() => {
-          this.holdTimers.delete(id);
-          this.writeState(id, false);
-        }, HOLD_MAX_MS);
-        if (timer) {
-          this.holdTimers.set(id, timer);
-        }
-      }
-    }
-    return true;
-  }
-
-  /**
-   * Disarm the hold watchdog of one key, if it has one.
-   *
-   * @param id the full key state id
-   */
-  private clearHoldTimer(id: string): void {
-    const pending = this.holdTimers.get(id);
-    if (pending) {
-      this.clearTimeout(pending);
-      this.holdTimers.delete(id);
-    }
-  }
-
-  /**
-   * The rate gate in front of every state write: MAX_COMMANDS_PER_SECOND per device,
-   * the excess is dropped and reported once per RATE_WARN_INTERVAL_MS. Every accepted
-   * command costs the states database three writes plus one more when the pulse
-   * ends — a flooding device in the LAN would otherwise slow the whole host.
-   *
-   * @param deviceId the id-safe device path segment
-   * @returns true if the command may be applied
-   */
-  private admitCommand(deviceId: string): boolean {
-    const now = Date.now();
-    let gate = this.commandGates.get(deviceId);
-    if (!gate) {
-      gate = new RateGate(MAX_COMMANDS_PER_SECOND, now);
-      this.commandGates.set(deviceId, gate);
-    }
-    if (gate.allow(now)) {
-      return true;
-    }
-    if (this.rateWarnings.due(deviceId, now)) {
-      this.log.warn(
-        `Emulated Roku "${this.deviceNames.get(deviceId) ?? deviceId}" receives more than ${MAX_COMMANDS_PER_SECOND} commands per second — dropping the excess (a misbehaving controller?)`,
-      );
-    }
-    return false;
+    const device = this.devices.get(deviceId);
+    return device ? this.commands.apply(device, cmd) : false;
   }
 
   /**
@@ -1183,20 +1077,15 @@ export class Fakeroku extends utils.Adapter {
    *
    * @param device the device whose server died
    */
-  private onEcpFatal(device: PendingDevice): void {
+  private onEcpFatal(device: DeviceRuntime): void {
     this.log.error(
-      `Emulated Roku "${device.friendlyName}" stopped answering after a server error — restart the instance to bring it back.`,
+      `Emulated Roku "${device.name}" stopped answering after a server error — restart the instance to bring it back.`,
     );
-    // Close it before forgetting it: once it is out of the map neither this path nor
-    // onUnload can ever reach it again, and in compact mode the port would stay taken for
-    // the lifetime of the whole host process. stop() is idempotent and safe on a dead
-    // server. The SSDP responder already does exactly this in its own fatal path.
-    this.ecpServers.get(device.deviceId)?.stop();
-    this.ecpServers.delete(device.deviceId);
-    const at = this.running.indexOf(device.advert);
-    if (at >= 0) {
-      this.running.splice(at, 1);
-    }
+    // Close it before letting go of it: nothing else ever reaches it again, and in compact mode
+    // the port would stay taken for the lifetime of the whole host process. stop() is
+    // idempotent and safe on a dead server.
+    device.server?.stop();
+    device.server = undefined;
     this.ssdp?.removeDevice(device.advert.uuid);
     this.writeIndicator("info.connection", false).catch((e: unknown) => {
       this.log.debug(`Connection state write failed: ${errText(e)}`);
@@ -1289,24 +1178,13 @@ export class Fakeroku extends utils.Adapter {
         this.clearTimeout(this.discoveryTimer);
         this.discoveryTimer = undefined;
       }
-      for (const t of this.pulseTimers) {
-        this.clearTimeout(t);
-      }
-      this.pulseTimers.clear();
-      for (const t of this.holdTimers.values()) {
-        this.clearTimeout(t);
-      }
-      this.holdTimers.clear();
+      this.commands.dispose();
       // The ECP servers close right here, synchronously: nothing about the farewell needs
       // them, and a keep-alive connection left open drags teardown toward a SIGKILL.
-      for (const s of this.ecpServers.values()) {
-        s.stop();
+      for (const device of this.devices.values()) {
+        device.server?.stop();
       }
-      this.ecpServers.clear();
-      this.deviceKeys.clear();
-      this.deviceNames.clear();
-      this.commandGates.clear();
-      this.running.length = 0;
+      this.devices.clear();
       this.pending = [];
       // The SSDP socket is the one thing that cannot close yet — the farewell goes out
       // through it. It is closed in the callback below, whichever way that arrives.
