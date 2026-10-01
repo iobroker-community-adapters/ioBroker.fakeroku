@@ -722,6 +722,8 @@ describe("RokuSsdpResponder — the farewell", () => {
   it("resolves immediately when there is no socket or no device left", async () => {
     const r = responder();
     await expect(r.byebye()).resolves.toBeUndefined();
+    // Without a socket there is nothing to send on — not even a failed attempt to log.
+    expect(sharedLog.debug).not.toHaveBeenCalled();
     await r.start();
     r.removeDevice("abc123");
     await expect(r.byebye()).resolves.toBeUndefined();

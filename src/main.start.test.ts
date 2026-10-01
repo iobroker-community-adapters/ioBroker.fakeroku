@@ -488,6 +488,21 @@ describe("Fakeroku onReady — key states are released at start-up", () => {
     expect(restarted.i.states.get("Wohnzimmer.keys.Select")?.val).toBe(false);
   });
 
+  it("writes info.connection only when it changes — not at every step of the start", async () => {
+    // The start passes false, the report after it passes the result: a stored false that stays
+    // false is written by neither, and a start that ends connected writes exactly once.
+    const stays = setup({ devices: [{ name: "Wohnzimmer", port: 8060, type: "player" }] }, { failEcpPort: 8060 });
+    stays.i.states.set("info.connection", { val: false, ack: true });
+    await stays.i.onReady();
+    expect(stays.i.written).not.toContain("info.connection");
+
+    const comesUp = setup();
+    comesUp.i.states.set("info.connection", { val: false, ack: true });
+    await comesUp.i.onReady();
+    expect(comesUp.i.written.filter(id => id === "info.connection")).toHaveLength(1);
+    expect(comesUp.i.states.get("info.connection")).toEqual({ val: true, ack: true });
+  });
+
   it("touches no key that is already false", async () => {
     // Compared against the start's bulk read: a healthy tree must not get 27 pointless writes
     // (and 27 fresh timestamps) on every single adapter start.
