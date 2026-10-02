@@ -7,7 +7,7 @@ vi.mock("@iobroker/adapter-core", async () => ({ I18n: await import("@iobroker/a
 import { I18n } from "@iobroker/adapter-core";
 import { join } from "node:path";
 import { LANGUAGES } from "./constants";
-import { t, tDesc, tName, tRaw, tText } from "./i18n";
+import { t, tDesc, tName, tRaw } from "./i18n";
 
 const LANGS = LANGUAGES;
 
@@ -44,8 +44,8 @@ describe("tName / tDesc — object names and explanations from the real files", 
 
   // Every key main.ts names an object from. A missing one would silently ship an
   // object whose name is the raw key, in every language.
-  const NAME_KEYS = ["channelInfo", "connectionStatus", "stateLastCommand", "stateLastCommandType", "channelKeys"];
-  const DESC_KEYS = ["connectionStatusDesc", "stateLastCommandDesc", "stateLastCommandTypeDesc", "channelKeysDesc"];
+  const NAME_KEYS = ["channelInfo", "connectionStatus", "stateLastCommand", "channelKeys"];
+  const DESC_KEYS = ["connectionStatusDesc", "stateLastCommandDesc", "channelKeysDesc"];
 
   it.each(NAME_KEYS)("resolves the object name %s in all eleven languages", key => {
     const text = tName(key as Parameters<typeof tName>[0]) as Record<string, string>;
@@ -73,32 +73,6 @@ describe("tName / tDesc — object names and explanations from the real files", 
       expect(desc[lang], lang).not.toBe(name[lang]);
       expect(desc[lang].length, lang).toBeGreaterThan(name[lang].length);
     }
-  });
-});
-
-describe("tText — a label in the system language", () => {
-  // Every label main.ts puts into commandType's value list.
-  const LABEL_KEYS = ["none", "keypress", "keydown", "keyup", "launch", "install", "input", "search"].map(
-    verb => `commandType_${verb}`,
-  );
-
-  it("returns a plain string in the language I18n was started with", async () => {
-    await I18n.init(join(__dirname, "..", "..", "admin"), "de");
-    expect(tText("commandType_keypress")).toBe("Tastendruck");
-    await I18n.init(join(__dirname, "..", "..", "admin"), "en");
-    expect(tText("commandType_keypress")).toBe("Key press");
-  });
-
-  it.each(LABEL_KEYS)("has the label %s in all eleven languages, each its own word", key => {
-    // The admin shows a label in the system language; one that stays English in a German
-    // system — or is the bare key — reads as an untranslated value.
-    const text = t(key as Parameters<typeof t>[0]) as Record<string, string>;
-    expect(Object.keys(text).sort()).toEqual([...LANGS].sort());
-    for (const lang of LANGS) {
-      expect(text[lang], lang).toBeTruthy();
-      expect(text[lang], `${lang} is not the untranslated key`).not.toBe(key);
-    }
-    expect(text.de).not.toBe(text.en);
   });
 });
 

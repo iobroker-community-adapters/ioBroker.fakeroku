@@ -38,7 +38,7 @@ export interface CommandHost {
 }
 
 /**
- * Turns the ECP commands of every emulated Roku into state writes: `command` / `commandType`, a pulse for a keypress,
+ * Turns the ECP commands of every emulated Roku into state writes: `command`, a pulse for a keypress,
  * a hold with a watchdog for keydown/keyup — behind a rate gate per device, the write-flood protection for the states
  * database. Owns its timers and releases them in {@link dispose}.
  */
@@ -55,7 +55,7 @@ export class CommandHandler {
   public constructor(private readonly host: CommandHost) {}
 
   /**
-   * Apply a received ECP command to the device's states: record it in `command` / `commandType`, and pulse or hold
+   * Apply a received ECP command to the device's states: record it in `command`, and pulse or hold
    * the standard key if the device carries it. The server logs only what this accepted, so the rate gate covers the
    * log as well as the states database.
    *
@@ -74,7 +74,6 @@ export class CommandHandler {
       return false;
     }
     this.host.writeState(`${device.id}.command`, write.command);
-    this.host.writeState(`${device.id}.commandType`, write.commandType);
     // A key only this device's type lacks lands in `command` alone — there is no state to write.
     if (write.pulseKey && device.keys.has(write.pulseKey)) {
       this.pulse(`${device.id}.keys.${write.pulseKey}`);

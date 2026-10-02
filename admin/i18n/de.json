@@ -30,16 +30,6 @@
   "connectionStatusDesc": "Nur wahr, solange jeder konfigurierte emulierte Roku tatsächlich lauscht.",
   "stateLastCommand": "Letzter Befehl",
   "stateLastCommandDesc": "Der zuletzt empfangene Befehl dieses emulierten Roku als Klartext.",
-  "stateLastCommandType": "Art des letzten Befehls",
-  "stateLastCommandTypeDesc": "Um welche Art Befehl es sich handelte: Tastendruck, Taste gehalten oder losgelassen, App-Start oder -Installation, Texteingabe oder Suche.",
-  "commandType_none": "Noch kein Befehl",
-  "commandType_keypress": "Tastendruck",
-  "commandType_keydown": "Taste gehalten",
-  "commandType_keyup": "Taste losgelassen",
-  "commandType_launch": "App-Start",
-  "commandType_install": "App-Installation",
-  "commandType_input": "Texteingabe",
-  "commandType_search": "Suche",
   "channelKeys": "Fernbedienungstasten",
   "channelKeysDesc": "Ein Datenpunkt je Taste, die dieses Gerät anbietet; ein Tastendruck setzt ihn kurz auf wahr."
 }

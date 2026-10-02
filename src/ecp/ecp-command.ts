@@ -1,6 +1,6 @@
 import { decodeFormText, normalizeKey } from "../lib/pure-helpers";
 
-/** One ECP verb a Roku remote sends via POST — the value list of the `commandType` state is checked against it. */
+/** One ECP verb a Roku remote sends via POST. */
 export type CommandType = "keypress" | "keydown" | "keyup" | "launch" | "install" | "input" | "search";
 
 /** A parsed ECP command from the Roku HTTP interface. */

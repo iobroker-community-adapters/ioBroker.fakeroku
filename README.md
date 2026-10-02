@@ -83,7 +83,6 @@ For every emulated Roku (`fakeroku.0.<name>`):
 | Datapoint | Type | Meaning |
 |---|---|---|
 | `.command` | string, read-only | The last command as plain text (`Home`, `Lit_a`, `launch:12`, `search:news`). One datapoint for everything — no object-per-character sprawl. |
-| `.commandType` | string, read-only | `keypress` / `keydown` / `keyup` / `launch` / `install` / `input` / `search`. |
 | `.keys.<Key>` | boolean, read-only | One state per remote key the device type exposes — a *Player* has the 16 navigation/playback keys, a *TV* adds Volume\*, PowerOn/PowerOff/Power, Sleep, Channel\*, Tuner/HDMI/AV inputs — all created up front. A keypress pulses it `true` for a moment; keydown/keyup hold it. Key names are read in any case (`home` is `Home`). |
 
 Free keyboard input (`Lit_x`) and app launches show up in `.command` only — they do
@@ -103,6 +102,10 @@ becomes `true` — or watch `.command` for the last button as text.
 	Placeholder for the next version (at the beginning of the line):
 	### **WORK IN PROGRESS**
 -->
+
+### **WORK IN PROGRESS**
+
+- (krobipd) Changed: the datapoint `commandType` is gone — `command` carries every command; an existing installation removes it on the next start.
 
 ### 1.8.2 (2026-10-02)
 

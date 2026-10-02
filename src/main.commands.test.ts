@@ -40,7 +40,6 @@ describe("Fakeroku applyCommand", () => {
     ctx.i.applyCommand("Wohnzimmer", { type: "keypress", key: "Home" });
 
     expect(ctx.i.states.get("Wohnzimmer.command")).toEqual({ val: "Home", ack: true });
-    expect(ctx.i.states.get("Wohnzimmer.commandType")).toEqual({ val: "keypress", ack: true });
     expect(ctx.i.states.get("Wohnzimmer.keys.Home")).toEqual({ val: true, ack: true });
     // The pulse must clear itself — a key left true is a stuck button in the UI.
     const release = ctx.i.setTimeout.mock.calls.at(-1)!;

@@ -42,17 +42,6 @@ export function tDesc(key: I18nKey): ioBroker.StringOrTranslated {
 }
 
 /**
- * A user-facing text as a plain string in the system language — for a `common.states` label, which the admin
- * cannot render as a translation object (React error #31). adapter-core resolves it from `system.config.language`.
- *
- * @param key translation key from admin/i18n/en.json
- * @returns the text in the system language
- */
-export function tText(key: I18nKey): string {
-  return I18n.translate(key);
-}
-
-/**
  * Wrap a text that comes from the Roku protocol — a remote key name such as
  * `Home` or `VolumeUp` — as a translation object.
  *

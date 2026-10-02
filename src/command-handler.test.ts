@@ -40,7 +40,6 @@ describe("CommandHandler", () => {
     expect(h.handler.apply(player, { type: "keypress", key: "Home" })).toBe(true);
     expect(h.writes).toEqual([
       ["Wohnzimmer.command", "Home"],
-      ["Wohnzimmer.commandType", "keypress"],
       ["Wohnzimmer.keys.Home", true],
     ]);
     expect(h.timers[0].ms).toBe(KEY_PULSE_MS);
@@ -48,10 +47,10 @@ describe("CommandHandler", () => {
     expect(h.writes.at(-1)).toEqual(["Wohnzimmer.keys.Home", false]);
   });
 
-  it("writes only command and commandType for a key the device does not carry", () => {
+  it("writes only command for a key the device does not carry", () => {
     const h = host();
     h.handler.apply(player, { type: "keypress", key: "VolumeUp" });
-    expect(h.writes.map(w => w[0])).toEqual(["Wohnzimmer.command", "Wohnzimmer.commandType"]);
+    expect(h.writes.map(w => w[0])).toEqual(["Wohnzimmer.command"]);
     expect(h.timers).toHaveLength(0);
   });
 

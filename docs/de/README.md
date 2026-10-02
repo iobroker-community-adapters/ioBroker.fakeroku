@@ -94,7 +94,6 @@ Je emuliertem Roku, unterhalb von `fakeroku.0.<Name>`:
 | Datenpunkt     | Typ                 | Bedeutung                                                                                                                                                |
 | -------------- | ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `command`      | string, nur lesbar  | Der letzte Befehl als lesbarer Text: `Home`, `Lit_a`, `launch:12`, `search:news`.                                                                        |
-| `commandType`  | string, nur lesbar  | Um welche Art Befehl es sich handelte: `keypress`, `keydown`, `keyup`, `launch`, `install`, `input` oder `search`.                                       |
 | `keys.<Taste>` | boolean, nur lesbar | Ein Datenpunkt je Taste. Ein Tastendruck setzt ihn kurz auf `true` und wieder auf `false`; eine gehaltene Taste bleibt `true`, bis sie losgelassen wird. |
 
 Tastatureingaben der Fernbedienung (`Lit_a`) und App-Starts erscheinen nur in

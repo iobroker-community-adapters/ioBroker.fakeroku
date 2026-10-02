@@ -30,16 +30,6 @@
   "connectionStatusDesc": "Істина лише поки кожен налаштований емульований Roku справді слухає.",
   "stateLastCommand": "Остання команда",
   "stateLastCommandDesc": "Найновіша команда, яку отримав цей емульований Roku, у вигляді тексту.",
-  "stateLastCommandType": "Тип останньої команди",
-  "stateLastCommandTypeDesc": "Якого роду була команда: натискання кнопки, утримання чи відпускання, запуск або встановлення застосунку, введення тексту чи пошук.",
-  "commandType_none": "Команд ще не було",
-  "commandType_keypress": "Натискання клавіші",
-  "commandType_keydown": "Клавіша утримується",
-  "commandType_keyup": "Клавішу відпущено",
-  "commandType_launch": "Запуск застосунку",
-  "commandType_install": "Встановлення застосунку",
-  "commandType_input": "Введення тексту",
-  "commandType_search": "Пошук",
   "channelKeys": "Кнопки пульта",
   "channelKeysDesc": "По одному стану на кожну кнопку, яку пропонує цей пристрій; натискання ненадовго переводить його в істину."
 }

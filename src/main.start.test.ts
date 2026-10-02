@@ -34,10 +34,10 @@ describe("Fakeroku onReady — device wiring", () => {
 
     expect(ctx.ecp).toHaveLength(2);
     expect(ctx.ecp[0].start).toHaveBeenCalledTimes(1);
-    // Object tree: device + command + commandType + keys channel + one state per key.
+    // Object tree: device + command + keys channel + one state per key.
     expect(ctx.i.objects.get("Wohnzimmer")?.type).toBe("device");
     expect(ctx.i.objects.get("Wohnzimmer.command")).toBeDefined();
-    expect(ctx.i.objects.get("Wohnzimmer.commandType")).toBeDefined();
+    expect(ctx.i.objects.has("Wohnzimmer.commandType")).toBe(false);
     expect(ctx.i.objects.get("Wohnzimmer.keys")?.type).toBe("channel");
     expect(ctx.i.objects.get("Wohnzimmer.keys.Home")?.type).toBe("state");
     // A TV carries more keys than a player — the type must reach keysForType.
@@ -77,28 +77,6 @@ describe("Fakeroku onReady — device wiring", () => {
     expect(ctx.i.objects.get("Wohnzimmer.keys")).toMatchObject({
       common: { name: { en: "channelKeys" }, desc: { en: "channelKeysDesc" } },
     });
-  });
-
-  it("commandType lists every value it can hold, labelled in the system language", async () => {
-    const ctx = setup();
-    await ctx.i.onReady();
-    const states = (ctx.i.objects.get("Wohnzimmer.commandType") as { common: { states: Record<string, unknown> } })
-      .common.states;
-    // The empty start value is a value too — a list without it marks every fresh tree as wrong.
-    expect(states).toEqual({
-      "": "commandType_none",
-      keypress: "commandType_keypress",
-      keydown: "commandType_keydown",
-      keyup: "commandType_keyup",
-      launch: "commandType_launch",
-      install: "commandType_install",
-      input: "commandType_input",
-      search: "commandType_search",
-    });
-    // A translation object as a value is React error #31 in the admin's object view.
-    for (const v of Object.values(states)) {
-      expect(typeof v).toBe("string");
-    }
   });
 
   it("keys are read-only booleans with the gate-conformant role", async () => {
@@ -363,9 +341,6 @@ describe("Fakeroku onReady — names and descriptions", () => {
     expect(ctx.i.objects.get("Wohnzimmer.command")).toMatchObject({
       common: { name: { en: "stateLastCommand" }, desc: { en: "stateLastCommandDesc" } },
     });
-    expect(ctx.i.objects.get("Wohnzimmer.commandType")).toMatchObject({
-      common: { name: { en: "stateLastCommandType" }, desc: { en: "stateLastCommandTypeDesc" } },
-    });
   });
 
   it("wraps the protocol key name and the user's device name as translation objects", async () => {
@@ -580,6 +555,20 @@ describe("Fakeroku cleanup of stale objects", () => {
     // Routine housekeeping after an update or a config change — debug, like the
     // other adapters' cleanups; the log keeps info for events the user acts on.
     expect(ctx.i.log.debug).toHaveBeenCalledWith(expect.stringContaining("orphaned object"));
+  });
+
+  it("removes the commandType datapoint an installation up to 1.8.2 carries, value included", async () => {
+    const ctx = setup();
+    ctx.i.objects.set("Wohnzimmer.commandType", { type: "state", common: { type: "string" }, native: {} });
+    ctx.i.states.set("Wohnzimmer.commandType", { val: "keypress", ack: true });
+
+    await ctx.i.onReady();
+
+    expect(ctx.i.objects.has("Wohnzimmer.commandType")).toBe(false);
+    expect(ctx.i.states.has("Wohnzimmer.commandType")).toBe(false);
+    // Only the retired datapoint goes — the device and its command stay.
+    expect(ctx.i.objects.get("Wohnzimmer.command")).toBeDefined();
+    expect(ctx.i.objects.get("Wohnzimmer.keys.Home")).toBeDefined();
   });
 
   it("keeps the info channel and says nothing when there is nothing to remove", async () => {

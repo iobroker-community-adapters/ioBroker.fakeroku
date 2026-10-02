@@ -97,8 +97,6 @@ export function keysForType(type: DeviceType): readonly string[] {
 export interface StateWrite {
   /** Human-readable last command for the `command` state (e.g. "Home", "launch:12", "search:news"). */
   command: string;
-  /** The command type: keypress / keydown / keyup / launch / install / input / search. */
-  commandType: string;
   /** For a keypress on a standard key: pulse this `keys.<Key>` true→false. null otherwise. */
   pulseKey: string | null;
   /** For keydown/keyup on a standard key: set this `keys.<Key>` to the given value. null otherwise. */
@@ -141,7 +139,6 @@ export function commandToStateWrite(cmd: CommandEvent): StateWrite {
   const canonical: CommandEvent = key === undefined ? cmd : { ...cmd, key };
   const write: StateWrite = {
     command: describeCommand(canonical).slice(0, MAX_COMMAND_LENGTH),
-    commandType: cmd.type,
     pulseKey: null,
     holdKey: null,
   };

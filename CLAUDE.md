@@ -9,7 +9,7 @@ Roku-Emulator im LAN: ein ECP/SSDP-Controller (Logitech Harmony, Sofabaton, Home
 ## Architektur (`src/`)
 
 - **`main.ts`** — Lifecycle: `I18n.init` zuerst, dann der Gerätemanager; `repairInstanceObject` (Flotten-Helfer `migrateNativeKeys`, EIN Schreibvorgang); EIN Objekt-Abzug (`KnownObjects`) und EIN Zustands-Abzug (`primeStates`) beim Start; `persistNewIdentities` (Erststart); Interface-Regel (`awaitBindAddress`, `isOwnClient`); je Gerät ein `DeviceRuntime`-Datensatz (Id, Name, Advert, Typ, Tasten, Server), `running` daraus abgeleitet; Wiederholung belegter Ports; Waisen-Durchgang; `writeIndicator` (die eine Schreibstelle für `info.connection`); `onUnload` schreibt zuletzt (`.finally`).
-- **`command-handler.ts`** — Befehl → Zustand: `command`/`commandType`, Impuls (50 ms), Halten mit 30-s-Wächter, Ratenbegrenzung je Gerät; besitzt seine Zeitgeber, `dispose()` im `onUnload`; die Zeitgeber im `CommandHost` sind als Eigenschaften mit Funktionstyp deklariert, nicht als Methoden-Signatur (der Prüfbot liest `setTimeout(` am Zeilenanfang als blanken Aufruf, S5005).
+- **`command-handler.ts`** — Befehl → Zustand: `command`, Impuls (50 ms), Halten mit 30-s-Wächter, Ratenbegrenzung je Gerät; besitzt seine Zeitgeber, `dispose()` im `onUnload`; die Zeitgeber im `CommandHost` sind als Eigenschaften mit Funktionstyp deklariert, nicht als Methoden-Signatur (der Prüfbot liest `setTimeout(` am Zeilenanfang als blanken Aufruf, S5005).
 - **`device-management.ts`** — Gerätemanager (dm-utils): Karten je Gerät (Id = Identität), Dialog mit `applyDisabledRule`, liest/schreibt `native.devices` über `lib/device-config`.
 - **`discovery/ssdp-responder.ts`** — handgebauter `dgram`-SSDP-Responder (0.0.0.0:1900, `reuseAddr`): Beitritt einmal je Interface, eigene Geräteliste, Antwort mit der Adresse aus dem Netz des Suchenden, NOTIFY/byebye je Interface. ⚠️ `node-ssdp` taugt nicht: es hängt `::device` ans USN.
 - **`discovery/ssdp-messages.ts`** — reine Datagramme (Suchantwort, alive, byebye, Suchziel), `usnOf`, `ROKU_DEVICE_TYPE`.
@@ -21,7 +21,7 @@ Roku-Emulator im LAN: ein ECP/SSDP-Controller (Logitech Harmony, Sofabaton, Home
 
 _Jede Entscheidung steht hier als Regel-Satz; Beleg, Messung und Verlauf stehen in `.claude/dev-history.md` (dort auch der frühere Wortlaut dieses Registers, Eintrag 2026-10-01)._
 
-1. **Datenmodell** — `<gerät>.command` + `commandType` (string, `text`; `commandType` mit Werteliste aller Verben samt leerem Startwert, Beschriftung per `tText` in der Systemsprache) und feste `<gerät>.keys.<Key>` (boolean, Rolle `sensor`, nicht `button.press` wegen E1010/E1011), alle Tasten vorab angelegt; `Lit_`-Eingaben und App-Starts landen nur in `command`.
+1. **Datenmodell** — `<gerät>.command` (string, `text`) und feste `<gerät>.keys.<Key>` (boolean, Rolle `sensor`, nicht `button.press` wegen E1010/E1011), alle Tasten vorab angelegt; `Lit_`-Eingaben und App-Starts landen nur in `command`.
 2. **Identität überlebt das Umbenennen** — eine Zeile ohne `uuid` wird über `deriveUuid(gespeicherter Name)` identifiziert; ein neues Gerät (Dialog, Erststart ohne Baum) bekommt `randomIdentity()`, geschrieben vor der ersten Ankündigung.
 3. **Die Objekt-ID ist fest** — gespeicherte `objectId`, sonst der vorhandene Baum (heutige ID oder Alt-ID `name.replace(/[.\s]+/g, "_")`), sonst `sanitizeId(gespeicherter Name)`; Umbenennen ändert nur den angezeigten Namen.
 4. **Eine typlose Zeile (vor 0.7.0) nimmt ihren Typ aus dem Baum** — TV-Tasten dort machen sie zum TV; ihr unbrauchbarer Port fällt auf die Alt-Vorgabe 9093.

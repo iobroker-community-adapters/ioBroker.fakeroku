@@ -85,11 +85,10 @@ At instance level:
 
 For each emulated Roku, below `fakeroku.0.<name>`:
 
-| Datapoint     | Type               | Meaning                                                                                                                                           |
-| ------------- | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `command`     | string, read-only  | The last command as readable text: `Home`, `Lit_a`, `launch:12`, `search:news`.                                                                   |
-| `commandType` | string, read-only  | What kind of command it was: `keypress`, `keydown`, `keyup`, `launch`, `install`, `input` or `search`.                                            |
-| `keys.<Key>`  | boolean, read-only | One datapoint per remote key. A key press sets it to `true` for a moment and back to `false`; holding a key keeps it `true` until it is released. |
+| Datapoint    | Type               | Meaning                                                                                                                                           |
+| ------------ | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `command`    | string, read-only  | The last command as readable text: `Home`, `Lit_a`, `launch:12`, `search:news`.                                                                   |
+| `keys.<Key>` | boolean, read-only | One datapoint per remote key. A key press sets it to `true` for a moment and back to `false`; holding a key keeps it `true` until it is released. |
 
 Typing on the remote's keyboard (`Lit_a`) and app launches appear in `command` only —
 they do not get datapoints of their own. An app button of a remote that sends app

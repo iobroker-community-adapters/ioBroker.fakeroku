@@ -14,6 +14,15 @@ describe("planObjectCleanup", () => {
     expect(plan).toEqual(["ioBroker.apps"]);
   });
 
+  it("removes the commandType datapoint up to 1.8.2 created, and only the direct child of that name", () => {
+    const plan = planObjectCleanup(
+      ["ioBroker", "ioBroker.command", "ioBroker.commandType", "ioBroker.keys", "ioBroker.keys.commandType"],
+      new Set(["ioBroker"]),
+      valid(["Home", "commandType"]),
+    );
+    expect(plan).toEqual(["ioBroker.commandType"]);
+  });
+
   it("removes a key not in this device's type (e.g. a TV key after switching to player)", () => {
     const plan = planObjectCleanup(
       ["ioBroker.keys.Home", "ioBroker.keys.Play", "ioBroker.keys.VolumeUp"],
@@ -63,7 +72,7 @@ describe("planObjectCleanup", () => {
 
   it("keeps a fully current device untouched", () => {
     const plan = planObjectCleanup(
-      ["ioBroker", "ioBroker.command", "ioBroker.commandType", "ioBroker.keys", "ioBroker.keys.Home"],
+      ["ioBroker", "ioBroker.command", "ioBroker.keys", "ioBroker.keys.Home"],
       new Set(["ioBroker"]),
       BASE,
     );

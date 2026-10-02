@@ -5,7 +5,7 @@ import { FakerokuDeviceManagement } from "./device-management";
 import type { RokuAdvert } from "./discovery/ssdp-messages";
 import { RokuSsdpResponder } from "./discovery/ssdp-responder";
 import { CommandHandler } from "./command-handler";
-import type { CommandEvent, CommandType } from "./ecp/ecp-command";
+import type { CommandEvent } from "./ecp/ecp-command";
 import { EcpHttpServer } from "./ecp/ecp-http-server";
 import { type DeviceType, keysForType } from "./ecp/state-model";
 import { instanceObjectId, RESERVED_IDS } from "./lib/constants";
@@ -21,7 +21,7 @@ import {
 } from "./lib/detect-ip";
 import { errText } from "./lib/err-text";
 import { migrateNativeKeys, type NativeKeyMigration } from "./lib/native-key-migration";
-import { tDesc, tName, tRaw, tText } from "./lib/i18n";
+import { tDesc, tName, tRaw } from "./lib/i18n";
 import { coveredBy, KnownObjects } from "./lib/known-objects";
 import { isLanClient } from "./lib/lan-guard";
 import { planNativePrune, planObjectCleanup } from "./lib/object-cleanup";
@@ -719,9 +719,9 @@ export class Fakeroku extends utils.Adapter {
   }
 
   /**
-   * Create the fixed object tree for one emulated Roku: the device, `command` +
-   * `commandType`, and one `sensor` boolean state per key the device type exposes —
-   * all up front, so the tree is usable before any key is ever pressed.
+   * Create the fixed object tree for one emulated Roku: the device, `command`, and one
+   * `sensor` boolean state per key the device type exposes — all up front, so the tree
+   * is usable before any key is ever pressed.
    *
    * Every key state is also RESET to false here. A key is a momentary signal, but
    * nothing writes its release when the adapter goes down: a keypress pulses true
@@ -757,32 +757,6 @@ export class Fakeroku extends utils.Adapter {
           read: true,
           write: false,
           def: "",
-        },
-        native: {},
-      }),
-      this.known.extend(`${deviceId}.commandType`, {
-        type: "state",
-        common: {
-          name: tName("stateLastCommandType"),
-          desc: tDesc("stateLastCommandTypeDesc"),
-          type: "string",
-          role: "text",
-          read: true,
-          write: false,
-          def: "",
-          // Every value the datapoint can hold — the fixed verb list and the empty start value — with a
-          // label in the system language. Plain strings only: a translation object here crashes the
-          // admin's object view. `satisfies` keeps the list complete against the parser's verbs.
-          states: {
-            "": tText("commandType_none"),
-            keypress: tText("commandType_keypress"),
-            keydown: tText("commandType_keydown"),
-            keyup: tText("commandType_keyup"),
-            launch: tText("commandType_launch"),
-            install: tText("commandType_install"),
-            input: tText("commandType_input"),
-            search: tText("commandType_search"),
-          } satisfies Record<"" | CommandType, string>,
         },
         native: {},
       }),

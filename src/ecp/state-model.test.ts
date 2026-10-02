@@ -30,7 +30,6 @@ describe("commandToStateWrite", () => {
   it("pulses a standard keypress and records the command", () => {
     expect(commandToStateWrite({ type: "keypress", key: "Home" })).toMatchObject({
       command: "Home",
-      commandType: "keypress",
       pulseKey: "Home",
       holdKey: null,
     });

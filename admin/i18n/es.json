@@ -30,16 +30,6 @@
   "connectionStatusDesc": "Verdadero solo mientras cada Roku emulado configurado esté realmente a la escucha.",
   "stateLastCommand": "Último comando",
   "stateLastCommandDesc": "El comando más reciente que recibió este Roku emulado, como texto simple.",
-  "stateLastCommandType": "Tipo del último comando",
-  "stateLastCommandTypeDesc": "Qué tipo de comando fue: pulsar una tecla, mantenerla o soltarla, iniciar o instalar una aplicación, introducir texto o buscar.",
-  "commandType_none": "Aún sin comando",
-  "commandType_keypress": "Pulsación de tecla",
-  "commandType_keydown": "Tecla mantenida",
-  "commandType_keyup": "Tecla soltada",
-  "commandType_launch": "Inicio de app",
-  "commandType_install": "Instalación de app",
-  "commandType_input": "Entrada de texto",
-  "commandType_search": "Búsqueda",
   "channelKeys": "Teclas del mando",
   "channelKeysDesc": "Un estado por cada tecla que ofrece este dispositivo; una pulsación lo pone brevemente en verdadero."
 }

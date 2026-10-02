@@ -30,16 +30,6 @@
   "connectionStatusDesc": "Prawda tylko wtedy, gdy każdy skonfigurowany emulowany Roku faktycznie nasłuchuje.",
   "stateLastCommand": "Ostatnie polecenie",
   "stateLastCommandDesc": "Najnowsze polecenie odebrane przez ten emulowany Roku, jako zwykły tekst.",
-  "stateLastCommandType": "Typ ostatniego polecenia",
-  "stateLastCommandTypeDesc": "Jakiego rodzaju było to polecenie: naciśnięcie klawisza, przytrzymanie lub zwolnienie, uruchomienie lub instalacja aplikacji, wpisanie tekstu albo wyszukiwanie.",
-  "commandType_none": "Jeszcze brak polecenia",
-  "commandType_keypress": "Naciśnięcie klawisza",
-  "commandType_keydown": "Klawisz przytrzymany",
-  "commandType_keyup": "Klawisz zwolniony",
-  "commandType_launch": "Uruchomienie aplikacji",
-  "commandType_install": "Instalacja aplikacji",
-  "commandType_input": "Wprowadzanie tekstu",
-  "commandType_search": "Wyszukiwanie",
   "channelKeys": "Klawisze pilota",
   "channelKeysDesc": "Jeden stan na każdy klawisz oferowany przez to urządzenie; naciśnięcie ustawia go na krótko na wartość true."
 }

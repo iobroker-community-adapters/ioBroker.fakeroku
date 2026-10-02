@@ -1,13 +1,19 @@
 import { OWN_INFO_IDS } from "./constants";
 
 /**
+ * Direct children of a device that an earlier version created and this one does not: the old adapter's `apps` node
+ * and `commandType` (1.3.0–1.8.2, the kind of the last command; `command` carries the command itself).
+ */
+const RETIRED_DEVICE_CHILDREN: ReadonlySet<string> = new Set(["apps", "commandType"]);
+
+/**
  * Decide which existing adapter objects are orphaned after the current device
  * tree has been (re)created. Pure — the caller performs the actual deletes — so
  * the tricky "what is stale" logic is unit-testable without a live adapter.
  *
  * Three kinds of orphan are collected:
  *  - a whole device sub-tree whose device is no longer configured (rename/removal),
- *  - the legacy `<device>.apps` node the old adapter created and 0.5.x does not,
+ *  - a direct child of a device an earlier version created and this one does not ({@link RETIRED_DEVICE_CHILDREN}),
  *  - a `<device>.keys.<Key>` state whose key is no longer part of the device's
  *    type (e.g. the TV keys after switching a device from "tv" back to "player").
  *
@@ -47,8 +53,8 @@ export function planObjectCleanup(
       del.add(device); // whole orphaned device tree — recursive delete drops the children
       continue;
     }
-    if (parts[1] === "apps") {
-      del.add(`${device}.apps`); // legacy node the old adapter created
+    if (parts.length === 2 && RETIRED_DEVICE_CHILDREN.has(parts[1])) {
+      del.add(id); // created by an earlier version, written by nobody now
     } else if (parts[1] === "keys" && parts.length === 3) {
       const valid = validKeysByDevice.get(device);
       if (valid && !valid.has(parts[2])) {

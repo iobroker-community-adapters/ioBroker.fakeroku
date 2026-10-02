@@ -115,54 +115,6 @@
     "native": {},
     "_id": "fakeroku.0.Player.command"
   },
-  "fakeroku.0.Player.commandType": {
-    "type": "state",
-    "common": {
-      "name": {
-        "de": "Art des letzten Befehls",
-        "en": "Last command type",
-        "es": "Tipo del último comando",
-        "fr": "Type de la dernière commande",
-        "it": "Tipo dell'ultimo comando",
-        "nl": "Type laatste opdracht",
-        "pl": "Typ ostatniego polecenia",
-        "pt": "Tipo do último comando",
-        "ru": "Тип последней команды",
-        "uk": "Тип останньої команди",
-        "zh-cn": "最后一条命令的类型"
-      },
-      "desc": {
-        "de": "Um welche Art Befehl es sich handelte: Tastendruck, Taste gehalten oder losgelassen, App-Start oder -Installation, Texteingabe oder Suche.",
-        "en": "What kind of command it was: a key press, a key held or released, an app launch or install, a text input or a search.",
-        "es": "Qué tipo de comando fue: pulsar una tecla, mantenerla o soltarla, iniciar o instalar una aplicación, introducir texto o buscar.",
-        "fr": "De quel type de commande il s'agissait : appui sur une touche, touche maintenue ou relâchée, lancement ou installation d'une application, saisie de texte ou recherche.",
-        "it": "Di che tipo di comando si trattava: pressione di un tasto, tasto tenuto premuto o rilasciato, avvio o installazione di un'app, immissione di testo o ricerca.",
-        "nl": "Wat voor soort opdracht het was: een toetsdruk, een toets ingedrukt of losgelaten, een app starten of installeren, tekstinvoer of zoeken.",
-        "pl": "Jakiego rodzaju było to polecenie: naciśnięcie klawisza, przytrzymanie lub zwolnienie, uruchomienie lub instalacja aplikacji, wpisanie tekstu albo wyszukiwanie.",
-        "pt": "Que tipo de comando foi: pressionar uma tecla, manter ou soltar, iniciar ou instalar uma aplicação, introduzir texto ou pesquisar.",
-        "ru": "Какого рода была команда: нажатие кнопки, удержание или отпускание, запуск или установка приложения, ввод текста или поиск.",
-        "uk": "Якого роду була команда: натискання кнопки, утримання чи відпускання, запуск або встановлення застосунку, введення тексту чи пошук.",
-        "zh-cn": "命令的种类：按键、按住或松开按键、启动或安装应用、输入文本或搜索。"
-      },
-      "type": "string",
-      "role": "text",
-      "read": true,
-      "write": false,
-      "def": "",
-      "states": {
-        "": "No command yet",
-        "keypress": "Key press",
-        "keydown": "Key held",
-        "keyup": "Key released",
-        "launch": "App launch",
-        "install": "App install",
-        "input": "Text input",
-        "search": "Search"
-      }
-    },
-    "native": {},
-    "_id": "fakeroku.0.Player.commandType"
-  },
   "fakeroku.0.Player.keys": {
     "type": "channel",
     "common": {
@@ -653,54 +605,6 @@
     },
     "native": {},
     "_id": "fakeroku.0.TV.command"
-  },
-  "fakeroku.0.TV.commandType": {
-    "type": "state",
-    "common": {
-      "name": {
-        "de": "Art des letzten Befehls",
-        "en": "Last command type",
-        "es": "Tipo del último comando",
-        "fr": "Type de la dernière commande",
-        "it": "Tipo dell'ultimo comando",
-        "nl": "Type laatste opdracht",
-        "pl": "Typ ostatniego polecenia",
-        "pt": "Tipo do último comando",
-        "ru": "Тип последней команды",
-        "uk": "Тип останньої команди",
-        "zh-cn": "最后一条命令的类型"
-      },
-      "desc": {
-        "de": "Um welche Art Befehl es sich handelte: Tastendruck, Taste gehalten oder losgelassen, App-Start oder -Installation, Texteingabe oder Suche.",
-        "en": "What kind of command it was: a key press, a key held or released, an app launch or install, a text input or a search.",
-        "es": "Qué tipo de comando fue: pulsar una tecla, mantenerla o soltarla, iniciar o instalar una aplicación, introducir texto o buscar.",
-        "fr": "De quel type de commande il s'agissait : appui sur une touche, touche maintenue ou relâchée, lancement ou installation d'une application, saisie de texte ou recherche.",
-        "it": "Di che tipo di comando si trattava: pressione di un tasto, tasto tenuto premuto o rilasciato, avvio o installazione di un'app, immissione di testo o ricerca.",
-        "nl": "Wat voor soort opdracht het was: een toetsdruk, een toets ingedrukt of losgelaten, een app starten of installeren, tekstinvoer of zoeken.",
-        "pl": "Jakiego rodzaju było to polecenie: naciśnięcie klawisza, przytrzymanie lub zwolnienie, uruchomienie lub instalacja aplikacji, wpisanie tekstu albo wyszukiwanie.",
-        "pt": "Que tipo de comando foi: pressionar uma tecla, manter ou soltar, iniciar ou instalar uma aplicação, introduzir texto ou pesquisar.",
-        "ru": "Какого рода была команда: нажатие кнопки, удержание или отпускание, запуск или установка приложения, ввод текста или поиск.",
-        "uk": "Якого роду була команда: натискання кнопки, утримання чи відпускання, запуск або встановлення застосунку, введення тексту чи пошук.",
-        "zh-cn": "命令的种类：按键、按住或松开按键、启动或安装应用、输入文本或搜索。"
-      },
-      "type": "string",
-      "role": "text",
-      "read": true,
-      "write": false,
-      "def": "",
-      "states": {
-        "": "No command yet",
-        "keypress": "Key press",
-        "keydown": "Key held",
-        "keyup": "Key released",
-        "launch": "App launch",
-        "install": "App install",
-        "input": "Text input",
-        "search": "Search"
-      }
-    },
-    "native": {},
-    "_id": "fakeroku.0.TV.commandType"
   },
   "fakeroku.0.TV.keys": {
     "type": "channel",

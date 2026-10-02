@@ -187,7 +187,7 @@ describe("object inventory", () => {
     }
     for (const device of ["Player", "TV"]) {
       expect(ids).toContain(`fakeroku.0.${device}.command`);
-      expect(ids).toContain(`fakeroku.0.${device}.commandType`);
+      expect(ids).not.toContain(`fakeroku.0.${device}.commandType`);
     }
     expect(ids).toContain("fakeroku.0.info.connection");
   });
