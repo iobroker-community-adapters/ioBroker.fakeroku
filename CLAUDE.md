@@ -34,7 +34,7 @@ _Jede Entscheidung steht hier als Regel-Satz; Beleg, Messung und Verlauf stehen 
 11. **`info` ist reserviert** — `RESERVED_IDS` im Dialog und in `startDevices`; der Waisen-Durchgang schützt nur `OWN_INFO_IDS`.
 12. **`refreshOwnObjects` frischt Name und Beschreibung von `info` + `info.connection` auf**, nur wo sie vom gespeicherten Objekt abweichen; alle Namen über `tName`/`tDesc`/`tRaw`.
 13. **Objekte und Anzeigen werden nur bei Unterschied geschrieben** — Objekte über `KnownObjects.extend`, `info.connection` über `writeIndicator` gegen den Zustands-Abzug.
-14. **Vertrauensgrenze = die eigenen Netze** (krobi 2026-09-24) — Netz einer eigenen Schnittstelle, dazu Loopback und Link-local; mit gewählter Schnittstelle nur deren Netz.
+14. **Vertrauensgrenze = die eigenen Netze** (krobi 2026-09-24, 2026-10-03) — Netz einer eigenen Schnittstelle, ohne Ausnahme für Loopback oder Link-local; mit gewählter Schnittstelle nur deren Netz: dort wird gelauscht, gesendet und angenommen.
 15. **Der Waisen-Durchgang läuft an jedem Konfigurations-Ausstieg von `onReady`** — `toDeviceRows` = `null` (kein `devices`-Schlüssel) räumt nichts, `[]` räumt alles.
 16. **„Alle Schnittstellen“ bedient jedes eigene Netz mit der eigenen Adresse darin**; virtuelle Brücken werden am Namen erkannt (Rückfall 172.17./172.18.); ohne IPv4 lauschen die ECP-Server, die Erkennung startet nach.
 17. **Eine gewählte Schnittstelle hält alles in ihrem Netz** (krobi 2026-09-24) — fehlt ihre Adresse, wird sie 2 min lang alle 10 s gesucht, dann Fehlerzeile, kein Rückfall.

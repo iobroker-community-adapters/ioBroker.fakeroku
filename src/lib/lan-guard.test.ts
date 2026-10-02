@@ -37,14 +37,16 @@ describe("isLanClient — only the host's own networks", () => {
     expect(isLanClient(undefined, home)).toBe(false);
   });
 
-  it("accepts loopback and link-local without asking for the networks", () => {
-    // A link-local address is on the same wire by definition — 169.254 is what a remote
-    // self-assigns when the DHCP server is slow or gone, exactly when the user troubleshoots.
-    const boom = (): LocalNet[] => {
-      throw new Error("must not be asked for loopback or link-local");
-    };
+  it("refuses loopback and link-local — no exception outside the networks handed in", () => {
     for (const ip of ["127.0.0.1", "::1", "169.254.10.5", "fe80::1", "FE80::A1B2:C3D4%en0", "::ffff:127.0.0.1"]) {
-      expect(isLanClient(ip, boom), ip).toBe(true);
+      expect(isLanClient(ip, home), ip).toBe(false);
+    }
+  });
+
+  it("accepts a link-local client only when the interface carries an address in that range", () => {
+    const linkLocal = (): LocalNet[] => [net("fe80::5", 64), net("169.254.3.4", 16)];
+    for (const ip of ["fe80::1", "FE80::A1B2:C3D4%en0", "169.254.10.5"]) {
+      expect(isLanClient(ip, linkLocal), ip).toBe(true);
     }
   });
 

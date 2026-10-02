@@ -3,6 +3,7 @@ import * as net from "node:net";
 import type { CommandEvent } from "./ecp-command";
 import { SOFTWARE_VERSION } from "./device-info";
 import { EcpHttpServer, type EcpServerConfig } from "./ecp-http-server";
+import type { LocalNet } from "../lib/detect-ip";
 import { isLanClient } from "../lib/lan-guard";
 import { LogThrottle } from "../lib/log-throttle";
 
@@ -31,6 +32,9 @@ const recordingLogger = {
   error: (): void => {},
 };
 
+/** The test's own network: loopback, where the requests below come from. */
+const LOOPBACK_NET: LocalNet = { iface: "lo", family: "IPv4", address: "127.0.0.1", prefixLength: 8, virtual: false };
+
 /**
  * A complete server configuration — every callback the adapter always hands in; a test overrides only what it is about.
  *
@@ -46,7 +50,8 @@ function serverConfig(overrides: Partial<EcpServerConfig>): EcpServerConfig {
     logger: recordingLogger,
     onCommand: () => true,
     onFatalError: () => {},
-    isClientAllowed: a => isLanClient(a),
+    // The real guard, with loopback handed in as the one own network — the test client sits there.
+    isClientAllowed: a => isLanClient(a, () => [LOOPBACK_NET]),
     ...overrides,
   };
 }
