@@ -1,8 +1,21 @@
 {
   "common": {
     "name": "fakeroku",
-    "version": "1.8.1",
+    "version": "1.8.2",
     "news": {
+      "1.8.2": {
+        "en": "A new instance starts switched off\nThe device manager answers right after a restart instead of failing until the translations are loaded\nThe type of the last command shows a readable label in the language you set instead of a protocol word\nA start writes only datapoints that changed — no needless updates for history adapters",
+        "de": "Eine neue Instanz startet ausgeschaltet\nDer Gerätemanager antwortet direkt nach einem Neustart, statt zu scheitern, bis die Übersetzungen geladen sind\nDie Art des letzten Befehls zeigt eine lesbare Beschriftung in der eingestellten Sprache statt eines Protokollworts\nEin Start schreibt nur geänderte Datenpunkte — keine unnötigen Updates für History-Adapter",
+        "ru": "Новый экземпляр запускается выключенным\nМенеджер устройств отвечает сразу после перезапуска, а не сбоит, пока не загружены переводы\nТип последней команды показывается понятной подписью на выбранном языке, а не словом протокола\nЗапуск пишет только изменённые точки данных — без лишних обновлений для адаптеров истории",
+        "pt": "Uma nova instância começa desligada\nO gestor de dispositivos responde logo após um reinício, em vez de falhar até as traduções serem carregadas\nO tipo do último comando mostra uma etiqueta legível no idioma definido em vez de uma palavra do protocolo\nUm arranque escreve só pontos de dados alterados — sem atualizações inúteis para adaptadores de histórico",
+        "nl": "Een nieuwe instantie start uitgeschakeld\nDe apparaatbeheerder antwoordt direct na een herstart in plaats van te falen tot de vertalingen geladen zijn\nHet type van de laatste opdracht toont een leesbaar label in de ingestelde taal in plaats van een protocolwoord\nEen start schrijft alleen gewijzigde datapunten — geen onnodige updates voor history-adapters",
+        "fr": "Une nouvelle instance démarre désactivée\nLe gestionnaire d'appareils répond dès le redémarrage au lieu d'échouer jusqu'au chargement des traductions\nLe type de la dernière commande affiche un libellé lisible dans la langue choisie au lieu d'un mot du protocole\nUn démarrage n'écrit que les points de données modifiés — plus de mises à jour inutiles pour les adaptateurs d'historique",
+        "it": "Una nuova istanza parte spenta\nIl gestore dispositivi risponde subito dopo un riavvio invece di fallire finché le traduzioni non sono caricate\nIl tipo dell'ultimo comando mostra un'etichetta leggibile nella lingua impostata invece di una parola del protocollo\nUn avvio scrive solo i datapoint cambiati — nessun aggiornamento inutile per gli adattatori di cronologia",
+        "es": "Una instancia nueva arranca apagada\nEl gestor de dispositivos responde justo tras un reinicio en lugar de fallar hasta que se cargan las traducciones\nEl tipo del último comando muestra una etiqueta legible en el idioma configurado en lugar de una palabra del protocolo\nUn arranque escribe solo los puntos de datos cambiados — sin actualizaciones inútiles para los adaptadores de historial",
+        "pl": "Nowa instancja startuje wyłączona\nMenedżer urządzeń odpowiada zaraz po restarcie, zamiast zawodzić do załadowania tłumaczeń\nTyp ostatniego polecenia pokazuje czytelną etykietę w ustawionym języku zamiast słowa protokołu\nStart zapisuje tylko zmienione punkty danych — bez zbędnych aktualizacji dla adapterów historii",
+        "uk": "Новий екземпляр запускається вимкненим\nМенеджер пристроїв відповідає одразу після перезапуску, а не збоїть, доки не завантажено переклади\nТип останньої команди показується зрозумілим підписом обраною мовою, а не словом протоколу\nЗапуск пише лише змінені точки даних — без зайвих оновлень для адаптерів історії",
+        "zh-cn": "新实例启动时为关闭状态\n设备管理器在重启后立即响应，不再在翻译加载完成前出错\n最近命令的类型以所设语言的易读标签显示，而不是协议词\n启动时只写入已更改的数据点——不再给历史记录适配器带来不必要的更新"
+      },
       "1.8.1": {
         "en": "The note the Admin shows before an update from 0.x is short now: the apps folder is removed, app launches arrive as launch:<id> in command.",
         "de": "Der Hinweis, den der Admin vor einem Update von 0.x zeigt, ist jetzt kurz: der Ordner apps fällt weg, App-Starts kommen als launch:<id> in command.",

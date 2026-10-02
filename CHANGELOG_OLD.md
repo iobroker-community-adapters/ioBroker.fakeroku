@@ -1,4 +1,7 @@
 # Older changes
+## 1.6.1 (2026-09-07) — stable
+
+- (krobipd) Changed: installing straight from GitHub is no longer offered — the adapter is built before publishing, so it is installed from the ioBroker repository instead.
 
 ## 1.6.0 (2026-09-07)
 

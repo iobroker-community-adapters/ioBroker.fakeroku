@@ -103,8 +103,7 @@ becomes `true` — or watch `.command` for the last button as text.
 	Placeholder for the next version (at the beginning of the line):
 	### **WORK IN PROGRESS**
 -->
-
-### **WORK IN PROGRESS**
+### 1.8.2 (2026-10-02)
 
 - (krobipd) Changed: a new instance starts switched off — check the settings, then switch it on.
 - (krobipd) Fixed: the README and the user documentation name admin 8.0.14, the version the adapter actually requires.
@@ -143,10 +142,6 @@ becomes `true` — or watch `.command` for the last button as text.
 - (krobipd) Fixed: the device dialog now also refuses a name that would collide with an existing device in the object tree.
 - (krobipd) Improved: after the host gets a new IP address, remotes find the emulated Rokus again without restarting the instance.
 - (krobipd) Changed: the network interface setting moved to the standard settings key (bind); the instance restarts once after this update.
-
-### 1.6.1 (2026-09-07) — stable
-
-- (krobipd) Changed: installing straight from GitHub is no longer offered — the adapter is built before publishing, so it is installed from the ioBroker repository instead.
 
 [Older changelogs can be found there](CHANGELOG_OLD.md)
 
