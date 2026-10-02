@@ -15,7 +15,7 @@ vi.mock("node:os", async importOriginal => {
   return { ...actual, default: { ...actual, networkInterfaces }, networkInterfaces };
 });
 
-import { setup, resetHarness, noAddressYet, fakeSsdp, type FakeSsdp } from "../test/helpers/fakeroku-harness";
+import { setup, resetHarness, noAddressYet, fakeSsdp, type FakeSsdp, kueche } from "../test/helpers/fakeroku-harness";
 import { osMock } from "../test/helpers/os-double";
 
 afterEach(resetHarness);
@@ -239,6 +239,42 @@ describe("Fakeroku onReady — discovery is an aid, not a precondition", () => {
 
     expect(ctx.ssdps[0].refreshAdvertise).not.toHaveBeenCalled();
     expect(ctx.ssdps[0].options.advertiseIp).toBe("192.168.1.5");
+  });
+
+  it("the start line says discovery is unavailable instead of naming an address it does not announce", async () => {
+    const ctx = setup({}, { ssdpStartFails: true });
+    await ctx.i.onReady();
+    expect(ctx.i.log.info).toHaveBeenCalledWith("Emulating 1 Roku device(s), discovery unavailable");
+  });
+
+  it("one retry timer at a time — a second outage while one is armed arms no second", async () => {
+    const ctx = setup(
+      { devices: [kueche(), { name: "Wohnzimmer", port: 8060, type: "player" }] },
+      { failEcpPort: 8061 },
+    );
+    await ctx.i.onReady();
+    const armed = (): number => ctx.i.setTimeout.mock.calls.filter(([, ms]) => ms === 60_000).length;
+    expect(armed()).toBe(1);
+
+    ctx.i.onSsdpFatal(new Error("SSDP socket closed"));
+
+    expect(armed()).toBe(1);
+  });
+
+  it("a Roku that comes back while discovery runs starts no second discovery", async () => {
+    const ctx = setup(
+      { devices: [kueche(), { name: "Wohnzimmer", port: 8060, type: "player" }] },
+      { failEcpPort: 8061 },
+    );
+    await ctx.i.onReady();
+    expect(ctx.ssdps).toHaveLength(1);
+    ctx.freeEcpPort();
+
+    await ctx.i.retryPendingDevices();
+
+    expect(ctx.i.running).toHaveLength(2);
+    expect(ctx.ssdps).toHaveLength(1);
+    expect(ctx.ssdps[0].addDevice).toHaveBeenCalledWith(expect.objectContaining({ port: 8061 }));
   });
 
   it("a runtime socket death: stops announcing, closes what is left, yellow, retried", async () => {

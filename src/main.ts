@@ -568,10 +568,8 @@ export class Fakeroku extends utils.Adapter {
       // Discovery may never have started (every device failed at boot), or it went down.
       if (this.running.length > 0 && !this.ssdp) {
         await this.startDiscovery();
-        if (this.stopping) {
-          return;
-        }
       }
+      // A stop during the start above finds nothing to write: onUnload wrote false and emptied what the retry would arm.
       await this.updateConnection();
       this.scheduleRetry();
     } catch (e) {
@@ -592,9 +590,7 @@ export class Fakeroku extends utils.Adapter {
    * membership, NOTIFY egress and every answer to itself.
    */
   private async startDiscovery(): Promise<void> {
-    if (this.ssdp || this.stopping) {
-      return;
-    }
+    // Both callers start it only while nothing runs and the host has not said stop.
     const bindIp = this.bindIp;
     const advertiseIp = bindIp ?? detectPrimaryIPv4();
     if (!advertiseIp) {

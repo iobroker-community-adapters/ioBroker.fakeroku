@@ -391,6 +391,51 @@ describe("Fakeroku — stop points that only one guard covers", () => {
   });
 });
 
+describe("Fakeroku — failures that arrive while the host says stop", () => {
+  it("a server error during the shutdown writes no error line and queues nothing", async () => {
+    const ctx = setup();
+    await ctx.i.onReady();
+    const fatal = ctx.ecp[0].options.onFatalError as (err: Error) => void;
+    ctx.i.onUnload(() => {});
+    ctx.i.setTimeout.mockClear();
+
+    fatal(new Error("socket closed"));
+
+    expect(ctx.i.log.error).not.toHaveBeenCalled();
+    expect(ctx.i.pending).toHaveLength(0);
+    expect(ctx.i.setTimeout).not.toHaveBeenCalled();
+  });
+
+  it("a discovery socket that dies during the shutdown reports no outage and arms no retry", async () => {
+    const ctx = setup();
+    await ctx.i.onReady();
+    ctx.i.onUnload(() => {});
+    ctx.i.setTimeout.mockClear();
+
+    ctx.i.onSsdpFatal(new Error("SSDP socket closed"));
+
+    expect(ctx.i.log.warn).not.toHaveBeenCalledWith(expect.stringContaining("SSDP discovery unavailable"));
+    expect(ctx.i.setTimeout).not.toHaveBeenCalled();
+  });
+
+  it("a stop during the orphan sweep: no lines about the Rokus, no discovery", async () => {
+    const ctx = setup({ devices: [kueche()] }, { failEcpPort: 8061 });
+    ctx.i.objects.set("Altgeraet", { type: "device", common: { name: "Altgeraet" }, native: {} });
+    const real = ctx.i.delObjectAsync.getMockImplementation() as (id: string, o?: unknown) => Promise<void>;
+    ctx.i.delObjectAsync.mockImplementation((id: string, o?: unknown) => {
+      ctx.i.onUnload(() => {});
+      return real(id, o);
+    });
+
+    await ctx.i.onReady();
+
+    expect(ctx.i.delObjectAsync).toHaveBeenCalled();
+    expect(ctx.i.log.warn).not.toHaveBeenCalledWith(expect.stringContaining("is not running"));
+    expect(ctx.i.log.error).not.toHaveBeenCalledWith(expect.stringContaining("is running"));
+    expect(ctx.ssdps).toHaveLength(0);
+  });
+});
+
 describe("Fakeroku onUnload", () => {
   it("stops every server, clears every timer and always calls back", async () => {
     const ctx = setup();
@@ -704,6 +749,19 @@ describe("Fakeroku — the paths that only a failing database reaches", () => {
     ctx.i.makeSsdpResponder = (options: Record<string, unknown>): FakeSsdp => (late = fakeSsdp(options, start));
     return { late: () => late, release };
   }
+
+  it("a stop while discovery starts: no start line, no status, no retry timer after the farewell", async () => {
+    const ctx = setup();
+    const { late, release } = lateSsdp(ctx);
+    const ready = ctx.i.onReady();
+    await vi.waitFor(() => expect(late().start).toHaveBeenCalled());
+    ctx.i.onUnload(() => {});
+    ctx.i.setTimeout.mockClear();
+    release();
+    await ready;
+    expect(ctx.i.log.info).not.toHaveBeenCalledWith(expect.stringContaining("Emulating"));
+    expect(ctx.i.setTimeout).not.toHaveBeenCalled();
+  });
 
   it("a discovery bind that lands after unload neither announces nor arms an interval", async () => {
     // If the bind resolves after the farewell went out, announcing would put the devices back
