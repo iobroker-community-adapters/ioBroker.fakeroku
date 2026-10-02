@@ -98,6 +98,8 @@ export interface DeviceRow {
   readonly port: number;
   /** The emulated device type. */
   readonly type: DeviceType;
+  /** True when the stored row carries no type (before 0.7.0): {@link type} is read from the tree, until it is written. */
+  readonly typeDerived: boolean;
   /** The SSDP identity of this row, resolved from the STORED row. */
   readonly identity: string;
   /** True when the row carried a persisted id the adapters never wrote, and this one replaces it. */
@@ -149,7 +151,8 @@ export function normalizeType(value: unknown): DeviceType {
  * which created every key state the remote pressed, TV keys included. Its type is read from the
  * tree it already has: TV keys there mean a TV, or the orphan sweep would delete them (and with
  * them their values, room assignments and history settings). The same rows take the old
- * adapter's fallback port.
+ * adapter's fallback port. The start writes both into the row once ({@link DeviceRow.typeDerived}),
+ * so the tree is read for it only until then.
  *
  * @param raw one element of native.devices
  * @param tree what the object tree holds (empty: nothing is known)
@@ -173,6 +176,7 @@ export function toDeviceRow(raw: unknown, tree: DeviceTree = EMPTY_TREE): Device
     name: row.name.trim(),
     port,
     type: legacyRow && tvKeysInTree ? "tv" : normalizeType(row.type),
+    typeDerived: legacyRow,
     identity,
     identityReplaced: typeof row.uuid === "string" && row.uuid.length > 0 && row.uuid !== identity,
     identityDerived: identity !== row.uuid,

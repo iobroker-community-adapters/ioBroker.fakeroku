@@ -261,7 +261,7 @@ describe("Fakeroku onReady — a device nothing has seen yet gets its own identi
     const ctx = setup({ devices: [{ name: "Roku", port: 8060, type: "player" }] }, { fresh: true });
     ctx.i.extendForeignObjectAsync.mockRejectedValueOnce(new Error("write refused"));
     await ctx.i.onReady();
-    expect(ctx.i.log.warn).toHaveBeenCalledWith(expect.stringContaining("could not get its own identity"));
+    expect(ctx.i.log.warn).toHaveBeenCalledWith(expect.stringContaining("settings could not be completed"));
     expect((ctx.ecp[0].options.device as { uuid: string }).uuid).toBe(deriveUuid("Roku"));
   });
 });
@@ -303,22 +303,46 @@ describe("Fakeroku onReady — an installation upgraded from the old adapter kee
     expect(ctx.i.enums.get("enum.rooms.kitchen")!.has("fakeroku.0.Küche.keys.Home")).toBe(true);
   });
 
-  it("keeps the TV keys the old adapter created for a row that stored no type", async () => {
+  it("writes the type a row without one reads from its TV keys into the settings, once, and keeps the keys", async () => {
     const ctx = setup({ devices: [{ name: "TV", port: 9093, uuid: "legacy-tv" }] }, { fresh: true });
     ctx.i.objects.set("TV", { type: "device", common: { name: "TV" }, native: {} });
     ctx.i.objects.set("TV.keys.VolumeUp", { type: "state", common: { name: "VolumeUp" }, native: {} });
 
     await ctx.i.onReady();
 
+    // The first start writes the derived type and restarts — nothing starts, nothing is swept.
+    const stored = ctx.i.instanceNative.devices as { type?: string; port: number; uuid: string; objectId: string }[];
+    expect(stored[0]).toMatchObject({ type: "tv", port: 9093, uuid: "legacy-tv", objectId: "TV" });
+    expect(ctx.ecp).toHaveLength(0);
+    expect(ctx.i.objects.has("TV.keys.VolumeUp")).toBe(true);
+    expect(ctx.i.log.info).toHaveBeenCalledWith(expect.stringContaining("now carries its type in the settings"));
+
+    // The restart reads the written row: a TV, and nothing more to write.
+    ctx.i.config = structuredClone(ctx.i.instanceNative);
+    await ctx.i.onReady();
+    expect(ctx.i.extendForeignObjectAsync).toHaveBeenCalledTimes(1);
+    expect((ctx.ecp[0].options as { deviceType: string }).deviceType).toBe("tv");
     expect(ctx.i.objects.has("TV.keys.VolumeUp")).toBe(true);
     expect(ctx.i.objects.has("TV.keys.InputTuner")).toBe(true);
-    expect((ctx.ecp[0].options as { deviceType: string }).deviceType).toBe("tv");
   });
 
-  it("starts an old row with an unusable port on the old adapter's 9093", async () => {
+  it("writes a row without a type and with an unusable port as a player on the old adapter's 9093", async () => {
     const ctx = setup({ devices: [{ name: "Alt", port: "", uuid: "legacy-alt" }] });
     await ctx.i.onReady();
+    const stored = ctx.i.instanceNative.devices as { type?: string; port: number }[];
+    expect(stored[0]).toMatchObject({ type: "player", port: 9093 });
+
+    ctx.i.config = structuredClone(ctx.i.instanceNative);
+    await ctx.i.onReady();
     expect((ctx.ecp[0].options.device as { port: number }).port).toBe(9093);
+    expect(ctx.i.extendForeignObjectAsync).toHaveBeenCalledTimes(1);
+  });
+
+  it("writes nothing for a row that carries its type", async () => {
+    const ctx = setup({ devices: [{ name: "Wohnzimmer", port: 8060, type: "tv" }] });
+    await ctx.i.onReady();
+    expect(ctx.i.extendForeignObjectAsync).not.toHaveBeenCalled();
+    expect(ctx.ecp).toHaveLength(1);
   });
 });
 

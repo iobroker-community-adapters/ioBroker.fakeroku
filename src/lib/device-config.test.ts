@@ -204,6 +204,14 @@ describe("a row from before 0.7.0 (no type stored)", () => {
   });
 });
 
+describe("typeDerived", () => {
+  it("is true only for a row that stores no type at all", () => {
+    expect(toDeviceRow({ name: "A" })!.typeDerived).toBe(true);
+    expect(toDeviceRow({ name: "A", type: "player" })!.typeDerived).toBe(false);
+    expect(toDeviceRow({ name: "A", type: "tv" })!.typeDerived).toBe(false);
+  });
+});
+
 describe("identityDerived", () => {
   it("tells a stored identity from one derived from the name", () => {
     expect(toDeviceRow({ name: "A", uuid: "0123456789abcdef0123456789abcdef" })!.identityDerived).toBe(false);

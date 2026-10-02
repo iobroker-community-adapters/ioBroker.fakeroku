@@ -104,6 +104,7 @@ becomes `true` — or watch `.command` for the last button as text.
 ### **WORK IN PROGRESS**
 
 - (krobipd) Changed: the emulated Roku answers only what a Harmony or Sofabaton reads — Home Assistant and openHAB can no longer set it up.
+- (krobipd) Changed: a Roku set up before 0.7.0 gets its type (player or TV) written into its settings once; the instance restarts once.
 - (krobipd) Changed: the datapoint `commandType` is gone — `command` carries every command; an existing installation removes it on the next start.
 
 ### 1.8.2 (2026-10-02)

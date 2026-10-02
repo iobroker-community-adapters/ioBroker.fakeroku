@@ -268,7 +268,7 @@ export class Fakeroku extends utils.Adapter {
         this.config.devices,
         deviceTreeOf(owned.keys(), id => owned.get(id)?.type),
       );
-      if (configured && (await this.persistNewIdentities(configured, owned))) {
+      if (configured && (await this.persistDeviceRows(configured, owned))) {
         return;
       }
 
@@ -889,27 +889,30 @@ export class Fakeroku extends utils.Adapter {
   }
 
   /**
-   * Give every device that has never been announced its own identity and fix its object id —
-   * on its very first start, before anything announces it.
+   * Write into the configuration what a row has to carry for good, once, before anything announces it.
    *
-   * "Never announced" is a row without a stored `uuid` whose object tree does not exist yet: the
-   * manifest's default device of a fresh instance, or a hand-written row. Its identity would
-   * otherwise be derived from its name, and every installation — every instance on one host too —
-   * announcing a device called "Roku" would share one USN. A row whose tree exists has been
-   * announced, maybe paired, and keeps the identity it has.
+   * - A device that has never been announced gets its own identity. "Never announced" is a row without a stored
+   *   `uuid` whose object tree does not exist yet: the manifest's default device of a fresh instance, or a hand-written
+   *   row. Its identity would otherwise be derived from its name, and every installation — every instance on one host
+   *   too — announcing a device called "Roku" would share one USN. A row whose tree exists has been announced, maybe
+   *   paired, and keeps the identity it has.
+   * - A row from before 0.7.0 carries no type. It is read from the tree once (TV keys there make it a TV) and then
+   *   written, together with the port it runs on, so no later start derives it again.
    *
-   * Writing `native` restarts the instance, so the start ends here when something was written.
+   * Every row is written with its object id. Writing `native` restarts the instance, so the start ends here when
+   * something was written.
    *
    * @param rows the configured rows
    * @param owned the object tree as it is
    * @returns true when the config was written — the caller aborts its start
    */
-  private async persistNewIdentities(
+  private async persistDeviceRows(
     rows: readonly DeviceRow[],
     owned: ReadonlyMap<string, ioBroker.Object>,
   ): Promise<boolean> {
     const fresh = rows.filter(row => row.identityDerived && !owned.has(row.objectId));
-    if (fresh.length === 0) {
+    const untyped = rows.filter(row => row.typeDerived);
+    if (fresh.length === 0 && untyped.length === 0) {
       return false;
     }
     const devices = rows.map(row => ({
@@ -922,13 +925,20 @@ export class Fakeroku extends utils.Adapter {
     try {
       await this.extendForeignObjectAsync(instanceObjectId(this.namespace), { native: { devices } });
     } catch (e) {
-      // Not fatal: the device starts with the identity derived from its name, as before.
-      this.log.warn(`New emulated Roku could not get its own identity (${errText(e)}) — trying again next start`);
+      // Not fatal: the device starts with what was derived, as before, and the next start writes it.
+      this.log.warn(`The emulated Roku settings could not be completed (${errText(e)}) — trying again next start`);
       return false;
     }
-    this.log.info(
-      `New emulated Roku ${fresh.map(row => `"${row.name}"`).join(", ")} got its own network identity — the instance restarts once`,
-    );
+    if (fresh.length > 0) {
+      this.log.info(
+        `New emulated Roku ${fresh.map(row => `"${row.name}"`).join(", ")} got its own network identity — the instance restarts once`,
+      );
+    }
+    if (untyped.length > 0) {
+      this.log.info(
+        `Emulated Roku ${untyped.map(row => `"${row.name}" (${row.type})`).join(", ")} from a version before 0.7.0 now carries its type in the settings — the instance restarts once`,
+      );
+    }
     return true;
   }
 
