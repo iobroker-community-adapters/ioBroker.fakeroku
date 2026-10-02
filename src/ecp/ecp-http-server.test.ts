@@ -170,20 +170,11 @@ describe("EcpHttpServer", () => {
     expect(r.status).toBe(404);
   });
 
-  it("answers the state queries Home Assistant and openHAB ask on every update", async () => {
-    // rokuecp turns any 4xx into RokuError and fails the whole setup (cannot_connect); openHAB
-    // marks the device offline. The emulator never runs an app, so the answers say "home screen,
-    // nothing playing" — what a real Roku answers in that state.
-    const app = await request("GET", "/query/active-app");
-    expect(app.status).toBe(200);
-    expect(app.body).toContain("<app>Roku</app>");
-    expect(app.headers["content-type"]).toMatch(/^text\/xml/);
-    const player = await request("GET", "/query/media-player");
-    expect(player.status).toBe(200);
-    expect(player.body).toBe('<player error="false" state="close"/>');
-  });
-  it("has no TV channel list on a player, like a real streaming box", async () => {
-    expect((await request("GET", "/query/tv-channels")).status).toBe(404);
+  it("answers none of the state queries only Home Assistant and openHAB ask", async () => {
+    // A Harmony and a Sofabaton read the description and the app list; nothing they send asks for these.
+    for (const path of ["/query/active-app", "/query/media-player", "/query/tv-channels"]) {
+      expect((await request("GET", path)).status, path).toBe(404);
+    }
   });
   it("serves an icon for an app it lists, and nothing for one it does not", async () => {
     const icon = await request("GET", "/query/icon/12");
@@ -536,10 +527,11 @@ describe("EcpHttpServer — a Roku TV", () => {
   });
   afterAll(() => server.stop());
 
-  it("answers the channel list rokuecp asks a device with is-tv for — empty, no tuner", async () => {
-    const r = await request("GET", "/query/tv-channels", port);
-    expect(r.status).toBe(200);
-    expect(r.body).toBe("<tv-channels/>");
+  it("says it is a TV in device-info and answers no channel list — no remote it serves asks for one", async () => {
+    const info = await request("GET", "/query/device-info", port);
+    expect(info.status).toBe(200);
+    expect(info.body).toContain("<is-tv>true</is-tv>");
+    expect((await request("GET", "/query/tv-channels", port)).status).toBe(404);
   });
 });
 

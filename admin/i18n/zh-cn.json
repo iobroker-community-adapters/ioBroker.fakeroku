@@ -7,7 +7,7 @@
   "deviceName": "名称",
   "devicePort": "ECP 端口",
   "portLabel": "端口",
-  "devicePortHint": "此 Roku 响应的 ECP 端口。每个模拟 Roku 都需要自己的端口。Harmony 和 Sofabaton 从发现信息中读取端口；Home Assistant 和 Homey 始终使用 8060——请把 8060 分配给它们要控制的 Roku。",
+  "devicePortHint": "此 Roku 响应的 ECP 端口。每个模拟 Roku 都需要自己的端口。Harmony 和 Sofabaton 从发现信息中读取端口。",
   "deviceTypeLabel": "类型",
   "deviceTypePlayer": "播放器（流媒体盒子）",
   "deviceTypeTv": "电视（带音量、电源、频道、输入）",

@@ -1,9 +1,8 @@
 # fakeroku — emulated Roku devices for your remote
 
 This adapter makes ioBroker look like one or more **Roku streaming devices** on your
-local network. A remote control or controller that speaks Roku's protocol — a Logitech
-Harmony hub, a Sofabaton X1/X2, Home Assistant's Roku integration, openHAB — finds the
-emulated device, and every button you press on it becomes a datapoint in ioBroker that
+local network. A remote that speaks Roku's protocol — a Logitech Harmony hub or a
+Sofabaton X1/X2 — finds the emulated device, and every button you press on it becomes a datapoint in ioBroker that
 your scripts and visualisations can react to.
 
 It is the **input** counterpart to the Logitech Harmony adapter: instead of ioBroker
@@ -55,8 +54,7 @@ Each card under **Emulated Roku devices** is one Roku your remote can find.
 - **ECP port** — the network port this Roku answers on. `8060` is the port a real
   Roku uses. Each emulated Roku needs **its own** port; the dialog pre-selects a free
   one and does not let you confirm a port that is already taken. A Harmony or Sofabaton
-  reads the port from the discovery; **Home Assistant and Homey always use 8060**, so
-  give 8060 to the Roku they should control.
+  reads the port from the discovery.
 - **Type**
   - **Player** (a streaming box) offers the 16 standard navigation and playback keys.
   - **TV** offers those plus volume, power, channel and input keys (`VolumeUp`,
@@ -71,9 +69,6 @@ its own and reads the port from the announcement — you do not have to enter it
 
 **Sofabaton X1/X2:** add a Roku device in the Sofabaton app while the app is on the
 same network; it finds the emulated Roku through discovery.
-
-**Home Assistant:** add the Roku integration — it discovers the emulated Roku, or you
-enter the ioBroker host. Home Assistant always talks to port 8060 (see above).
 
 ## What you get in the object tree
 
@@ -92,7 +87,7 @@ For each emulated Roku, below `fakeroku.0.<name>`:
 
 Typing on the remote's keyboard (`Lit_a`) and app launches appear in `command` only —
 they do not get datapoints of their own. An app button of a remote that sends app
-launches (a Sofabaton, Home Assistant) arrives as `launch:<id>`, with its parameters if
+launches (a Sofabaton) arrives as `launch:<id>`, with its parameters if
 it carries any (`launch:12?contentId=…`). Key names are read in any case: `home` and
 `HOME` are the key `Home`.
 
@@ -165,10 +160,6 @@ The interface address chosen in the settings is not on the host any more — a n
 network card, a changed DHCP address, a restored backup on other hardware. Choose the
 current interface (or "all interfaces") and save; the instance restarts.
 
-**Home Assistant cannot reach one of several emulated Rokus.**
-Home Assistant always uses port 8060. Give 8060 to the emulated Roku it should
-control.
-
 **The instance stays "not connected".**
 At least one configured Roku could not start. The log names the device and its port —
 almost always the port is already used by something else (including another emulated
@@ -195,7 +186,7 @@ play and for pause, so the two cannot be told apart here.
 **The app buttons on my Harmony do nothing.**
 A Harmony Hub did not send its app buttons (Netflix, YouTube …) to the emulated Roku —
 they are bound to Harmony activities, so the adapter never sees them. Remotes that do
-send app launches (a Sofabaton, Home Assistant) show them in `command` as `launch:<id>`.
+send app launches (a Sofabaton) show them in `command` as `launch:<id>`.
 
 ## Privacy
 

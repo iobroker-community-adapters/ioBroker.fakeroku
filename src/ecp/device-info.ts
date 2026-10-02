@@ -179,40 +179,6 @@ export function buildScpdXml(): string {
 }
 
 /**
- * The app on screen: always the Roku home screen, which is the answer a real Roku gives while no
- * app runs — an emulator never runs one.
- *
- * Not in Roku's current ECP table, but the controllers ask for it on every update: Home
- * Assistant's `rokuecp` fails the whole setup on a 404 here (`cannot_connect`), openHAB marks the
- * device offline. The answer has no app id, so neither goes on to ask for a TV channel.
- *
- * @returns the active-app XML
- */
-export function buildActiveAppXml(): string {
-  return `<active-app>\n  <app>Roku</app>\n</active-app>`;
-}
-
-/**
- * The media player state: nothing playing. openHAB asks for it after every active-app query that
- * carries no app id, and a 404 turns into an offline device there.
- *
- * @returns the media-player XML
- */
-export function buildMediaPlayerXml(): string {
-  return `<player error="false" state="close"/>`;
-}
-
-/**
- * The TV channel list of a Roku TV: empty — the emulator has no tuner. `rokuecp` asks for it on a
- * device that says `is-tv`, and takes an empty list as an empty list.
- *
- * @returns the tv-channels XML
- */
-export function buildTvChannelsXml(): string {
-  return `<tv-channels/>`;
-}
-
-/**
  * The icon of an app at /query/icon/<id>: a transparent 1×1 PNG. The emulator has no artwork,
  * but a 404 made Home Assistant's media browser show broken images and made node-roku-client's
  * `icon()` throw.

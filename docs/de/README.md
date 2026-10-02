@@ -1,9 +1,8 @@
 # fakeroku — emulierte Roku-Geräte für deine Fernbedienung
 
 Dieser Adapter lässt ioBroker im Heimnetz wie ein oder mehrere **Roku-Streaming-Geräte**
-aussehen. Eine Fernbedienung oder Steuerung, die das Roku-Protokoll spricht — ein
-Logitech-Harmony-Hub, eine Sofabaton X1/X2, die Roku-Integration von Home Assistant,
-openHAB — findet das emulierte Gerät, und jeder Tastendruck darauf wird zu einem
+aussehen. Eine Fernbedienung, die das Roku-Protokoll spricht — ein Logitech-Harmony-Hub
+oder eine Sofabaton X1/X2 — findet das emulierte Gerät, und jeder Tastendruck darauf wird zu einem
 Datenpunkt in ioBroker, auf den Skripte und Visualisierungen reagieren können.
 
 Er ist das **Eingabe**-Gegenstück zum Logitech-Harmony-Adapter: Statt dass ioBroker
@@ -57,8 +56,7 @@ finden kann.
 - **ECP-Port** — der Netzwerk-Port, auf dem dieser Roku antwortet. `8060`
   ist der Port eines echten Roku. Jeder emulierte Roku braucht **seinen eigenen**;
   der Dialog schlägt einen freien vor und lässt einen bereits belegten nicht bestätigen.
-  Eine Harmony oder Sofabaton liest den Port aus der Erkennung; **Home Assistant und
-  Homey nutzen immer 8060** — gib 8060 dem Roku, den sie steuern sollen.
+  Eine Harmony oder Sofabaton liest den Port aus der Erkennung.
 - **Typ**
   - **Player** (eine Streaming-Box) bietet die 16 üblichen Navigations- und
     Wiedergabetasten.
@@ -77,10 +75,6 @@ eintippen.
 **Sofabaton X1/X2:** In der Sofabaton-App ein Roku-Gerät hinzufügen, während die App
 im selben Netz ist; sie findet den emulierten Roku über die Erkennung.
 
-**Home Assistant:** Die Roku-Integration hinzufügen — sie findet den emulierten Roku,
-oder du gibst den ioBroker-Rechner an. Home Assistant spricht immer Port 8060 an (siehe
-oben).
-
 ## Was im Objektbaum entsteht
 
 Auf Instanz-Ebene:
@@ -98,7 +92,7 @@ Je emuliertem Roku, unterhalb von `fakeroku.0.<Name>`:
 
 Tastatureingaben der Fernbedienung (`Lit_a`) und App-Starts erscheinen nur in
 `command` — sie bekommen keine eigenen Datenpunkte. Die App-Taste einer Fernbedienung,
-die App-Starts sendet (eine Sofabaton, Home Assistant), kommt als `launch:<id>` an, mit
+die App-Starts sendet (eine Sofabaton), kommt als `launch:<id>` an, mit
 ihren Parametern, falls sie welche trägt (`launch:12?contentId=…`). Tastennamen werden in
 jeder Schreibweise erkannt: `home` und `HOME` sind die Taste `Home`.
 
@@ -177,9 +171,6 @@ Netzwerkkarte, geänderte DHCP-Adresse, eine Sicherung auf anderer Hardware
 zurückgespielt. Wähle die aktuelle Schnittstelle (oder „alle Schnittstellen") und
 speichere; die Instanz startet neu.
 
-**Home Assistant erreicht einen von mehreren emulierten Rokus nicht.**
-Home Assistant nutzt immer Port 8060. Gib 8060 dem emulierten Roku, den es steuern soll.
-
 **Die Instanz bleibt „nicht verbunden".**
 Mindestens ein konfigurierter Roku konnte nicht starten. Das Protokoll nennt Gerät
 und Anschluss — fast immer ist der Anschluss schon von etwas anderem belegt (auch von
@@ -209,7 +200,7 @@ unterscheidbar.
 **Die App-Tasten meiner Harmony bewirken nichts.**
 Ein Harmony-Hub hat seine App-Tasten (Netflix, YouTube …) nicht an den emulierten Roku
 gesendet — sie hängen an Harmony-Aktivitäten, der Adapter sieht sie also nie.
-Fernbedienungen, die App-Starts senden (eine Sofabaton, Home Assistant), zeigen sie in
+Fernbedienungen, die App-Starts senden (eine Sofabaton), zeigen sie in
 `command` als `launch:<id>`.
 
 ## Datenschutz

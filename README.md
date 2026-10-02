@@ -9,14 +9,12 @@
 > [!IMPORTANT]
 > This adapter cannot be installed from github
 
-Emulates one or more **[Roku](https://www.roku.com/) devices** on your LAN so that ECP/SSDP remotes and
-controllers — a Logitech Harmony Hub, a Sofabaton X1/X2, Home Assistant's Roku integration,
-openHAB — can trigger events in ioBroker. It is the **input** counterpart to the Logitech
+Emulates one or more **[Roku](https://www.roku.com/) devices** on your LAN so that a Logitech Harmony Hub or
+a Sofabaton X1/X2 can trigger events in ioBroker. It is the **input** counterpart to the Logitech
 Harmony adapter: a button on the remote becomes a datapoint in ioBroker.
 
-Besides the key presses it answers the queries these controllers make before and while
-they use a Roku — device info, app list, active app, media player, TV channels, app icons —
-so they accept the emulated device instead of giving up on it.
+Besides the key presses it answers what these remotes read when they pair — device info,
+app list, app icons.
 
 > **The official Roku mobile app is not supported.** It drives Rokus over Roku's
 > proprietary, undocumented ECP-2 WebSocket channel, which this emulator does not
@@ -87,7 +85,7 @@ For every emulated Roku (`fakeroku.0.<name>`):
 
 Free keyboard input (`Lit_x`) and app launches show up in `.command` only — they do
 not get their own objects. An app button of a remote that sends app launches (a
-Sofabaton, Home Assistant) arrives as `launch:<id>`; a Harmony Hub did not send its app
+Sofabaton) arrives as `launch:<id>`; a Harmony Hub did not send its app
 buttons to the emulated Roku.
 
 > Note: the Roku remote sends the **same** `Play` command for play and pause, so
@@ -105,6 +103,7 @@ becomes `true` — or watch `.command` for the last button as text.
 
 ### **WORK IN PROGRESS**
 
+- (krobipd) Changed: the emulated Roku answers only what a Harmony or Sofabaton reads — Home Assistant and openHAB can no longer set it up.
 - (krobipd) Changed: the datapoint `commandType` is gone — `command` carries every command; an existing installation removes it on the next start.
 
 ### 1.8.2 (2026-10-02)

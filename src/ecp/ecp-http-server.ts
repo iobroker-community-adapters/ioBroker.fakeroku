@@ -7,13 +7,10 @@ import type { AdapterLogger } from "../lib/logger";
 import { type CommandEvent, parseEcpCommand } from "./ecp-command";
 import {
   APP_ICON_PNG,
-  buildActiveAppXml,
   buildAppsXml,
   buildDescXml,
   buildDeviceInfoXml,
-  buildMediaPlayerXml,
   buildScpdXml,
-  buildTvChannelsXml,
   DEFAULT_APPS,
 } from "./device-info";
 import type { DeviceType } from "./state-model";
@@ -86,10 +83,10 @@ const XML = "text/xml; charset=utf-8";
 
 /**
  * The Roku ECP HTTP server for one emulated device. Serves the UPnP description, the service
- * description, /query/device-info, /query/apps, /query/active-app, /query/media-player,
- * /query/tv-channels (TV only) and /query/icon/<id>; turns POST key/launch/input/search into
- * command events. Unknown GET paths get a clean 404 (not the old adapter's empty 200), and
- * commands are accepted only from the adapter's own networks.
+ * description, /query/device-info, /query/apps and /query/icon/<id> — what a Harmony and a
+ * Sofabaton read; turns POST key/launch/input/search into command events. Unknown GET paths get
+ * a clean 404 (not the old adapter's empty 200), and commands are accepted only from the
+ * adapter's own networks.
  */
 export class EcpHttpServer {
   private server: http.Server | undefined;
@@ -229,15 +226,6 @@ export class EcpHttpServer {
         return xml(buildDeviceInfoXml(this.config.device, this.config.friendlyName, this.config.deviceType));
       case "/query/apps":
         return xml(buildAppsXml(DEFAULT_APPS));
-      // Asked on every update by Home Assistant (rokuecp) and openHAB; a 404 failed the whole
-      // setup there. See device-info.ts for what each answer says.
-      case "/query/active-app":
-        return xml(buildActiveAppXml());
-      case "/query/media-player":
-        return xml(buildMediaPlayerXml());
-      case "/query/tv-channels":
-        // Only a Roku TV has a tuner; rokuecp asks for the list only where is-tv is true.
-        return this.config.deviceType === "tv" ? xml(buildTvChannelsXml()) : null;
       // The root description points at this document; answering 404 for a path the device
       // itself advertises is a contradiction a strict UPnP control point can trip over.
       case "/ecp_SCPD.xml":

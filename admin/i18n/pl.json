@@ -7,7 +7,7 @@
   "deviceName": "Nazwa",
   "devicePort": "Port ECP",
   "portLabel": "Port",
-  "devicePortHint": "Port ECP, na którym odpowiada ten Roku. Każdy emulowany Roku potrzebuje własnego portu. Harmony i Sofabaton odczytują port z wykrywania; Home Assistant i Homey zawsze używają 8060 — nadaj 8060 temu Roku, którym mają sterować.",
+  "devicePortHint": "Port ECP, na którym odpowiada ten Roku. Każdy emulowany Roku potrzebuje własnego portu. Harmony i Sofabaton odczytują port z wykrywania.",
   "deviceTypeLabel": "Typ",
   "deviceTypePlayer": "Player (przystawka)",
   "deviceTypeTv": "TV (z głośnością, zasilaniem, kanałem, wejściem)",

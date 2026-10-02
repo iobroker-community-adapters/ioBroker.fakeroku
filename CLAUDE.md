@@ -4,7 +4,7 @@ Adapter-spezifischer Kontext. Globale Dev-Standards: `../CLAUDE.md` + `../CLAUDE
 
 ## Projekt
 
-Roku-Emulator im LAN: ein ECP/SSDP-Controller (Logitech Harmony, Sofabaton, Home Assistant/rokuecp, openHAB) findet einen emulierten Roku und löst über Tastendrücke Ereignisse in ioBroker aus — die **Eingabe-Seite**, Gegenstück zum harmony-Adapter (Ausgabe). Community-Adapter (`iobroker-community-adapters`), Greenfield-Neubau des `fakeroku` von Pmant (2017) ab 0.5.0, an Nutzer ausgeliefert ab 0.6.0, krobi Maintainer. Version: `io-package.json`. Feld-/Protokoll-Details: `../../Ressourcen/rokuemu/`, Audits: `../../Ressourcen/fakeroku/`.
+Roku-Emulator im LAN: eine Logitech Harmony (höchstens noch eine Sofabaton) findet einen emulierten Roku und löst über Tastendrücke Ereignisse in ioBroker aus — die **Eingabe-Seite**, Gegenstück zum harmony-Adapter (Ausgabe). Community-Adapter (`iobroker-community-adapters`), Greenfield-Neubau des `fakeroku` von Pmant (2017) ab 0.5.0, an Nutzer ausgeliefert ab 0.6.0, krobi Maintainer. Version: `io-package.json`. Feld-/Protokoll-Details: `../../Ressourcen/rokuemu/`, Audits: `../../Ressourcen/fakeroku/`.
 
 ## Architektur (`src/`)
 
@@ -13,7 +13,7 @@ Roku-Emulator im LAN: ein ECP/SSDP-Controller (Logitech Harmony, Sofabaton, Home
 - **`device-management.ts`** — Gerätemanager (dm-utils): Karten je Gerät (Id = Identität), Dialog mit `applyDisabledRule`, liest/schreibt `native.devices` über `lib/device-config`.
 - **`discovery/ssdp-responder.ts`** — handgebauter `dgram`-SSDP-Responder (0.0.0.0:1900, `reuseAddr`): Beitritt einmal je Interface, eigene Geräteliste, Antwort mit der Adresse aus dem Netz des Suchenden, NOTIFY/byebye je Interface. ⚠️ `node-ssdp` taugt nicht: es hängt `::device` ans USN.
 - **`discovery/ssdp-messages.ts`** — reine Datagramme (Suchantwort, alive, byebye, Suchziel), `usnOf`, `ROKU_DEVICE_TYPE`.
-- **`ecp/ecp-http-server.ts`** — ein `node:http` je Gerät (`maxConnections` 32): Description, SCPD, device-info, apps, active-app, media-player, tv-channels (nur TV), icon; POST → `CommandEvent`, protokolliert nach der Ratenbegrenzung; Vertrauensgrenze über `isClientAllowed`.
+- **`ecp/ecp-http-server.ts`** — ein `node:http` je Gerät (`maxConnections` 32): Description, SCPD, device-info, apps, icon; POST → `CommandEvent`, protokolliert nach der Ratenbegrenzung; Vertrauensgrenze über `isClientAllowed`.
 - **`ecp/device-info.ts`** — Profile Player/TV, `SOFTWARE_VERSION`, `DEFAULT_APPS`, die Abfrage-Antworten. **`ecp/ecp-command.ts`** — Parser POST-URL → `CommandEvent`. **`ecp/state-model.ts`** — `BASE_KEYS` + `TV_KEYS`, `canonicalKey`, `commandToStateWrite`.
 - **`lib/`** — `device-config` (EINE Lesestelle für `native.devices`, feste `objectId`), `device-identity`, `detect-ip` (Netz-Modell, `net.BlockList` für die Subnetz-Prüfung, virtuelle Brücken am Namen), `lan-guard`, `rate-gate`, `log-throttle`, `object-cleanup`, `pure-helpers`, `constants` (`LANGUAGES`, `instanceObjectId`, `RESERVED_IDS`), `i18n`, `logger`; Flotten-Master byte-gleich: `err-text`, `known-objects`, `native-key-migration`.
 
@@ -40,7 +40,7 @@ _Jede Entscheidung steht hier als Regel-Satz; Beleg, Messung und Verlauf stehen 
 17. **Eine gewählte Schnittstelle hält alles in ihrem Netz** (krobi 2026-09-24) — fehlt ihre Adresse, wird sie 2 min lang alle 10 s gesucht, dann Fehlerzeile, kein Rückfall.
 18. **Ein sterbender ECP-Server widerruft `info.connection`** (`onFatalError` → `onEcpFatal`, Meldung nennt das Gerät).
 19. **Ein SSDP-Empfangsfehler schaltet die Erkennung nicht ab**; tödlich ist nur ein `close`, das `stop()` nicht ausgelöst hat.
-20. **Die Abfragen der Clients werden beantwortet** (active-app, media-player, tv-channels, icon), Tastennamen ohne Groß-/Kleinschreibung.
+20. **Beantwortet wird, was Harmony und Sofabaton lesen** — Description, SCPD, device-info, apps, icon; jede andere Abfrage ist 404, Tastennamen ohne Groß-/Kleinschreibung.
 21. **⚠️ Play≠Pause ist protokollbedingt ungelöst** (Harmony sendet für beide `Play`); **Harmony-App-Tasten erreichen den Adapter nicht**; die App-Liste bleibt fest (krobi 2026-09-24).
 22. **Port 8060 ist Vorgabe, das Feld bleibt frei** (krobi 2026-07-30) — Harmony/Sofabaton lesen den Port aus der Erkennung, Home Assistant und Homey sprechen fest 8060.
 23. **UDP 1900 wird mit `reuseAddr` geteilt** — mehrere Rokus je Instanz und mehrere Instanzen je Rechner; nur ein fremdes Programm ohne Wiederverwendung führt in den Ablehnungszweig von `startDiscovery`.
