@@ -33,7 +33,7 @@ const recordingLogger = {
 };
 
 /** The test's own network: loopback, where the requests below come from. */
-const LOOPBACK_NET: LocalNet = { iface: "lo", family: "IPv4", address: "127.0.0.1", prefixLength: 8, virtual: false };
+const LOOPBACK_NET: LocalNet = { iface: "lo", family: "IPv4", address: "127.0.0.1", prefixLength: 8 };
 
 /**
  * A complete server configuration — every callback the adapter always hands in; a test overrides only what it is about.

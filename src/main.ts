@@ -32,8 +32,6 @@ const SSDP_START_TIMEOUT_MS = 5000;
 const SSDP_NOTIFY_INTERVAL_MS = 300_000;
 /** How long to wait before trying a device whose ECP port was busy at start-up again. */
 const DEVICE_RETRY_INTERVAL_MS = 60_000;
-/** How often "all interfaces" looks for an address to start discovery with when it had none. */
-const DISCOVERY_RETRY_INTERVAL_MS = 60_000;
 
 /**
  * Keys the 0.1.x adapter declared and nothing reads any more: its own HTTP port and multicast
@@ -126,8 +124,6 @@ export class Fakeroku extends utils.Adapter {
   });
   /** The retry timer for {@link pending}, armed only while something is waiting. */
   private retryTimer: ioBroker.Timeout | undefined;
-  /** The timer that starts discovery once the host has an address ("all interfaces" only). */
-  private discoveryTimer: ioBroker.Timeout | undefined;
 
   /**
    * Set as the very first thing onUnload does. Everything that can still be in flight at
@@ -310,50 +306,16 @@ export class Fakeroku extends utils.Adapter {
         if (advertiseIp) {
           this.startDiscovery(advertiseIp);
         } else {
-          // The ECP servers listen on every interface and need no address; only discovery has
-          // nothing to announce yet. It starts as soon as the host has an address.
+          // Without an IPv4 there is nothing to announce: discovery fails like any other start of it.
           this.log.warn(
-            "No routable IPv4 address yet — the emulated Rokus are listening; discovery starts as soon as the host has an address.",
+            "SSDP discovery unavailable: the host has no IPv4 address — already-paired remotes still work.",
           );
-          this.scheduleDiscoveryStart();
         }
       }
       await this.reportConnectionState(advertiseIp);
       this.scheduleDeviceRetry();
     } catch (e) {
       this.log.error(`onReady failed: ${errText(e)}`);
-    }
-  }
-
-  /**
-   * Look for an address to start discovery with, once a minute, until one is there ("all
-   * interfaces" with no routable IPv4 at start-up: the ECP servers already listen).
-   */
-  private scheduleDiscoveryStart(): void {
-    const timer = this.setTimeout(() => {
-      this.discoveryTimer = undefined;
-      void this.tryStartDiscovery();
-    }, DISCOVERY_RETRY_INTERVAL_MS);
-    if (timer) {
-      this.discoveryTimer = timer;
-    }
-  }
-
-  /** One attempt of {@link scheduleDiscoveryStart}; dropped with `void`, so it catches its own failures. */
-  private async tryStartDiscovery(): Promise<void> {
-    try {
-      if (this.stopping || this.ssdp) {
-        return;
-      }
-      const advertiseIp = detectPrimaryIPv4();
-      if (!advertiseIp) {
-        this.scheduleDiscoveryStart();
-        return;
-      }
-      this.startDiscovery(advertiseIp);
-      await this.reportConnectionState(advertiseIp);
-    } catch (e) {
-      this.log.warn(`Starting discovery failed: ${errText(e)}`);
     }
   }
 
@@ -1123,10 +1085,6 @@ export class Fakeroku extends utils.Adapter {
       if (this.retryTimer) {
         this.clearTimeout(this.retryTimer);
         this.retryTimer = undefined;
-      }
-      if (this.discoveryTimer) {
-        this.clearTimeout(this.discoveryTimer);
-        this.discoveryTimer = undefined;
       }
       this.commands.dispose();
       // The ECP servers close right here, synchronously: nothing about the farewell needs

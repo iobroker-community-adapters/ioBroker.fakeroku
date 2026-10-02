@@ -152,8 +152,7 @@ so in the log and keeps working for remotes that were already paired.
 In Docker's default bridge network the container only has an internal address no
 remote can reach, and discovery searches from your home network never arrive. Run the
 ioBroker container with `network_mode: host`, or give it an address in your home
-network with a `macvlan` network. The adapter recognises Docker, libvirt, VirtualBox
-and WSL bridges on the host itself and does not announce them.
+network with a `macvlan` network.
 
 **The log says "Address … does not exist on this host — listening on all addresses".**
 The address chosen in the settings is not on the host any more — a new network card, a

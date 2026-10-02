@@ -42,29 +42,8 @@ describe("pickPrimaryIPv4", () => {
     expect(pickPrimaryIPv4({})).toBe("");
   });
 
-  it("skips Docker's default bridges in favour of the real LAN address", () => {
-    // docker0 can come first in the enumeration. Advertising 172.17.0.1 puts an unreachable
-    // address into every SSDP answer while the adapter looks perfectly healthy.
-    expect(
-      pickPrimaryIPv4({
-        docker0: [v4("172.17.0.1", 16)],
-        br_compose: [v4("172.18.0.1", 16)],
-        eth0: [v4("192.168.1.20")],
-      }),
-    ).toBe("192.168.1.20");
-  });
-
-  it("recognises every virtual bridge by its NAME, whatever address it got", () => {
-    // Docker's third compose network gets 172.19.0.0/16, the pools continue up to 172.31 and then
-    // into 192.168.0.0/16 (moby ipamutils) — an address rule cannot tell those from a real LAN.
-    for (const name of ["br-3f2a9c", "docker1", "veth12ab", "virbr0", "vboxnet0", "vEthernet (WSL)", "cni0"]) {
-      expect(pickPrimaryIPv4({ [name]: [v4("192.168.176.1", 20)], eth0: [v4("10.0.0.5")] }), name).toBe("10.0.0.5");
-    }
-  });
-
-  it("still advertises a bridge address when the host has nothing else", () => {
-    // Inside a container that IS on the bridge network, that address is all there is.
-    expect(pickPrimaryIPv4({ eth0: [v4("172.17.0.5", 16)] })).toBe("172.17.0.5");
+  it("takes the first IPv4 the host enumerates, a bridge included — no interface is filtered by its name", () => {
+    expect(pickPrimaryIPv4({ docker0: [v4("172.17.0.1", 16)], eth0: [v4("192.168.1.20")] })).toBe("172.17.0.1");
   });
 
   it("keeps a real interface in 172.16.0.0/12 — ordinary private space", () => {
@@ -82,8 +61,8 @@ describe("listLocalNets", () => {
 
   it("reads address, family and prefix of every non-internal entry", () => {
     expect(listLocalNets({ lo: [v4("127.0.0.1", 8, true)], eth0: [v4("192.168.1.5"), v6("2003:e1::5")] })).toEqual([
-      { iface: "eth0", family: "IPv4", address: "192.168.1.5", prefixLength: 24, virtual: false },
-      { iface: "eth0", family: "IPv6", address: "2003:e1::5", prefixLength: 64, virtual: false },
+      { iface: "eth0", family: "IPv4", address: "192.168.1.5", prefixLength: 24 },
+      { iface: "eth0", family: "IPv6", address: "2003:e1::5", prefixLength: 64 },
     ]);
   });
 
@@ -107,20 +86,19 @@ describe("listLocalNets", () => {
         ],
       }),
     ).toEqual([
-      { iface: "eth0", family: "IPv6", address: "fe80::1", prefixLength: 64, virtual: false },
-      { iface: "eth0", family: "IPv4", address: "10.0.0.1", prefixLength: 32, virtual: false },
+      { iface: "eth0", family: "IPv6", address: "fe80::1", prefixLength: 64 },
+      { iface: "eth0", family: "IPv4", address: "10.0.0.1", prefixLength: 32 },
     ]);
   });
 });
 
 describe("inNet", () => {
-  const lan = { iface: "eth0", family: "IPv4" as const, address: "192.168.1.5", prefixLength: 24, virtual: false };
+  const lan = { iface: "eth0", family: "IPv4" as const, address: "192.168.1.5", prefixLength: 24 };
   const v6net = {
     iface: "eth0",
     family: "IPv6" as const,
     address: "2003:e1:1f28:9a00::5",
     prefixLength: 64,
-    virtual: false,
   };
 
   it("a /0 network takes every address (the shift by 32 would otherwise keep only the own one)", () => {
@@ -222,17 +200,15 @@ describe("pickMembershipIPv4s", () => {
     ]);
   });
 
-  it("skips a virtual bridge — nothing a remote sends can arrive there", () => {
+  it("joins a bridge like every other interface — a search from its network gets that network's address", () => {
     expect(
       pickMembershipIPv4s({
         docker0: [v4("172.17.0.1", 16)],
-        "br-1": [v4("172.19.0.1", 16)],
         eth0: [v4("10.47.88.2")],
       }),
-    ).toEqual([{ iface: "eth0", address: "10.47.88.2" }]);
-  });
-
-  it("uses the bridge after all when it is everything the host has (inside a container)", () => {
-    expect(pickMembershipIPv4s({ eth0: [v4("172.17.0.5", 16)] })).toEqual([{ iface: "eth0", address: "172.17.0.5" }]);
+    ).toEqual([
+      { iface: "docker0", address: "172.17.0.1" },
+      { iface: "eth0", address: "10.47.88.2" },
+    ]);
   });
 });

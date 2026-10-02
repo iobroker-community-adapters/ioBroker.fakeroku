@@ -9,7 +9,7 @@ import { isLanClient } from "./lan-guard";
  * @param iface the interface name
  */
 function net(address: string, prefixLength: number, iface = "eth0"): LocalNet {
-  return { iface, family: address.includes(":") ? "IPv6" : "IPv4", address, prefixLength, virtual: false };
+  return { iface, family: address.includes(":") ? "IPv6" : "IPv4", address, prefixLength };
 }
 
 // A host in 192.168.1.0/24 with native IPv6 (2003:e1:1f28:9a00::/64) and a ULA prefix.

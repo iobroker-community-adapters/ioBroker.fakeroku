@@ -162,8 +162,7 @@ Fernbedienungen weiter.
 Im Standard-Bridge-Netz von Docker hat der Container nur eine interne Adresse, die keine
 Fernbedienung erreicht, und Suchanfragen aus deinem Heimnetz kommen nie an. Starte den
 ioBroker-Container mit `network_mode: host` oder gib ihm über ein `macvlan`-Netz eine
-Adresse im Heimnetz. Brücken von Docker, libvirt, VirtualBox und WSL auf dem Rechner
-selbst erkennt der Adapter und kündigt sie nicht an.
+Adresse im Heimnetz.
 
 **Im Protokoll steht „Address … does not exist on this host — listening on all addresses".**
 Die in den Einstellungen gewählte Adresse gibt es auf dem Rechner nicht mehr — neue

@@ -15,7 +15,7 @@ Roku-Emulator im LAN: eine Logitech Harmony (höchstens noch eine Sofabaton) fin
 - **`discovery/ssdp-messages.ts`** — reine Datagramme (Suchantwort, alive, byebye, Suchziel), `usnOf`, `ROKU_DEVICE_TYPE`.
 - **`ecp/ecp-http-server.ts`** — ein `node:http` je Gerät (`maxConnections` 32): Description, SCPD, device-info, apps, icon; POST → `CommandEvent`, protokolliert nach der Ratenbegrenzung; Vertrauensgrenze über `isClientAllowed`.
 - **`ecp/device-info.ts`** — Profile Player/TV, `SOFTWARE_VERSION`, `DEFAULT_APPS`, die Abfrage-Antworten. **`ecp/ecp-command.ts`** — Parser POST-URL → `CommandEvent`. **`ecp/state-model.ts`** — `BASE_KEYS` + `TV_KEYS`, `canonicalKey`, `commandToStateWrite`.
-- **`lib/`** — `device-config` (EINE Lesestelle für `native.devices`, feste `objectId`), `device-identity`, `detect-ip` (Netz-Modell, `net.BlockList` für die Subnetz-Prüfung, virtuelle Brücken am Namen), `lan-guard`, `rate-gate`, `log-throttle`, `object-cleanup`, `pure-helpers`, `constants` (`LANGUAGES`, `instanceObjectId`, `RESERVED_IDS`), `i18n`, `logger`; Flotten-Master byte-gleich: `err-text`, `known-objects`, `native-key-migration`.
+- **`lib/`** — `device-config` (EINE Lesestelle für `native.devices`, feste `objectId`), `device-identity`, `detect-ip` (Netz-Modell, `net.BlockList` für die Subnetz-Prüfung), `lan-guard`, `rate-gate`, `log-throttle`, `object-cleanup`, `pure-helpers`, `constants` (`LANGUAGES`, `instanceObjectId`, `RESERVED_IDS`), `i18n`, `logger`; Flotten-Master byte-gleich: `err-text`, `known-objects`, `native-key-migration`.
 
 ## Design-Entscheidungen
 
@@ -36,7 +36,7 @@ _Jede Entscheidung steht hier als Regel-Satz; Beleg, Messung und Verlauf stehen 
 13. **Objekte und Anzeigen werden nur bei Unterschied geschrieben** — Objekte über `KnownObjects.extend`, `info.connection` über `writeIndicator` gegen den Zustands-Abzug.
 14. **Vertrauensgrenze = die eigenen Netze** (krobi 2026-09-24, 2026-10-03) — Netz einer eigenen Schnittstelle, ohne Ausnahme für Loopback oder Link-local; mit gewählter Schnittstelle nur deren Netz: dort wird gelauscht, gesendet und angenommen.
 15. **Der Waisen-Durchgang läuft an jedem Konfigurations-Ausstieg von `onReady`** — `toDeviceRows` = `null` (kein `devices`-Schlüssel) räumt nichts, `[]` räumt alles.
-16. **„Alle Schnittstellen“ bedient jedes eigene Netz mit der eigenen Adresse darin**; virtuelle Brücken werden am Namen erkannt (Rückfall 172.17./172.18.); ohne IPv4 lauschen die ECP-Server, die Erkennung startet nach.
+16. **„Alle Schnittstellen“ bedient jedes eigene Netz mit der eigenen Adresse darin** — jede Suche bekommt die Adresse aus dem Netz des Suchenden, jeder NOTIFY die Adresse seiner Schnittstelle; keine Schnittstelle wird am Namen ausgefiltert (krobi 2026-10-03), ohne IPv4 ist die Erkennung ausgefallen wie bei jedem anderen Startfehler.
 17. **Eine gewählte Schnittstelle hält alles in ihrem Netz** (krobi 2026-09-24) — trägt der Rechner ihre Adresse nicht, lauscht fakeroku auf allen Adressen, schreibt genau eine warn-Zeile mit der Ursache und meldet `info.connection` false (krobi 2026-10-02); `native.bind` bleibt unverändert.
 18. **Ein sterbender ECP-Server widerruft `info.connection`** (`onFatalError` → `onEcpFatal`, Meldung nennt das Gerät).
 19. **Ein SSDP-Empfangsfehler schaltet die Erkennung nicht ab**; tödlich ist nur ein `close`, das `stop()` nicht ausgelöst hat.

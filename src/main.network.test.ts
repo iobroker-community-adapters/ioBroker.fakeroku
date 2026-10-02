@@ -2,7 +2,7 @@ import { vi } from "vitest";
 import type * as OsModule from "node:os";
 
 /**
- * Orchestration tests of the adapter — The network side: interfaces, the trust boundary, discovery as an aid, the late discovery start and the wait for a chosen address.
+ * Orchestration tests of the adapter — The network side: interfaces, the trust boundary, discovery as an aid and a chosen address the host does not carry.
  * Shared doubles and harness: `test/helpers/`.
  */
 vi.mock("@iobroker/adapter-core", () => vi.importActual("../test/helpers/adapter-core-double"));
@@ -15,7 +15,7 @@ vi.mock("node:os", async importOriginal => {
   return { ...actual, default: { ...actual, networkInterfaces }, networkInterfaces };
 });
 
-import { setup, settle, type Ctx, resetHarness, noAddressYet, timerFor } from "../test/helpers/fakeroku-harness";
+import { setup, resetHarness, noAddressYet } from "../test/helpers/fakeroku-harness";
 import { osMock } from "../test/helpers/os-double";
 
 afterEach(resetHarness);
@@ -52,38 +52,18 @@ describe("Fakeroku onReady — network interface", () => {
     }
   });
 
-  it("all interfaces without an address yet: the Rokus listen, discovery follows the address", async () => {
-    // A host whose network comes up after ioBroker (Wi-Fi, DHCP, a restart after a power cut).
-    // The ECP servers listen on every interface and need no address; before, the whole start
-    // gave up here and the instance stayed dead until someone restarted it by hand.
+  it("all interfaces without any IPv4: the Rokus listen, discovery is unavailable like any failed start", async () => {
+    // No special path that waits for an address: the ECP servers bind every interface and need none, discovery has
+    // nothing to announce and says so.
     noAddressYet();
     const ctx = setup({ bind: "" });
     await ctx.i.onReady();
-    expect(ctx.i.log.warn).toHaveBeenCalledWith(expect.stringContaining("No routable IPv4 address yet"));
     expect(ctx.ecp).toHaveLength(1);
     expect(ctx.ecp[0].options.bindIp).toBeUndefined();
     expect(ctx.ssdps).toHaveLength(0);
-    expect(ctx.i.states.get("info.connection")).toEqual({ val: true, ack: true });
-
-    // A minute later the host has its address — discovery starts on its own.
-    const scheduled = timerFor(ctx, 60_000);
-    osMock.interfaces = {
-      eth0: [{ family: "IPv4", address: "192.168.1.30", internal: false, cidr: "192.168.1.30/24" }],
-    };
-    scheduled();
-    await vi.waitFor(() => expect(ctx.ssdps).toHaveLength(1));
-    expect(ctx.ssdps[0].options.advertiseIp).toBe("192.168.1.30");
-  });
-
-  it("all interfaces still without an address a minute later: looks again, starts nothing", async () => {
-    noAddressYet();
-    const ctx = setup({ bind: "" });
-    await ctx.i.onReady();
-    const scheduled = timerFor(ctx, 60_000);
-    ctx.i.setTimeout.mockClear();
-    scheduled();
-    await vi.waitFor(() => expect(ctx.i.setTimeout).toHaveBeenCalledWith(expect.any(Function), 60_000));
-    expect(ctx.ssdps).toHaveLength(0);
+    expect(ctx.i.log.warn).toHaveBeenCalledWith(
+      expect.stringContaining("SSDP discovery unavailable: the host has no IPv4"),
+    );
   });
 
   it("a chosen address the host does not carry: listens on all addresses, says so once, not healthy", async () => {
@@ -248,106 +228,6 @@ describe("Fakeroku onReady — discovery is an aid, not a precondition", () => {
     expect(ctx.i.log.warn).toHaveBeenCalledWith(expect.stringContaining("SSDP discovery stopped"));
     // info.connection reflects ECP readiness and must NOT drop here.
     expect(ctx.i.states.get("info.connection")).toEqual({ val: true, ack: true });
-  });
-});
-
-describe("Fakeroku — the late discovery start (all interfaces, no address at first)", () => {
-  /**
-   * An adapter that started without any IPv4 and armed its discovery timer.
-   *
-   * @returns the context and the armed callback
-   */
-  async function waiting(): Promise<{ ctx: Ctx; fire: () => void }> {
-    noAddressYet();
-    const ctx = setup({ bind: "" });
-    await ctx.i.onReady();
-    const fire = timerFor(ctx, 60_000);
-    osMock.interfaces = {
-      eth0: [{ family: "IPv4", address: "192.168.1.30", internal: false, cidr: "192.168.1.30/24" }],
-    };
-    return { ctx, fire };
-  }
-
-  it("does nothing when the timer fires after unload", async () => {
-    const { ctx, fire } = await waiting();
-    ctx.i.onUnload(() => {});
-    fire();
-    await settle();
-    expect(ctx.ssdps).toHaveLength(0);
-  });
-
-  it("the same timer without an unload starts discovery after one settle — the wait above is long enough", async () => {
-    const { ctx, fire } = await waiting();
-    fire();
-    await settle();
-    expect(ctx.ssdps).toHaveLength(1);
-  });
-
-  it("clears the waiting timer on unload", async () => {
-    const { ctx } = await waiting();
-    const at = ctx.i.setTimeout.mock.calls.findIndex(([, ms]) => ms === 60_000);
-    const handle = ctx.i.setTimeout.mock.results[at].value as unknown;
-    ctx.i.onUnload(() => {});
-    expect(ctx.i.clearTimeout).toHaveBeenCalledWith(handle);
-  });
-
-  it("reports a failed status write instead of an unhandled rejection", async () => {
-    const { ctx, fire } = await waiting();
-    // The status is written only on a change; a value the adapter does not know forces the write here.
-    ctx.i.lastState.delete("info.connection");
-    ctx.i.setState.mockImplementationOnce(() => Promise.reject(new Error("states db gone")));
-    fire();
-    await vi.waitFor(() => expect(ctx.i.log.warn).toHaveBeenCalledWith(expect.stringContaining("states db gone")));
-  });
-});
-
-describe("Fakeroku — one discovery, however it gets started", () => {
-  /**
-   * Two devices, the second one's port taken, and no address yet: discovery waits for an address
-   * and the second device waits for its port — two timers that may fire in either order.
-   *
-   * @returns the context and the two armed callbacks
-   */
-  async function twoTimers(): Promise<{ ctx: Ctx; discovery: () => void; retry: () => void }> {
-    noAddressYet();
-    const ctx = setup(
-      {
-        bind: "",
-        devices: [
-          { name: "Wohnzimmer", port: 8060, type: "player" },
-          { name: "Kueche", port: 8061, type: "player" },
-        ],
-      },
-      { failEcpPort: 8061 },
-    );
-    await ctx.i.onReady();
-    // Discovery is armed first (no address), the device retry last (end of onReady).
-    const armed = ctx.i.setTimeout.mock.calls.filter(([, ms]) => ms === 60_000).map(([fn]) => fn as () => void);
-    expect(armed).toHaveLength(2);
-    osMock.interfaces = {
-      eth0: [{ family: "IPv4", address: "192.168.1.30", internal: false, cidr: "192.168.1.30/24" }],
-    };
-    ctx.freeEcpPort();
-    return { ctx, discovery: armed[0], retry: armed[1] };
-  }
-
-  it("the late device finds discovery running and starts no second one", async () => {
-    const { ctx, discovery, retry } = await twoTimers();
-    discovery();
-    await vi.waitFor(() => expect(ctx.ssdps).toHaveLength(1));
-    retry();
-    await vi.waitFor(() => expect(ctx.i.states.get("info.connection")?.val).toBe(true));
-    expect(ctx.ssdps).toHaveLength(1);
-  });
-
-  it("the address timer finds discovery started by the late device and starts no second one", async () => {
-    const { ctx, discovery, retry } = await twoTimers();
-    retry();
-    await vi.waitFor(() => expect(ctx.i.states.get("info.connection")?.val).toBe(true));
-    expect(ctx.ssdps).toHaveLength(1);
-    discovery();
-    await settle();
-    expect(ctx.ssdps).toHaveLength(1);
   });
 });
 

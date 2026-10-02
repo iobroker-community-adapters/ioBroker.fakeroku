@@ -14,8 +14,6 @@ export interface LocalNet {
   address: string;
   /** The prefix length of the network (from `cidr`, or derived from the netmask). */
   prefixLength: number;
-  /** A virtual bridge (container, VM, WSL) — nothing on the LAN sits behind it. */
-  virtual: boolean;
 }
 
 /** One interface to join the SSDP multicast group on: its name and its IPv4 address. */
@@ -24,30 +22,6 @@ export interface Membership {
   iface: string;
   /** The IPv4 address the membership and the outgoing NOTIFY use. */
   address: string;
-}
-
-/**
- * Interface names of virtual bridges: Docker (`docker0`, compose/user networks `br-<id>`, the
- * container ends `veth…`), libvirt (`virbr…`), VirtualBox host-only (`vboxnet…`), Hyper-V/WSL
- * (`vEthernet (…)`), CNI/flannel/podman/LXC bridges. Recognised by NAME: Docker hands out
- * 172.17.0.0/16 up to 172.31.0.0/16 and then pools out of 192.168.0.0/16 (moby
- * `ipamutils`), so an address rule either misses the third compose network or collides with
- * ordinary LANs.
- */
-const VIRTUAL_IFACE = /^(docker\d*|br-|veth|virbr|vboxnet|vEthernet|cni|flannel|podman|lxcbr)/i;
-
-/** Docker's default bridges by address — the fallback for a bridge that carries an unusual name. */
-const CONTAINER_BRIDGE_PREFIXES = ["172.17.", "172.18."];
-
-/**
- * Is this interface a virtual bridge no remote on the LAN can reach?
- *
- * @param iface the interface name
- * @param address one of its IPv4 addresses
- * @returns true for a virtual bridge
- */
-function isVirtual(iface: string, address: string): boolean {
-  return VIRTUAL_IFACE.test(iface) || CONTAINER_BRIDGE_PREFIXES.some(prefix => address.startsWith(prefix));
 }
 
 /**
@@ -81,41 +55,28 @@ export function listLocalNets(interfaces: InterfaceMap): LocalNet[] {
       // stays usable to bind and advertise, and the trust boundary grows by nothing.
       const prefixLength = prefixLengthOf(addr) ?? (addr.family === "IPv4" ? 32 : 128);
       const address = addr.family === "IPv6" ? addr.address.split("%")[0].toLowerCase() : addr.address;
-      out.push({
-        iface,
-        family: addr.family,
-        address,
-        prefixLength,
-        virtual: addr.family === "IPv4" && isVirtual(iface, address),
-      });
+      out.push({ iface, family: addr.family, address, prefixLength });
     }
   }
   return out;
 }
 
 /**
- * The address to advertise when no interface is chosen and nothing better is known: the first
- * IPv4 that is not a virtual bridge, and a bridge address only as a last resort (inside a
- * container it is all there is). Pure.
- *
- * Why bridges are skipped: an ioBroker host commonly runs Docker, and a bridge can come first in
- * the interface enumeration. Advertising it puts an address into every SSDP answer that no remote
- * on the LAN can reach — while the adapter reports "advertising on 172.17.0.1", which looks like
- * success (hassemu v1.21.0 hit exactly this).
+ * The address announced when no interface is chosen and nothing more specific is known: the host's first IPv4. Every
+ * search is answered with the host's address in the searcher's own network and every NOTIFY carries the address of
+ * the interface it leaves through, so this one only names the host in the log. Pure.
  *
  * @param interfaces the OS network-interface map
- * @returns the IPv4 address to advertise, or "" if none is found
+ * @returns the first IPv4 address, or "" if the host has none
  */
 export function pickPrimaryIPv4(interfaces: InterfaceMap): string {
-  const nets = listLocalNets(interfaces).filter(net => net.family === "IPv4");
-  return (nets.find(net => !net.virtual) ?? nets[0])?.address ?? "";
+  return listLocalNets(interfaces).find(net => net.family === "IPv4")?.address ?? "";
 }
 
 /**
  * The interfaces to join the SSDP multicast group on: ONE entry per interface (its first IPv4) —
  * a membership belongs to the interface, and joining it a second time through another address of
- * the same card throws EADDRINUSE. Virtual bridges are left out unless they are all there is.
- * Pure.
+ * the same card throws EADDRINUSE. Pure.
  *
  * @param interfaces the OS network-interface map
  * @returns the interfaces to join on (may be empty)
@@ -127,9 +88,7 @@ export function pickMembershipIPv4s(interfaces: InterfaceMap): Membership[] {
       byIface.set(net.iface, net);
     }
   }
-  const all = [...byIface.values()];
-  const real = all.filter(net => !net.virtual);
-  return (real.length > 0 ? real : all).map(net => ({ iface: net.iface, address: net.address }));
+  return [...byIface.values()].map(net => ({ iface: net.iface, address: net.address }));
 }
 
 /**
