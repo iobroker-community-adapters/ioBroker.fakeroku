@@ -135,7 +135,8 @@ export class EcpHttpServer {
    * @param err the server error
    */
   private onRuntimeError(err: Error): void {
-    this.config.logger.error(`ECP server "${this.config.friendlyName}" error: ${errText(err)}`);
+    // The adapter writes the one line about it (with the device and the retry); here only the trace.
+    this.config.logger.debug(`ECP server "${this.config.friendlyName}" error: ${errText(err)}`);
     if (!this.fatalReported) {
       this.fatalReported = true;
       this.config.onFatalError(err);

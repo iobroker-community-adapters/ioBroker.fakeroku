@@ -79,9 +79,9 @@ im selben Netz ist; sie findet den emulierten Roku über die Erkennung.
 
 Auf Instanz-Ebene:
 
-| Datenpunkt        | Typ                 | Bedeutung                                                                                                                                                                                                                                                 |
-| ----------------- | ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `info.connection` | boolean, nur lesbar | Nur wahr, solange **jeder** konfigurierte Roku tatsächlich lauscht. Kann einer nicht starten — fast immer, weil sein Port schon belegt ist —, nennt das Protokoll Gerät und Port, und der Adapter versucht dieses Gerät jede Minute erneut, bis es läuft. |
+| Datenpunkt        | Typ                 | Bedeutung                                                                                                                                                                                                                                                                                                                       |
+| ----------------- | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `info.connection` | boolean, nur lesbar | Nur wahr, solange alles läuft: **jeder** konfigurierte Roku lauscht, die Erkennung antwortet und die gewählte Adresse existiert. Alles darunter zeigt die Instanz gelb; das Protokoll nennt die Ursache einmal, und der Adapter versucht einen ausgefallenen Roku oder die Erkennung jede Minute erneut, bis sie wieder laufen. |
 
 Je emuliertem Roku, unterhalb von `fakeroku.0.<Name>`:
 
@@ -155,8 +155,8 @@ hier ist dafür nichts umzustellen.
 Prüfe, ob Hub und ioBroker-Rechner im selben Netz sind und keine Firewall den
 UDP-Anschluss 1900 blockiert. Bei einem Rechner mit mehreren Netzwerkkarten die
 richtige unter **Netzwerkschnittstelle** auswählen. Ist die Erkennung nicht verfügbar,
-schreibt der Adapter das ins Protokoll und arbeitet für bereits gekoppelte
-Fernbedienungen weiter.
+schreibt der Adapter das ins Protokoll, zeigt gelb, arbeitet für bereits gekoppelte
+Fernbedienungen weiter und startet die Erkennung jede Minute erneut.
 
 **Die Fernbedienung findet nichts, und ioBroker läuft in Docker.**
 Im Standard-Bridge-Netz von Docker hat der Container nur eine interne Adresse, die keine
@@ -171,13 +171,14 @@ zurückgespielt. Die emulierten Rokus laufen solange auf allen Adressen weiter, 
 zeigt gelb. Wähle die aktuelle Adresse (oder „alle Schnittstellen") und speichere; die
 Instanz startet neu.
 
-**Die Instanz bleibt „nicht verbunden".**
-Mindestens ein konfigurierter Roku konnte nicht starten. Das Protokoll nennt Gerät
-und Anschluss — fast immer ist der Anschluss schon von etwas anderem belegt (auch von
-einem zweiten emulierten Roku mit demselben Anschluss). Gib ihm einen freien.
-Der Adapter versucht es bei so einem Gerät jede Minute erneut und meldet im Protokoll,
-wenn es hochkommt — ein Anschluss, den der vorherige Prozess nach einem Neustart noch
-hielt, löst sich damit von allein.
+**Die Instanz bleibt gelb.**
+Etwas läuft nicht, und das Protokoll sagt einmal, was. Meist konnte ein konfigurierter
+Roku nicht starten, weil sein Anschluss schon von etwas anderem belegt ist (auch von
+einem zweiten emulierten Roku mit demselben Anschluss) — gib ihm einen freien. Der
+Adapter versucht so einen Roku jede Minute erneut, auch einen, dessen Server im Betrieb
+ausgefallen ist, und meldet im Protokoll, wenn er wieder läuft — ein Anschluss, den der
+vorherige Prozess nach einem Neustart noch hielt, löst sich damit von allein. Ist gar
+kein Roku angelegt, bittet das Protokoll, einen in den Instanzeinstellungen anzulegen.
 
 **Ich drücke eine Taste und in ioBroker passiert nichts.**
 Stelle die Protokollstufe der Instanz kurz auf `debug`. Jeder _angewendete_ Befehl wird

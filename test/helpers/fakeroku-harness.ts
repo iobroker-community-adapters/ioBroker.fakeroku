@@ -58,7 +58,7 @@ export function internalOf(adapter: Fakeroku): {
   onReady(): Promise<void>;
   onUnload(cb: () => void): void;
   applyCommand(deviceId: string, cmd: CommandEvent): boolean;
-  onSsdpFatal(): void;
+  onSsdpFatal(err: Error): void;
   startWithTimeout(p: Promise<void>, ms: number): Promise<void>;
   objects: Map<string, Record<string, unknown>>;
   states: Map<string, { val: unknown; ack: boolean }>;
@@ -68,6 +68,7 @@ export function internalOf(adapter: Fakeroku): {
   log: Record<"debug" | "info" | "warn" | "error", ReturnType<typeof vi.fn>>;
   setTimeout: ReturnType<typeof vi.fn>;
   clearTimeout: ReturnType<typeof vi.fn>;
+  terminate: ReturnType<typeof vi.fn>;
   setInterval: ReturnType<typeof vi.fn>;
   clearInterval: ReturnType<typeof vi.fn>;
   ssdp: FakeSsdp | undefined;
@@ -206,7 +207,13 @@ export function setup(
   i.makeEcpServer = (options: Record<string, unknown>) => {
     const port = (options.device as { port: number }).port;
     const server = fakeEcp(options, () =>
-      opts.failEcpPort === port ? Promise.reject(new Error(`EADDRINUSE ${port}`)) : Promise.resolve(),
+      opts.failEcpPort === port
+        ? Promise.reject(
+            Object.assign(new Error(`listen EADDRINUSE: address already in use 0.0.0.0:${port}`), {
+              code: "EADDRINUSE",
+            }),
+          )
+        : Promise.resolve(),
     );
     ecp.push(server);
     return server;

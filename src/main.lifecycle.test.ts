@@ -89,8 +89,8 @@ describe("Fakeroku collaborator wiring", () => {
     const ctx = setup();
     await ctx.i.onReady();
     ctx.i.clearInterval.mockClear();
-    const onFatal = ctx.ssdps[0].options.onFatalError as () => void;
-    onFatal();
+    const onFatal = ctx.ssdps[0].options.onFatalError as (err: Error) => void;
+    onFatal(new Error("SSDP socket closed"));
     // Without this wiring the announce interval keeps firing into a dead socket
     // for as long as the instance runs.
     expect(ctx.i.clearInterval).toHaveBeenCalledTimes(1);
@@ -106,9 +106,9 @@ describe("Fakeroku collaborator wiring", () => {
     await ctx.i.onReady();
     expect(ctx.i.states.get("info.connection")?.val).toBe(true);
 
-    const onFatal = ctx.ecp[0].options.onFatalError as () => void;
+    const onFatal = ctx.ecp[0].options.onFatalError as (err: Error) => void;
     expect(onFatal, "the ECP server's fatal callback must be wired").toBeDefined();
-    onFatal();
+    onFatal(new Error("listen EADDRNOTAVAIL"));
 
     expect(ctx.i.states.get("info.connection")?.val).toBe(false);
     expect(ctx.i.log.error).toHaveBeenCalledWith(expect.stringContaining('"Wohnzimmer" stopped answering'));
@@ -126,8 +126,8 @@ describe("Fakeroku collaborator wiring", () => {
     await ctx.i.onReady();
     ctx.i.setState.mockRejectedValueOnce(new Error("states db closed"));
 
-    const onFatal = ctx.ecp[0].options.onFatalError as () => void;
-    expect(() => onFatal()).not.toThrow();
+    const onFatal = ctx.ecp[0].options.onFatalError as (err: Error) => void;
+    expect(() => onFatal(new Error("listen EADDRNOTAVAIL"))).not.toThrow();
     await settle();
 
     expect(ctx.i.log.debug).toHaveBeenCalledWith(expect.stringContaining("states db closed"));
@@ -137,7 +137,7 @@ describe("Fakeroku collaborator wiring", () => {
     const ctx = setup({}, { ssdpStartFails: true });
     await ctx.i.onReady();
     ctx.i.clearInterval.mockClear();
-    ctx.i.onSsdpFatal();
+    ctx.i.onSsdpFatal(new Error("SSDP socket closed"));
     // clearInterval(undefined) is a js-controller warning per call, not a no-op.
     expect(ctx.i.clearInterval).not.toHaveBeenCalled();
   });
@@ -264,24 +264,35 @@ describe("Fakeroku — a device whose port was busy is retried", () => {
     await ctx.i.retryPendingDevices();
 
     expect(ctx.i.log.warn).not.toHaveBeenCalled();
-    expect(ctx.i.log.debug).toHaveBeenCalledWith(expect.stringContaining("still cannot start"));
+    expect(ctx.i.log.debug).toHaveBeenCalledWith(expect.stringContaining("still not running"));
     expect(ctx.i.pending).toHaveLength(1);
   });
 
-  it("does not queue a device whose server died at runtime", async () => {
-    // A port busy at boot is a restart race and heals; a server that died while running
-    // died for a reason this code does not know, and retrying it would flood the log.
+  it("a server that died at runtime: yellow, one error, retried every minute, info once it is back", async () => {
     const ctx = setup();
     await ctx.i.onReady();
-    const fatal = ctx.ecp[0].options.onFatalError as () => void;
+    const fatal = ctx.ecp[0].options.onFatalError as (err: Error) => void;
+    ctx.i.setTimeout.mockClear();
 
-    fatal();
+    fatal(new Error("network down"));
 
-    expect(ctx.i.pending).toHaveLength(0);
     expect(ctx.i.running).toHaveLength(0);
+    expect(ctx.i.pending.map(p => p.name)).toEqual(["Wohnzimmer"]);
     expect(ctx.i.states.get("info.connection")).toEqual({ val: false, ack: true });
-    // And discovery stops pointing remotes at a port nobody serves any more.
+    expect(ctx.i.log.error).toHaveBeenCalledTimes(1);
+    expect(ctx.i.log.error).toHaveBeenCalledWith(
+      'Emulated Roku "Wohnzimmer" stopped answering: network down — retrying every 60 s',
+    );
+    // Discovery stops pointing remotes at a port nobody serves any more.
     expect(ctx.ssdps[0].removeDevice).toHaveBeenCalledWith(deriveUuid("Wohnzimmer"));
+    expect(ctx.i.setTimeout).toHaveBeenCalledWith(expect.any(Function), 60_000);
+
+    await ctx.i.retryPendingDevices();
+
+    expect(ctx.i.running).toHaveLength(1);
+    expect(ctx.i.log.info).toHaveBeenCalledWith('Emulated Roku "Wohnzimmer" is listening on port 8060 again.');
+    expect(ctx.ssdps[0].addDevice).toHaveBeenCalledWith(expect.objectContaining({ port: 8060 }));
+    expect(ctx.i.states.get("info.connection")).toEqual({ val: true, ack: true });
   });
 });
 
@@ -642,10 +653,8 @@ describe("Fakeroku — the paths that only a failing database reaches", () => {
     expect(ctx.i.setTimeout).not.toHaveBeenCalled();
   });
 
-  it("names the missing address instead of logging a gap when the retry finds none", async () => {
-    // detectPrimaryIPv4 can come back empty on the retry path — the host lost its address
-    // in the meantime. The line then read "advertising on  (discovery off)", which looks
-    // like a truncated log line rather than the finding it is.
+  it("names the missing address when the retry finds none — discovery is unavailable, not silently off", async () => {
+    // detectPrimaryIPv4 can come back empty on the retry path — the host lost its address in the meantime.
     const ctx = setup(
       { devices: [{ name: "Kueche", port: 8061, type: "player" }], bind: "" },
       {
@@ -660,7 +669,10 @@ describe("Fakeroku — the paths that only a failing database reaches", () => {
 
     await ctx.i.retryPendingDevices();
 
-    expect(ctx.i.log.info).toHaveBeenCalledWith(expect.stringContaining("advertising on no routable IPv4"));
+    expect(ctx.i.log.warn).toHaveBeenCalledWith(
+      expect.stringContaining("SSDP discovery unavailable: the host has no IPv4 address"),
+    );
+    expect(ctx.i.states.get("info.connection")).toEqual({ val: false, ack: true });
   });
 
   it("a retry that fires after unload does nothing at all", async () => {
@@ -699,24 +711,27 @@ describe("Fakeroku — the paths that only a failing database reaches", () => {
     // "setInterval called, but adapter is shutting down" — a warning nothing explains.
     const ctx = setup();
     const { late, release } = lateSsdp(ctx);
-    await ctx.i.onReady();
+    const ready = ctx.i.onReady();
+    await vi.waitFor(() => expect(late().start).toHaveBeenCalled());
     ctx.i.setInterval.mockClear();
 
     ctx.i.onUnload(() => {});
     release();
-    await settle();
+    await ready;
 
     expect(late().announce).not.toHaveBeenCalled();
     expect(ctx.i.setInterval).not.toHaveBeenCalled();
   });
 
-  it("the same late bind without an unload announces after one settle — the wait above is long enough", async () => {
+  it("the same late bind without an unload announces — the start waits for discovery", async () => {
     const ctx = setup();
     const { late, release } = lateSsdp(ctx);
-    await ctx.i.onReady();
+    const ready = ctx.i.onReady();
+    await vi.waitFor(() => expect(late().start).toHaveBeenCalled());
     release();
-    await settle();
+    await ready;
     expect(late().announce).toHaveBeenCalled();
+    expect(ctx.i.states.get("info.connection")).toEqual({ val: true, ack: true });
   });
 
   it("disarms the retry timer on unload", async () => {

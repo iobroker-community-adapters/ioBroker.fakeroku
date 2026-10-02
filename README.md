@@ -74,7 +74,7 @@ At instance level:
 
 | Datapoint | Type | Meaning |
 |---|---|---|
-| `info.connection` | boolean, read-only | `true` only while **every** configured Roku is actually listening. If one of them cannot start — usually because its port is already taken — the log names the device and the port, and the adapter retries that device every minute until it comes up. |
+| `info.connection` | boolean, read-only | `true` only while everything runs: **every** configured Roku listens, discovery answers, and the chosen address exists. Anything less shows the instance yellow; the log names the cause once, and the adapter retries a Roku or discovery that is down every minute. |
 
 For every emulated Roku (`fakeroku.0.<name>`):
 
@@ -104,9 +104,11 @@ becomes `true` — or watch `.command` for the last button as text.
 ### **WORK IN PROGRESS**
 
 - (krobipd) Changed: the emulated Roku answers only what a Harmony or Sofabaton reads — Home Assistant and openHAB can no longer set it up.
-- (krobipd) Changed: with all interfaces, a host without an IPv4 address no longer waits for one; discovery reports itself unavailable like any other failed start.
-- (krobipd) Changed: if the chosen address is missing on the host, the Rokus listen on all addresses and the log says so, instead of waiting two minutes and staying off.
-- (krobipd) Changed: with a chosen network interface, requests from the ioBroker host itself or from self-assigned addresses outside its network are refused too.
+- (krobipd) Changed: the instance shows green only while every Roku and discovery run, and yellow otherwise.
+- (krobipd) Changed: a Roku whose server stopped while running and a discovery that failed start again within a minute instead of waiting for a restart.
+- (krobipd) Changed: with no Roku configured or none running, the instance stays up so the device manager works, and asks you to add a Roku.
+- (krobipd) Changed: a chosen address that is missing on the host no longer leaves the Rokus off — they listen on all addresses until you choose another.
+- (krobipd) Changed: requests from the ioBroker host itself or from self-assigned addresses outside the host's networks are refused.
 - (krobipd) Changed: a Roku set up before 0.7.0 gets its type (player or TV) written into its settings once; the instance restarts once.
 - (krobipd) Changed: the datapoint `commandType` is gone — `command` carries every command; an existing installation removes it on the next start.
 

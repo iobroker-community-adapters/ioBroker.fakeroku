@@ -95,6 +95,8 @@ class Adapter {
     },
   );
   public on = vi.fn();
+  /** Ending the process — the adapter never does it itself: the device manager runs inside the process. */
+  public terminate = vi.fn();
   public setState = vi.fn((id: string, state: unknown) => {
     const s = state as { val?: unknown; ack?: boolean };
     const key = id.replace(`${this.namespace}.`, "");

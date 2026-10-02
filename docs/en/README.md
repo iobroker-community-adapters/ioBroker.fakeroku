@@ -74,9 +74,9 @@ same network; it finds the emulated Roku through discovery.
 
 At instance level:
 
-| Datapoint         | Type               | Meaning                                                                                                                                                                                                                                                      |
-| ----------------- | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `info.connection` | boolean, read-only | True only while **every** configured Roku is actually listening. If one of them cannot start — almost always because its port is already in use — the log names the device and the port, and the adapter retries that device every minute until it comes up. |
+| Datapoint         | Type               | Meaning                                                                                                                                                                                                                                                                                 |
+| ----------------- | ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `info.connection` | boolean, read-only | True only while everything runs: **every** configured Roku listens, discovery answers, and the chosen address exists. Anything less shows the instance yellow; the log names the cause once, and the adapter retries a Roku or discovery that is down every minute until it runs again. |
 
 For each emulated Roku, below `fakeroku.0.<name>`:
 
@@ -146,7 +146,8 @@ startup time. You switch it on in the instance settings; nothing here needs chan
 Check that the hub and the ioBroker host are on the same network and that no
 firewall blocks UDP port 1900. On a host with several network cards, select the
 right one under **Network interface**. If discovery is unavailable the adapter says
-so in the log and keeps working for remotes that were already paired.
+so in the log, shows yellow, keeps working for remotes that were already paired and
+starts discovery again every minute.
 
 **The remote finds nothing, and ioBroker runs in Docker.**
 In Docker's default bridge network the container only has an internal address no
@@ -160,13 +161,14 @@ changed DHCP address, a restored backup on other hardware. The emulated Rokus ke
 on all addresses meanwhile, and the instance shows yellow. Choose the current address (or
 "all interfaces") and save; the instance restarts.
 
-**The instance stays "not connected".**
-At least one configured Roku could not start. The log names the device and its port —
-almost always the port is already used by something else (including another emulated
-Roku with the same port). Give it a free port.
-The adapter keeps trying such a device once a minute and says so in the log when it
-comes up, so a port that was still held by the previous process after a restart sorts
-itself out without you doing anything.
+**The instance stays yellow.**
+Something does not run, and the log says what, once. Most often a configured Roku could
+not start because its port is already used by something else (including another
+emulated Roku with the same port) — give it a free port. The adapter keeps trying such a
+Roku once a minute, also one whose server stopped while running, and says so in the log
+when it comes up, so a port that was still held by the previous process after a restart
+sorts itself out without you doing anything. With no Roku configured at all, the log asks
+you to add one in the instance settings.
 
 **I press a button and nothing happens in ioBroker.**
 Set the instance log level to `debug` for a moment. Every command the adapter _applied_

@@ -18,7 +18,7 @@ vi.mock("node:os", async importOriginal => {
 import { I18n } from "@iobroker/adapter-core";
 import { join } from "node:path";
 import { deriveUuid } from "./lib/device-identity";
-import { setup, resetHarness, noAddressYet, twoPlayers } from "../test/helpers/fakeroku-harness";
+import { setup, resetHarness, noAddressYet, twoPlayers, fakeEcp } from "../test/helpers/fakeroku-harness";
 
 afterEach(resetHarness);
 
@@ -100,7 +100,9 @@ describe("Fakeroku onReady — device wiring", () => {
     );
     await ctx.i.onReady();
 
-    expect(ctx.i.log.warn).toHaveBeenCalledWith(expect.stringContaining("could not start on port 8060"));
+    expect(ctx.i.log.warn).toHaveBeenCalledWith(
+      'Emulated Roku "Wohnzimmer" is not running — port 8060 is already in use (another program or another instance holds it); retrying every 60 s',
+    );
     // The surviving device keeps working and gets announced …
     expect(ctx.ssdps[0].options.devices as unknown[]).toHaveLength(1);
   });
@@ -120,7 +122,9 @@ describe("Fakeroku onReady — device wiring", () => {
     // … but "connected" must not paper over the dead one: a taken port is a
     // configuration the user has to fix, and the only other trace is a log line.
     expect(ctx.i.states.get("info.connection")).toEqual({ val: false, ack: true });
-    expect(ctx.i.log.error).toHaveBeenCalledWith(expect.stringContaining("Only 1 of 2 configured"));
+    // Yellow: one warning about the missing one, no error — one Roku still runs.
+    expect(ctx.i.log.error).not.toHaveBeenCalled();
+    expect(ctx.i.log.info).toHaveBeenCalledWith(expect.stringContaining("Emulating 1 of 2 Roku device(s)"));
   });
 
   it("reports connected once every configured device is up", async () => {
@@ -137,11 +141,16 @@ describe("Fakeroku onReady — device wiring", () => {
     expect(ctx.i.log.info).toHaveBeenCalledWith(expect.stringContaining("Emulating 2 Roku device(s)"));
   });
 
-  it("reports the failure and starts no discovery when the only device's port is taken", async () => {
+  it("no Roku runs: one error naming each with its reason, no discovery, the instance stays up and retries", async () => {
     const ctx = setup({ devices: [{ name: "Wohnzimmer", port: 8060, type: "player" }] }, { failEcpPort: 8060 });
     await ctx.i.onReady();
 
-    expect(ctx.i.log.error).toHaveBeenCalledWith(expect.stringContaining("Only 0 of 1 configured Roku device"));
+    expect(ctx.i.log.error).toHaveBeenCalledTimes(1);
+    expect(ctx.i.log.error).toHaveBeenCalledWith(
+      'No emulated Roku is running — "Wohnzimmer": port 8060 is already in use (another program or another instance holds it); retrying every 60 s',
+    );
+    expect(ctx.i.log.warn).not.toHaveBeenCalled();
+    expect(ctx.i.terminate).not.toHaveBeenCalled();
     expect(ctx.i.states.get("info.connection")).toEqual({ val: false, ack: true });
     // Nothing is listening, so there is nothing to announce — but the device is queued
     // for a retry rather than written off (a port taken at boot is usually a restart race).
@@ -149,12 +158,27 @@ describe("Fakeroku onReady — device wiring", () => {
     expect(ctx.i.pending.map(p => p.name)).toEqual(["Wohnzimmer"]);
   });
 
+  it("names the system's text for a listen error that is not a taken port", async () => {
+    const ctx = setup({ devices: [{ name: "Wohnzimmer", port: 8060, type: "player" }] });
+    ctx.i.makeEcpServer = (options: Record<string, unknown>) => {
+      const server = fakeEcp(options, () => Promise.reject(new Error("listen EACCES: permission denied 0.0.0.0:80")));
+      ctx.ecp.push(server);
+      return server;
+    };
+    await ctx.i.onReady();
+    expect(ctx.i.log.error).toHaveBeenCalledWith(
+      'No emulated Roku is running — "Wohnzimmer": port 8060: listen EACCES: permission denied 0.0.0.0:80; retrying every 60 s',
+    );
+  });
+
   it("gives up only when no device is startable at all, and says why", async () => {
     // Every row unusable for a reason a retry cannot fix (here: the reserved name).
     const ctx = setup({ devices: [{ name: "info", port: 8060, type: "player" }] });
     await ctx.i.onReady();
 
-    expect(ctx.i.log.error).toHaveBeenCalledWith(expect.stringContaining("No emulated Roku device could be started"));
+    expect(ctx.i.log.error).toHaveBeenCalledWith(
+      'No emulated Roku is running — "info": its object id "info" is reserved for the adapter\'s own status',
+    );
     expect(ctx.i.states.get("info.connection")).toEqual({ val: false, ack: true });
     expect(ctx.i.pending).toHaveLength(0);
   });
@@ -186,10 +210,13 @@ describe("Fakeroku onReady — device wiring", () => {
     expect(ctx.i.log.warn).not.toHaveBeenCalled();
   });
 
-  it("warns and stops when no device is configured", async () => {
+  it("no Roku configured: an error asking to add one, yellow, and the instance stays up for the device manager", async () => {
     const ctx = setup({ devices: [] });
     await ctx.i.onReady();
-    expect(ctx.i.log.warn).toHaveBeenCalledWith(expect.stringContaining("No emulated Roku devices configured"));
+    expect(ctx.i.log.error).toHaveBeenCalledWith(
+      "No Roku device configured — add one in the instance settings (device manager)",
+    );
+    expect(ctx.i.terminate).not.toHaveBeenCalled();
     expect(ctx.ecp).toHaveLength(0);
     expect(ctx.i.states.get("info.connection")).toEqual({ val: false, ack: true });
   });
@@ -433,7 +460,7 @@ describe("Fakeroku onReady — reserved object ids", () => {
     expect(ctx.i.objects.get("info")?.type).toBe("channel");
     expect(ctx.i.objects.get("info.command")).toBeUndefined();
     expect(ctx.i.objects.get("info.keys.Home")).toBeUndefined();
-    expect(ctx.i.log.warn).toHaveBeenCalledWith(expect.stringContaining("reserves for its own status"));
+    expect(ctx.i.log.error).toHaveBeenCalledWith(expect.stringContaining("is reserved for the adapter's own status"));
     // Nothing is controllable, so the instance must not claim to be connected.
     expect(ctx.i.states.get("info.connection")?.val).toBe(false);
   });
@@ -633,7 +660,7 @@ describe("Fakeroku cleanup of stale objects", () => {
 
     await ctx.i.onReady();
 
-    expect(ctx.i.log.warn).toHaveBeenCalledWith(expect.stringContaining("No emulated Roku devices configured"));
+    expect(ctx.i.log.error).toHaveBeenCalledWith(expect.stringContaining("No Roku device configured"));
     expect(ctx.i.objects.has("Wohnzimmer")).toBe(false);
   });
 
@@ -678,7 +705,7 @@ describe("Fakeroku — the configured row is read once, for everyone", () => {
     await ctx.i.onReady();
 
     expect(ctx.ecp).toHaveLength(0);
-    expect(ctx.i.log.warn).toHaveBeenCalledWith(expect.stringContaining("No emulated Roku devices configured"));
+    expect(ctx.i.log.error).toHaveBeenCalledWith(expect.stringContaining("No Roku device configured"));
   });
 });
 
@@ -763,7 +790,9 @@ describe("Fakeroku start-up robustness", () => {
     await ctx.i.onReady();
     // A never-configured instance has no `devices` key at all — reading it as a
     // list must not throw before the "configure a device" hint is logged.
-    expect(ctx.i.log.warn).toHaveBeenCalledWith("No emulated Roku devices configured.");
+    expect(ctx.i.log.error).toHaveBeenCalledWith(
+      "No Roku device configured — add one in the instance settings (device manager)",
+    );
     expect(ctx.i.states.get("info.connection")?.val).not.toBe(true);
   });
 

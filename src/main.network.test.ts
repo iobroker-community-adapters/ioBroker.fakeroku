@@ -15,7 +15,7 @@ vi.mock("node:os", async importOriginal => {
   return { ...actual, default: { ...actual, networkInterfaces }, networkInterfaces };
 });
 
-import { setup, resetHarness, noAddressYet } from "../test/helpers/fakeroku-harness";
+import { setup, resetHarness, noAddressYet, fakeSsdp, type FakeSsdp } from "../test/helpers/fakeroku-harness";
 import { osMock } from "../test/helpers/os-double";
 
 afterEach(resetHarness);
@@ -131,15 +131,40 @@ describe("Fakeroku onReady — network interface", () => {
 });
 
 describe("Fakeroku onReady — discovery is an aid, not a precondition", () => {
-  it("a failing SSDP start leaves the adapter usable and announces nothing", async () => {
+  it("a failing SSDP start: the Rokus keep working, yellow, one warning, retried every minute, info once back", async () => {
     const ctx = setup({}, { ssdpStartFails: true });
     await ctx.i.onReady();
 
-    expect(ctx.i.log.warn).toHaveBeenCalledWith(expect.stringContaining("SSDP discovery unavailable"));
-    // ECP is what makes the adapter controllable — already-paired remotes work.
-    expect(ctx.i.states.get("info.connection")).toEqual({ val: true, ack: true });
+    const lines = ctx.i.log.warn.mock.calls.filter(([text]) => String(text).includes("SSDP discovery unavailable"));
+    expect(lines).toEqual([
+      [
+        "SSDP discovery unavailable: port 1900 busy — paired remotes keep working, a new pairing does not; retrying every 60 s",
+      ],
+    ]);
+    expect(ctx.ecp[0].start).toHaveBeenCalled();
+    expect(ctx.i.states.get("info.connection")).toEqual({ val: false, ack: true });
     expect(ctx.ssdps[0].announce).not.toHaveBeenCalled();
     expect(ctx.i.ssdp).toBeUndefined();
+    expect(ctx.i.setTimeout).toHaveBeenCalledWith(expect.any(Function), 60_000);
+
+    // Still busy a minute later: debug only.
+    ctx.i.log.warn.mockClear();
+    await ctx.i.retryPendingDevices();
+    expect(ctx.i.log.warn).not.toHaveBeenCalled();
+    expect(ctx.i.log.debug).toHaveBeenCalledWith(expect.stringContaining("SSDP discovery still unavailable"));
+
+    // Free again: discovery runs, green, one info line.
+    ctx.i.makeSsdpResponder = (options: Record<string, unknown>): FakeSsdp => {
+      const responder = fakeSsdp(options, () => Promise.resolve());
+      ctx.ssdps.push(responder);
+      return responder;
+    };
+    await ctx.i.retryPendingDevices();
+    expect(ctx.ssdps.at(-1)!.announce).toHaveBeenCalled();
+    expect(ctx.i.log.info).toHaveBeenCalledWith(
+      "SSDP discovery is running again — remotes can find the emulated Rokus.",
+    );
+    expect(ctx.i.states.get("info.connection")).toEqual({ val: true, ack: true });
   });
 
   it("closes a responder whose start failed, so a late bind cannot outlive the dropped reference", async () => {
@@ -216,18 +241,24 @@ describe("Fakeroku onReady — discovery is an aid, not a precondition", () => {
     expect(ctx.ssdps[0].options.advertiseIp).toBe("192.168.1.5");
   });
 
-  it("a runtime socket death stops announcing but keeps ECP alive", async () => {
+  it("a runtime socket death: stops announcing, closes what is left, yellow, retried", async () => {
     const ctx = setup();
     await ctx.i.onReady();
     ctx.i.clearInterval.mockClear();
+    const dead = ctx.ssdps[0];
 
-    ctx.i.onSsdpFatal();
+    ctx.i.onSsdpFatal(new Error("SSDP socket closed"));
 
     expect(ctx.i.clearInterval).toHaveBeenCalledTimes(1);
+    expect(dead.stop).toHaveBeenCalled();
     expect(ctx.i.ssdp).toBeUndefined();
-    expect(ctx.i.log.warn).toHaveBeenCalledWith(expect.stringContaining("SSDP discovery stopped"));
-    // info.connection reflects ECP readiness and must NOT drop here.
-    expect(ctx.i.states.get("info.connection")).toEqual({ val: true, ack: true });
+    expect(ctx.i.log.warn).toHaveBeenCalledWith(
+      expect.stringContaining("SSDP discovery unavailable: SSDP socket closed"),
+    );
+    // The Rokus keep running; the instance is yellow until discovery is back.
+    expect(ctx.i.running).toHaveLength(1);
+    expect(ctx.i.states.get("info.connection")).toEqual({ val: false, ack: true });
+    expect(ctx.i.setTimeout).toHaveBeenCalledWith(expect.any(Function), 60_000);
   });
 });
 

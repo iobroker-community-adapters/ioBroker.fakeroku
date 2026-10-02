@@ -30,8 +30,8 @@ import { planNativePrune, planObjectCleanup } from "./lib/object-cleanup";
 const SSDP_START_TIMEOUT_MS = 5000;
 /** Proactive ssdp:alive interval so controllers find the device without searching. */
 const SSDP_NOTIFY_INTERVAL_MS = 300_000;
-/** How long to wait before trying a device whose ECP port was busy at start-up again. */
-const DEVICE_RETRY_INTERVAL_MS = 60_000;
+/** How long to wait before trying again what does not run: a device whose ECP server is down, and discovery. */
+const RETRY_INTERVAL_MS = 60_000;
 
 /**
  * Keys the 0.1.x adapter declared and nothing reads any more: its own HTTP port and multicast
@@ -85,6 +85,30 @@ function toBindAddress(old: unknown): string {
   return typeof old === "string" && old.trim() ? old.trim() : "0.0.0.0";
 }
 
+/** A configured emulated Roku that is not running after the start, and why — for the one log line about it. */
+interface DeviceFailure {
+  /** The configured device name. */
+  name: string;
+  /** Why it does not run, in words the user can act on. */
+  reason: string;
+  /** Whether the minute retry brings it back by itself (a busy port), or only a changed setting does. */
+  retried: boolean;
+}
+
+/**
+ * Why an ECP server could not listen, in words the user can act on: a taken port names its likely holder, anything
+ * else keeps the system's text.
+ *
+ * @param e the listen error
+ * @param port the port the server tried
+ * @returns the reason
+ */
+function listenFailure(e: unknown, port: number): string {
+  return (e as NodeJS.ErrnoException | undefined)?.code === "EADDRINUSE"
+    ? `port ${port} is already in use (another program or another instance holds it)`
+    : `port ${port}: ${errText(e)}`;
+}
+
 /** One configured emulated Roku at runtime — its object tree exists; it listens while it has a server. */
 interface DeviceRuntime {
   /** The id-safe device path segment. */
@@ -113,7 +137,7 @@ export class Fakeroku extends utils.Adapter {
   private notifyTimer: ioBroker.Interval | undefined;
   /** Every configured emulated Roku whose object tree this start created, by device id. */
   private readonly devices = new Map<string, DeviceRuntime>();
-  /** Devices whose ECP server did not start; retried on a timer until they come up. */
+  /** Devices whose ECP server is down — it did not start, or it died; retried on a timer until they come up. */
   private pending: DeviceRuntime[] = [];
   /** Turns the remotes' commands into state writes. */
   private readonly commands = new CommandHandler({
@@ -122,8 +146,12 @@ export class Fakeroku extends utils.Adapter {
     clearTimeout: timer => this.clearTimeout(timer),
     warn: message => this.log.warn(message),
   });
-  /** The retry timer for {@link pending}, armed only while something is waiting. */
+  /** The retry timer for {@link pending} and for discovery, armed only while something does not run. */
   private retryTimer: ioBroker.Timeout | undefined;
+  /** Discovery is answering and announcing — one of the conditions of a healthy instance. */
+  private discoveryUp = false;
+  /** Discovery is down and the warning about it is written: repeats go to debug, its return to info. */
+  private discoveryDown = false;
 
   /**
    * Set as the very first thing onUnload does. Everything that can still be in flight at
@@ -187,6 +215,28 @@ export class Fakeroku extends utils.Adapter {
    */
   private get running(): RokuAdvert[] {
     return [...this.devices.values()].filter(d => d.server).map(d => d.advert);
+  }
+
+  /**
+   * Green: everything runs — every configured Roku listens, discovery answers, the chosen address is the one in use.
+   * Anything less is yellow (`info.connection` false) while the process keeps running, so the device manager stays
+   * usable; red is only a process that is gone.
+   *
+   * @returns true when everything runs
+   */
+  private get healthy(): boolean {
+    return (
+      this.expectedDevices > 0 && this.running.length === this.expectedDevices && this.discoveryUp && !this.bindMissing
+    );
+  }
+
+  /**
+   * Write {@link healthy} to `info.connection` — only on a change.
+   *
+   * @returns once the write landed (or nothing had to be written)
+   */
+  private updateConnection(): Promise<void> {
+    return this.writeIndicator("info.connection", this.healthy);
   }
 
   /**
@@ -280,13 +330,14 @@ export class Fakeroku extends utils.Adapter {
       }
 
       if (!configured || configured.length === 0) {
-        this.log.warn("No emulated Roku devices configured.");
+        // Yellow, not an exit: the device manager runs inside this process, and it is where a Roku is added.
+        this.log.error("No Roku device configured — add one in the instance settings (device manager)");
         await this.sweepOrphans(configured);
         return;
       }
 
       this.expectedDevices = configured.length;
-      await this.startDevices(configured);
+      const failures = await this.startDevices(configured);
       if (this.stopping) {
         return;
       }
@@ -294,29 +345,53 @@ export class Fakeroku extends utils.Adapter {
       if (this.stopping) {
         return;
       }
-
-      if (this.running.length === 0 && this.pending.length === 0) {
-        // Nothing is controllable and nothing is worth retrying — leave info.connection false.
-        this.log.error("No emulated Roku device could be started — check the configured names for conflicts.");
-        return;
-      }
-
-      const advertiseIp = this.bindIp ?? detectPrimaryIPv4();
+      this.reportFailures(failures);
       if (this.running.length > 0) {
-        if (advertiseIp) {
-          this.startDiscovery(advertiseIp);
-        } else {
-          // Without an IPv4 there is nothing to announce: discovery fails like any other start of it.
-          this.log.warn(
-            "SSDP discovery unavailable: the host has no IPv4 address — already-paired remotes still work.",
-          );
+        await this.startDiscovery();
+        if (this.stopping) {
+          return;
         }
+        const of = this.running.length < this.expectedDevices ? ` of ${this.expectedDevices}` : "";
+        const where = this.discoveryUp ? `advertising on ${this.advertisedAddresses()}` : "discovery unavailable";
+        this.log.info(`Emulating ${this.running.length}${of} Roku device(s), ${where}`);
       }
-      await this.reportConnectionState(advertiseIp);
-      this.scheduleDeviceRetry();
+      await this.updateConnection();
+      this.scheduleRetry();
     } catch (e) {
       this.log.error(`onReady failed: ${errText(e)}`);
     }
+  }
+
+  /**
+   * One line per Roku that does not run after the start — a warning while others run, and ONE error naming every Roku
+   * and its reason when none runs. The instance stays up either way: the device manager runs inside it.
+   *
+   * @param failures the Rokus that do not run, with their reasons
+   */
+  private reportFailures(failures: readonly DeviceFailure[]): void {
+    const retry = (f: DeviceFailure): string => (f.retried ? `; retrying every ${RETRY_INTERVAL_MS / 1000} s` : "");
+    if (failures.length > 0 && this.running.length === 0) {
+      const list = failures.map(f => `"${f.name}": ${f.reason}${retry(f)}`).join(" · ");
+      this.log.error(`No emulated Roku is running — ${list}`);
+      return;
+    }
+    for (const f of failures) {
+      this.log.warn(`Emulated Roku "${f.name}" is not running — ${f.reason}${retry(f)}`);
+    }
+  }
+
+  /**
+   * The addresses discovery announces: the chosen one, or the host's own in every network it joins.
+   *
+   * @returns the addresses, comma-separated
+   */
+  private advertisedAddresses(): string {
+    return (
+      this.bindIp ??
+      detectLocalIPv4s()
+        .map(m => m.address)
+        .join(", ")
+    );
   }
 
   /**
@@ -342,30 +417,34 @@ export class Fakeroku extends utils.Adapter {
    * real conflict, and without the retry the user has to restart the instance by hand.
    *
    * @param configured the normalised device rows
+   * @returns the devices that do not run, with their reasons — the caller writes the lines about them
    */
-  private async startDevices(configured: readonly DeviceRow[]): Promise<void> {
+  private async startDevices(configured: readonly DeviceRow[]): Promise<DeviceFailure[]> {
+    const failures: DeviceFailure[] = [];
     const seenIds = new Set<string>();
     for (const row of configured) {
       // The host said stop: nothing more may start, and nothing may land in the queue onUnload
       // just emptied.
       if (this.stopping) {
-        return;
+        return failures;
       }
       const deviceId = row.objectId;
       // Two configured names can sanitize to the same object id — the admin guards
       // against it, but a hand-edited config could still carry it. Skip the duplicate
       // instead of letting two devices fight over one object tree.
       if (seenIds.has(deviceId)) {
-        this.log.warn(`Emulated Roku "${row.name}" maps to an object id already in use (${deviceId}) — skipping it.`);
+        failures.push({ name: row.name, reason: `its object id ${deviceId} is already in use`, retried: false });
         continue;
       }
       // The dialog refuses these names, but native.devices is hand-editable. A
       // device called "info" would rewrite the adapter's own info channel into a
       // device object and hang its command/keys states under info.connection.
       if (RESERVED_IDS.has(deviceId)) {
-        this.log.warn(
-          `Emulated Roku "${row.name}" maps to the object id "${deviceId}", which the adapter reserves for its own status — skipping it.`,
-        );
+        failures.push({
+          name: row.name,
+          reason: `its object id "${deviceId}" is reserved for the adapter's own status`,
+          retried: false,
+        });
         continue;
       }
       seenIds.add(deviceId);
@@ -379,7 +458,7 @@ export class Fakeroku extends utils.Adapter {
       try {
         await this.createDeviceStates(deviceId, row.name, keys);
       } catch (e) {
-        this.log.warn(`Emulated Roku "${row.name}" could not be created: ${errText(e)} — skipping it.`);
+        failures.push({ name: row.name, reason: `its objects could not be created: ${errText(e)}`, retried: false });
         continue;
       }
       const device: DeviceRuntime = {
@@ -390,23 +469,25 @@ export class Fakeroku extends utils.Adapter {
         keys: new Set(keys),
       };
       this.devices.set(deviceId, device);
-      if (!(await this.startDeviceServer(device, "start")) && !this.stopping) {
+      const failed = await this.startDeviceServer(device);
+      if (failed !== null && !this.stopping) {
         this.pending.push(device);
+        failures.push({ name: row.name, reason: failed, retried: true });
       }
     }
+    return failures;
   }
 
   /**
    * Start one device's ECP server and register it as running.
    *
    * @param device the device to start
-   * @param phase whether this is the initial start (warn) or a retry (debug — the warning was written once)
-   * @returns true if the server is listening
+   * @returns null when the server listens, else why it does not
    */
-  private async startDeviceServer(device: DeviceRuntime, phase: "start" | "retry"): Promise<boolean> {
+  private async startDeviceServer(device: DeviceRuntime): Promise<string | null> {
     // The host said stop while this device's objects were being created: bind nothing.
     if (this.stopping) {
-      return false;
+      return "the adapter is stopping";
     }
     let server: EcpHttpServer | undefined;
     try {
@@ -417,7 +498,7 @@ export class Fakeroku extends utils.Adapter {
         bindIp: this.bindIp,
         logger: this.log,
         onCommand: cmd => this.applyCommand(device.id, cmd),
-        onFatalError: () => this.onEcpFatal(device),
+        onFatalError: err => this.onEcpFatal(device, err),
         isClientAllowed: this.isOwnClient,
       });
       await server.start();
@@ -425,46 +506,39 @@ export class Fakeroku extends utils.Adapter {
       // server to a device onUnload has already let go of — nothing would ever close it.
       if (this.stopping) {
         server.stop();
-        return false;
+        return "the adapter is stopping";
       }
       device.server = server;
       this.ssdp?.addDevice(device.advert);
-      if (phase === "retry") {
-        this.log.info(`Emulated Roku "${device.name}" is listening on port ${device.advert.port} again.`);
-      }
-      return true;
+      return null;
     } catch (e) {
       // One device's failure (a busy ECP port) must not take the others down.
       // Close whatever the failed start left behind, so nothing outlives this turn.
       server?.stop();
-      const detail = `${errText(e)} — retrying every ${DEVICE_RETRY_INTERVAL_MS / 1000} s`;
-      if (phase === "start") {
-        this.log.warn(`Emulated Roku "${device.name}" could not start on port ${device.advert.port}: ${detail}`);
-      } else {
-        this.log.debug(`Emulated Roku "${device.name}" still cannot start on port ${device.advert.port}: ${detail}`);
-      }
-      return false;
+      return listenFailure(e, device.advert.port);
     }
   }
 
-  /** Arm the retry timer while any device is still waiting for its port; a no-op otherwise. */
-  private scheduleDeviceRetry(): void {
-    if (this.retryTimer || this.pending.length === 0) {
+  /** Arm the retry timer while a device is down or discovery is; a no-op otherwise. */
+  private scheduleRetry(): void {
+    const discoveryWanted = this.running.length > 0 && !this.ssdp;
+    if (this.retryTimer || (this.pending.length === 0 && !discoveryWanted)) {
       return;
     }
     const timer = this.setTimeout(() => {
       this.retryTimer = undefined;
       void this.retryPendingDevices();
-    }, DEVICE_RETRY_INTERVAL_MS);
+    }, RETRY_INTERVAL_MS);
     if (timer) {
       this.retryTimer = timer;
     }
   }
 
   /**
-   * Try the devices that could not start yet. A port taken at boot is usually a restart
-   * race — the previous process still holds it — so this recovers on its own instead of
-   * leaving a dead device behind a red instance until someone restarts by hand.
+   * Try again what does not run: the devices whose server is down, then discovery. A port taken at boot is usually a
+   * restart race — the previous process still holds it — so this recovers on its own instead of leaving a dead device
+   * behind a yellow instance until someone restarts by hand. A retry that fails again says so on debug only; one that
+   * succeeds says so once on info.
    */
   private async retryPendingDevices(): Promise<void> {
     // The timer drops this call with `void`, so nothing may escape it: a rejection here — the
@@ -475,52 +549,58 @@ export class Fakeroku extends utils.Adapter {
       // same synchronous block, so a call that arrives afterwards finds nothing to do, and a
       // call already inside the loop is caught after the bind and again at the tail.
       const stillPending: DeviceRuntime[] = [];
-      let recovered = false;
       for (const device of this.pending) {
-        if (await this.startDeviceServer(device, "retry")) {
-          recovered = true;
+        const failed = await this.startDeviceServer(device);
+        if (failed === null) {
+          this.log.info(`Emulated Roku "${device.name}" is listening on port ${device.advert.port} again.`);
         } else {
+          this.log.debug(`Emulated Roku "${device.name}" still not running — ${failed}`);
           stillPending.push(device);
         }
       }
       if (this.stopping) {
         // The host said stop while we were binding. Assigning the list back would re-fill the
-        // queue onUnload just emptied, and scheduleDeviceRetry would then arm a new timer —
+        // queue onUnload just emptied, and scheduleRetry would then arm a new timer —
         // which js-controller refuses during shutdown, with a warning nobody can explain.
         return;
       }
       this.pending = stillPending;
-      if (recovered) {
-        // Discovery may never have started (every device failed at boot) — bring it up now.
-        const advertiseIp = this.bindIp ?? detectPrimaryIPv4();
-        if (advertiseIp && !this.ssdp) {
-          this.startDiscovery(advertiseIp);
+      // Discovery may never have started (every device failed at boot), or it went down.
+      if (this.running.length > 0 && !this.ssdp) {
+        await this.startDiscovery();
+        if (this.stopping) {
+          return;
         }
-        await this.reportConnectionState(advertiseIp);
       }
-      this.scheduleDeviceRetry();
+      await this.updateConnection();
+      this.scheduleRetry();
     } catch (e) {
-      this.log.warn(`Retrying the waiting emulated Rokus failed: ${errText(e)}`);
-      // No stopping check: onUnload empties the queue, and scheduleDeviceRetry arms nothing for
+      this.log.warn(`Retrying the emulated Rokus failed: ${errText(e)}`);
+      // No stopping check: onUnload empties the queue, and scheduleRetry arms nothing for
       // an empty one.
-      this.scheduleDeviceRetry();
+      this.scheduleRetry();
     }
   }
 
   /**
    * Start the SSDP responder for the devices that are listening.
    *
-   * Discovery is only an aid; the ECP servers already make the adapter controllable, so a
-   * busy port 1900 (or a stuck bind) degrades to "discovery off, already-paired remotes
-   * still work" instead of failing the whole start-up. In the auto case join every real
-   * interface and answer each network with the host's own address in it, so a multi-homed
-   * host is discoverable — and reachable — on all its LANs; a chosen interface pins
+   * Discovery is what lets a remote FIND an emulated Roku; a remote already paired keeps working without it. A busy port
+   * 1900, a stuck bind or a host without an IPv4 therefore leaves the Rokus running and the instance yellow, and the
+   * minute retry starts it again. In the auto case join every interface and answer each network with the host's own
+   * address in it, so a multi-homed host is discoverable — and reachable — on all its LANs; a chosen interface pins
    * membership, NOTIFY egress and every answer to itself.
-   *
-   * @param advertiseIp the routable IP to announce
    */
-  private startDiscovery(advertiseIp: string): void {
+  private async startDiscovery(): Promise<void> {
+    if (this.ssdp || this.stopping) {
+      return;
+    }
     const bindIp = this.bindIp;
+    const advertiseIp = bindIp ?? detectPrimaryIPv4();
+    if (!advertiseIp) {
+      this.discoveryFailed("the host has no IPv4 address");
+      return;
+    }
     const membershipInterfaces = bindIp
       ? [{ iface: detectLocalNets().find(net => net.address === bindIp)?.iface ?? bindIp, address: bindIp }]
       : detectLocalIPv4s();
@@ -534,35 +614,54 @@ export class Fakeroku extends utils.Adapter {
       // "All interfaces": every search is answered with the host's address in the searcher's own
       // network. A chosen interface answers with its address only (the responder uses bindIp).
       advertiseFor: bindIp ? undefined : remote => localAddressFor(remote, detectLocalNets()),
-      onFatalError: () => this.onSsdpFatal(),
+      onFatalError: err => this.onSsdpFatal(err),
     });
     this.ssdp = ssdp;
-    this.startWithTimeout(ssdp.start(), SSDP_START_TIMEOUT_MS).then(
-      () => {
-        // The bind resolved after the host asked us to stop: announcing now would put a
-        // device back into the network we just said goodbye to, and this.setInterval would
-        // refuse with "setInterval called, but adapter is shutting down".
-        if (this.stopping) {
-          ssdp.stop();
-          return;
-        }
-        ssdp.announce();
-        const timer = this.setInterval(() => this.announceTick(), SSDP_NOTIFY_INTERVAL_MS);
-        if (timer) {
-          this.notifyTimer = timer;
-        }
-      },
-      (e: unknown) => {
-        this.log.warn(
-          `SSDP discovery unavailable: ${errText(e)} — already-paired remotes still work; set the network interface if devices are not found.`,
-        );
-        // A start that only timed out can still bind later. Close it, or the socket
-        // outlives the reference dropped here and keeps answering with nobody to stop it.
-        ssdp.stop();
-        if (this.ssdp === ssdp) {
-          this.ssdp = undefined;
-        }
-      },
+    try {
+      await this.startWithTimeout(ssdp.start(), SSDP_START_TIMEOUT_MS);
+    } catch (e) {
+      // A start that only timed out can still bind later. Close it, or the socket
+      // outlives the reference dropped here and keeps answering with nobody to stop it.
+      ssdp.stop();
+      if (this.ssdp === ssdp) {
+        this.ssdp = undefined;
+      }
+      this.discoveryFailed(errText(e));
+      return;
+    }
+    // The bind resolved after the host asked us to stop: announcing now would put a
+    // device back into the network we just said goodbye to, and this.setInterval would
+    // refuse with "setInterval called, but adapter is shutting down".
+    if (this.stopping) {
+      ssdp.stop();
+      return;
+    }
+    this.discoveryUp = true;
+    if (this.discoveryDown) {
+      this.discoveryDown = false;
+      this.log.info("SSDP discovery is running again — remotes can find the emulated Rokus.");
+    }
+    ssdp.announce();
+    const timer = this.setInterval(() => this.announceTick(), SSDP_NOTIFY_INTERVAL_MS);
+    if (timer) {
+      this.notifyTimer = timer;
+    }
+  }
+
+  /**
+   * Discovery is down: one warning with the cause for the outage, its repeats on debug.
+   *
+   * @param cause why it is down
+   */
+  private discoveryFailed(cause: string): void {
+    this.discoveryUp = false;
+    if (this.discoveryDown) {
+      this.log.debug(`SSDP discovery still unavailable: ${cause}`);
+      return;
+    }
+    this.discoveryDown = true;
+    this.log.warn(
+      `SSDP discovery unavailable: ${cause} — paired remotes keep working, a new pairing does not; retrying every ${RETRY_INTERVAL_MS / 1000} s`,
     );
   }
 
@@ -583,33 +682,6 @@ export class Fakeroku extends utils.Adapter {
       }
     }
     this.ssdp?.announce();
-  }
-
-  /**
-   * Write info.connection and say in the log what the instance is doing.
-   *
-   * "Connected" means EVERY configured Roku is listening, not just some of them. A device
-   * whose port is taken (or whose name collides) is skipped with a warning naming it;
-   * reporting "connected" anyway would hide a broken configuration behind the devices that
-   * did come up, and the user would only find out when the remote stops working. Config rows
-   * without a usable name are filtered out before this point and deliberately do not count —
-   * every device that fails has said so in the log.
-   *
-   * @param advertiseIp the announced IP, for the log line
-   */
-  private async reportConnectionState(advertiseIp: string): Promise<void> {
-    const allStarted = this.running.length === this.expectedDevices;
-    await this.writeIndicator("info.connection", allStarted && !this.bindMissing);
-    // The retry path can hand in an empty address (detectPrimaryIPv4 found nothing), and
-    // "advertising on  (discovery off)" reads like a truncated line rather than a finding.
-    const where = `advertising on ${advertiseIp || "no routable IPv4"}${this.ssdp ? "" : " (discovery off)"}`;
-    if (allStarted) {
-      this.log.info(`Emulating ${this.running.length} Roku device(s), ${where}`);
-    } else {
-      this.log.error(
-        `Only ${this.running.length} of ${this.expectedDevices} configured Roku device(s) could be started, ${where} — fix the cause reported above; the instance stays disconnected until every device runs.`,
-      );
-    }
   }
 
   /**
@@ -979,22 +1051,20 @@ export class Fakeroku extends utils.Adapter {
   }
 
   /**
-   * One emulated Roku's ECP server died at runtime (a server error after a good
-   * start). That device answers nothing any more, so the instance is no longer
-   * "every configured Roku is listening" — revise the status instead of leaving a
-   * green instance behind a device that is gone, and stop announcing it, or discovery
-   * would keep pointing remotes at a port nobody serves. The other devices keep
-   * running, and the message names the one that failed.
-   *
-   * No retry here, deliberately: a port that was busy at boot is a restart race and
-   * heals; a server that died while running died for a reason this code does not know,
-   * and retrying it on a timer would be a log-flood generator.
+   * One emulated Roku's ECP server died at runtime (a server error after a good start, e.g. the host lost its network).
+   * That device answers nothing any more: the instance turns yellow, discovery stops pointing remotes at it, and the
+   * minute retry brings it back like a port that was busy at start-up. The other devices keep running, and the one
+   * line names the device and the cause.
    *
    * @param device the device whose server died
+   * @param err the server error
    */
-  private onEcpFatal(device: DeviceRuntime): void {
+  private onEcpFatal(device: DeviceRuntime, err: Error): void {
+    if (this.stopping) {
+      return;
+    }
     this.log.error(
-      `Emulated Roku "${device.name}" stopped answering after a server error — restart the instance to bring it back.`,
+      `Emulated Roku "${device.name}" stopped answering: ${errText(err)} — retrying every ${RETRY_INTERVAL_MS / 1000} s`,
     );
     // Close it before letting go of it: nothing else ever reaches it again, and in compact mode
     // the port would stay taken for the lifetime of the whole host process. stop() is
@@ -1002,25 +1072,37 @@ export class Fakeroku extends utils.Adapter {
     device.server?.stop();
     device.server = undefined;
     this.ssdp?.removeDevice(device.advert.uuid);
-    this.writeIndicator("info.connection", false).catch((e: unknown) => {
+    if (!this.pending.includes(device)) {
+      this.pending.push(device);
+    }
+    this.scheduleRetry();
+    this.updateConnection().catch((e: unknown) => {
       this.log.debug(`Connection state write failed: ${errText(e)}`);
     });
   }
 
   /**
-   * The SSDP responder died at runtime (a socket error after a good start). Stop
-   * announcing into the dead socket and drop the discovery aid. The ECP servers
-   * keep working, so info.connection — which reflects ECP readiness — stays true.
+   * The SSDP responder died at runtime (its socket closed after a good start). Stop announcing into the dead socket,
+   * close what is left of it, and let the minute retry start discovery again; the ECP servers keep working, the
+   * instance is yellow meanwhile.
+   *
+   * @param err why it died
    */
-  private onSsdpFatal(): void {
+  private onSsdpFatal(err: Error): void {
     if (this.notifyTimer) {
       this.clearInterval(this.notifyTimer);
       this.notifyTimer = undefined;
     }
+    this.ssdp?.stop();
     this.ssdp = undefined;
-    this.log.warn(
-      "SSDP discovery stopped after a socket error — already-paired remotes still work; restart the instance to re-enable discovery.",
-    );
+    if (this.stopping) {
+      return;
+    }
+    this.discoveryFailed(errText(err));
+    this.scheduleRetry();
+    this.updateConnection().catch((e: unknown) => {
+      this.log.debug(`Connection state write failed: ${errText(e)}`);
+    });
   }
 
   /**
