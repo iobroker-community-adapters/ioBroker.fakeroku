@@ -846,7 +846,7 @@ export class Fakeroku extends utils.Adapter {
     const states = await this.getStatesAsync(`${this.namespace}.*`);
     const prefix = `${this.namespace}.`;
     this.lastState.clear();
-    for (const [id, state] of Object.entries(states ?? {})) {
+    for (const [id, state] of Object.entries(states)) {
       if (state) {
         this.lastState.set(id.slice(prefix.length), { val: state.val, ack: state.ack, q: state.q });
       }

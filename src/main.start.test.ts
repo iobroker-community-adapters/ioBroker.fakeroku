@@ -529,6 +529,16 @@ describe("Fakeroku onReady — key states are released at start-up", () => {
     expect(ctx.i.states.get("Wohnzimmer.keys.Select")).toEqual({ val: false, ack: true });
   });
 
+  it("starts when the bulk read carries an empty entry", async () => {
+    // js-controller lists the keys first and reads the values after: a state that expired in
+    // between comes back as null, and reading val from it would end the start.
+    const ctx = setup();
+    ctx.i.states.set("Wohnzimmer.keys.Select", null as unknown as { val: unknown; ack: boolean });
+    await ctx.i.onReady();
+    expect(ctx.i.log.error).not.toHaveBeenCalled();
+    expect(ctx.i.states.get("info.connection")).toEqual({ val: true, ack: true });
+  });
+
   it("resets only the keys the device type actually carries", async () => {
     const ctx = setup({ devices: [{ name: "Wohnzimmer", port: 8060, type: "player" }] });
     ctx.i.states.set("Wohnzimmer.keys.Home", { val: true, ack: true });

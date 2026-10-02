@@ -103,6 +103,12 @@ describe("buildNativeKeyPatch", () => {
     expect(buildNativeKeyPatch({}, DROP_OLD)).toEqual({});
   });
 
+  it("never treats a drop as a rename, whatever the native keys are called", () => {
+    expect(buildNativeKeyPatch({ undefined: "x", pollInterval: 30 }, [{ drop: "pollInterval" }])).toEqual({
+      pollInterval: null,
+    });
+  });
+
   it("moves the old value to the new key and nulls the old key", () => {
     expect(buildNativeKeyPatch({ host: "192.168.1.10", bind: "0.0.0.0", port: 8080 }, HOST_TO_BIND)).toEqual({
       bind: "192.168.1.10",

@@ -116,6 +116,7 @@ describe("errText — the non-Error branches stay", () => {
     expect(errText(1n)).toBe("1");
     expect(errText(Symbol("q"))).toBe("Symbol(q)");
     expect(errText({ code: "ECONNRESET" })).toBe('{"code":"ECONNRESET"}');
+    expect(errText({ toJSON: () => undefined })).toBe("[object Object]");
     const cyc: Record<string, unknown> = {};
     cyc.self = cyc;
     expect(errText(cyc)).toBe("[object Object]");

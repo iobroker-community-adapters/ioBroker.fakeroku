@@ -1,6 +1,13 @@
 // Fleet master — the release run requires this file byte for byte in every adapter; change it in
 // Entwicklung/.consistency-master, never in an adapter.
-import { coveredBy, KnownObjects, type KnownObjectsAdapter, mergedWith, sameStructure } from "./known-objects";
+import {
+  coveredBy,
+  KnownObjects,
+  type KnownObjectsAdapter,
+  mergedWith,
+  sameStructure,
+  storedAfterSet,
+} from "./known-objects";
 
 describe("mergedWith — the merge of extendObject (node.extend, deep)", () => {
   it("merges plain objects key by key and leaves the stored object untouched", () => {
@@ -22,6 +29,34 @@ describe("mergedWith — the merge of extendObject (node.extend, deep)", () => {
     expect(mergedWith({ a: 1, b: 2 }, { a: null, b: undefined })).toEqual({ a: null, b: 2 });
     expect(mergedWith({ a: { x: 1 } }, { a: 5 })).toEqual({ a: 5 });
     expect(mergedWith({ a: 5 }, { a: { x: 1 } })).toEqual({ a: { x: 1 } });
+  });
+
+  it("skips an undefined array element and merges an object without a prototype like any plain object", () => {
+    expect(mergedWith([1, 2], [undefined, 3])).toEqual([1, 3]);
+    const bare = Object.assign(Object.create(null) as Record<string, unknown>, { a: 1 });
+    expect(mergedWith(bare, { b: 2 })).toEqual({ a: 1, b: 2 });
+  });
+});
+
+describe("storedAfterSet — what setForeignObject leaves in the database (js-controller 7.2.2)", () => {
+  it("returns a value that is not a plain object as it is", () => {
+    expect(storedAfterSet("demo.0.x", undefined, null)).toBeNull();
+  });
+
+  it("keeps the old recording of a state even when the new object has no common, and what follows it", () => {
+    const stored = { type: "state", common: { custom: { "history.0": { enabled: true } }, smartName: "Lamp" } };
+    expect(storedAfterSet("demo.0.x", stored, { type: "state" })).toEqual({
+      _id: "demo.0.x",
+      type: "state",
+      common: { custom: { "history.0": { enabled: true } }, smartName: "Lamp" },
+    });
+  });
+
+  it("drops a preserved setting when the new object has no common and no recording gives it one", () => {
+    expect(storedAfterSet("demo.0.x", { type: "state", common: { smartName: "Lamp" } }, { type: "state" })).toEqual({
+      _id: "demo.0.x",
+      type: "state",
+    });
   });
 });
 
@@ -120,6 +155,20 @@ describe("KnownObjects — read once, write only on a difference", () => {
     expect(known.get("dev.on")).toBeUndefined();
     expect(known.get("other")).toEqual({ type: "state", common: { name: "Other" } });
     expect(calls.filter(c => c[0] !== "list").map(c => `${c[0]} ${c[1]}`)).toEqual(["set demo.0.dev", "del dev"]);
+  });
+
+  it("skips a row without an object, and a delete without recursive keeps the children known", async () => {
+    const { adapter } = fakeAdapter([
+      { id: "demo.0.gone", value: null },
+      { id: "demo.0.dev", value: { type: "device", common: { name: "Dev" } } },
+      { id: "demo.0.dev.on", value: { type: "state", common: { name: "On" } } },
+    ]);
+    const known = new KnownObjects(adapter);
+    await known.load();
+    expect(known.get("gone")).toBeUndefined();
+    await known.remove("dev");
+    expect(known.get("dev")).toBeUndefined();
+    expect(known.get("dev.on")).toEqual({ type: "state", common: { name: "On" } });
   });
 
   it("does not rewrite a loaded object on restart — what the database stamps and keeps is not the adapter's", async () => {

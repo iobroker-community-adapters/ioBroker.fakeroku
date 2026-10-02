@@ -100,7 +100,8 @@ const PRESERVED_COMMON = ["custom", "smartName", "material", "habpanel", "mobile
  * `from`/`user`/`ts` (taken over from `stored` here, they change on every write and are not the adapter's content),
  * the objects database (`objectsInRedisClient.ts` `_setObject`) sets `_id`, keeps the old `acl` when the new object
  * has none, keeps each preserved common setting the new object leaves out (`custom` only for a state, and merged
- * attribute by attribute when both carry it) and deletes one set to `null`.
+ * attribute by attribute when both carry it) and deletes one set to `null`. A new object without `common` keeps a
+ * preserved setting only when the old `custom` gives it a `common` first.
  *
  * @param id the full id
  * @param stored the object before the write (undefined when unknown)
@@ -155,8 +156,9 @@ export function storedAfterSet(id: string, stored: unknown, obj: unknown): unkno
       } else if (common[key] === null) {
         delete common[key];
       } else if (before !== undefined && common[key] === undefined) {
+        // 7.2.2 puts it into a local `objCommon = objCommon || {}`: without a `common` of its own the object keeps
+        // the setting only when the custom step above attached one
         common[key] = structuredClone(before);
-        touched = true;
       }
     }
     if (touched) {
