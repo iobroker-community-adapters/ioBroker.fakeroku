@@ -155,10 +155,11 @@ ioBroker container with `network_mode: host`, or give it an address in your home
 network with a `macvlan` network. The adapter recognises Docker, libvirt, VirtualBox
 and WSL bridges on the host itself and does not announce them.
 
-**The log says "The network interface address … does not exist on this host".**
-The interface address chosen in the settings is not on the host any more — a new
-network card, a changed DHCP address, a restored backup on other hardware. Choose the
-current interface (or "all interfaces") and save; the instance restarts.
+**The log says "Address … does not exist on this host — listening on all addresses".**
+The address chosen in the settings is not on the host any more — a new network card, a
+changed DHCP address, a restored backup on other hardware. The emulated Rokus keep working
+on all addresses meanwhile, and the instance shows yellow. Choose the current address (or
+"all interfaces") and save; the instance restarts.
 
 **The instance stays "not connected".**
 At least one configured Roku could not start. The log names the device and its port —

@@ -32,14 +32,6 @@ const SSDP_START_TIMEOUT_MS = 5000;
 const SSDP_NOTIFY_INTERVAL_MS = 300_000;
 /** How long to wait before trying a device whose ECP port was busy at start-up again. */
 const DEVICE_RETRY_INTERVAL_MS = 60_000;
-/** How often a chosen interface address that is missing at start-up is looked for again. */
-const BIND_WAIT_STEP_MS = 10_000;
-/**
- * How long a missing chosen address is waited for. Long enough for a host whose network comes up
- * after ioBroker (Wi-Fi, DHCP, a restart after a power cut); after that the address is taken as
- * gone, and serving on another one would leave the network the user chose.
- */
-const BIND_WAIT_MAX_MS = 120_000;
 /** How often "all interfaces" looks for an address to start discovery with when it had none. */
 const DISCOVERY_RETRY_INTERVAL_MS = 60_000;
 
@@ -159,6 +151,8 @@ export class Fakeroku extends utils.Adapter {
   private expectedDevices = 0;
   /** The interface to bind to, or undefined for "all" — kept for the retry after onReady returned. */
   private bindIp: string | undefined;
+  /** The chosen address does not exist on this host: the adapter listens on all addresses instead and is not healthy. */
+  private bindMissing = false;
   /**
    * Device-manager backend: the emulated Rokus as cards with add/edit/delete.
    *
@@ -278,22 +272,15 @@ export class Fakeroku extends utils.Adapter {
       const configuredIp = this.config.bind;
       this.bindIp = configuredIp && configuredIp !== "0.0.0.0" ? configuredIp : undefined;
 
-      // A chosen interface is the user's decision: everything stays in its network. An address no
-      // interface carries cannot be served — and serving on another one would leave the network
-      // the user chose. It is waited for briefly (a host whose network comes up after ioBroker),
-      // then reported and nothing starts.
-      if (this.bindIp && !(await this.awaitBindAddress(this.bindIp))) {
-        if (this.stopping) {
-          return;
-        }
-        this.log.error(
-          `The network interface address ${this.bindIp} does not exist on this host — choose another network interface in the instance settings.`,
+      // A chosen interface is the user's decision: everything stays in its network. An address the host does not carry
+      // (a new address from the router, a restored backup on other hardware) cannot be served — then the Rokus listen on
+      // all addresses, so the remotes still find them, and the log says once what to fix.
+      if (this.bindIp && !hasLocalAddress(this.bindIp, detectLocalNets())) {
+        this.log.warn(
+          `Address ${this.bindIp} does not exist on this host — listening on all addresses; choose another address in the instance settings`,
         );
-        await this.sweepOrphans(configured);
-        return;
-      }
-      if (this.stopping) {
-        return;
+        this.bindIp = undefined;
+        this.bindMissing = true;
       }
 
       if (!configured || configured.length === 0) {
@@ -335,34 +322,6 @@ export class Fakeroku extends utils.Adapter {
       this.scheduleDeviceRetry();
     } catch (e) {
       this.log.error(`onReady failed: ${errText(e)}`);
-    }
-  }
-
-  /**
-   * Wait until an interface carries the chosen address — at most {@link BIND_WAIT_MAX_MS}, looking
-   * every {@link BIND_WAIT_STEP_MS}. Returns at once when the address is there (the normal case).
-   *
-   * @param address the chosen interface address
-   * @returns true once an interface carries it; false when it did not appear or the host said stop
-   */
-  private async awaitBindAddress(address: string): Promise<boolean> {
-    for (let waited = 0; ; waited += BIND_WAIT_STEP_MS) {
-      if (hasLocalAddress(address, detectLocalNets())) {
-        return true;
-      }
-      if (this.stopping || waited >= BIND_WAIT_MAX_MS) {
-        return false;
-      }
-      if (waited === 0) {
-        this.log.info(`Waiting for the network interface address ${address} to come up …`);
-      }
-      await new Promise<void>(resolve => {
-        // The managed timer refuses during shutdown and hands back nothing — then there is
-        // nothing to wait for.
-        if (!this.setTimeout(resolve, BIND_WAIT_STEP_MS)) {
-          resolve();
-        }
-      });
     }
   }
 
@@ -678,7 +637,7 @@ export class Fakeroku extends utils.Adapter {
    */
   private async reportConnectionState(advertiseIp: string): Promise<void> {
     const allStarted = this.running.length === this.expectedDevices;
-    await this.writeIndicator("info.connection", allStarted);
+    await this.writeIndicator("info.connection", allStarted && !this.bindMissing);
     // The retry path can hand in an empty address (detectPrimaryIPv4 found nothing), and
     // "advertising on  (discovery off)" reads like a truncated line rather than a finding.
     const where = `advertising on ${advertiseIp || "no routable IPv4"}${this.ssdp ? "" : " (discovery off)"}`;

@@ -32,7 +32,6 @@ import {
   type FakeSsdp,
   resetHarness,
   noAddressYet,
-  lastTimer,
   timerFor,
   stopWhenWriting,
   twoPlayers,
@@ -320,45 +319,6 @@ describe("Fakeroku — every stop point of the start", () => {
     expect(ctx.i.log.error).not.toHaveBeenCalled();
   });
 
-  it("stops while waiting for a chosen address, without the missing-address error", async () => {
-    noAddressYet();
-    const ctx = setup({ bind: "192.168.1.5" });
-    const ready = ctx.i.onReady();
-    await vi.waitFor(() => expect(ctx.i.setTimeout).toHaveBeenCalledWith(expect.any(Function), 10_000));
-    ctx.i.onUnload(() => {});
-    lastTimer(ctx)();
-    await ready;
-    expect(ctx.i.log.error).not.toHaveBeenCalled();
-    expect(ctx.ecp).toHaveLength(0);
-  });
-
-  it("stops when the chosen address came up during the stop", async () => {
-    noAddressYet();
-    const ctx = setup({ bind: "192.168.1.5" });
-    const ready = ctx.i.onReady();
-    await vi.waitFor(() => expect(ctx.i.setTimeout).toHaveBeenCalledWith(expect.any(Function), 10_000));
-    osMock.interfaces = {
-      eth0: [{ family: "IPv4", address: "192.168.1.5", internal: false, cidr: "192.168.1.5/24" }],
-    };
-    ctx.i.onUnload(() => {});
-    lastTimer(ctx)();
-    await ready;
-    expect(ctx.ecp).toHaveLength(0);
-    expect(ctx.i.log.error).not.toHaveBeenCalled();
-  });
-
-  it("does not wait when the host already refuses timers — the stop is under way", async () => {
-    noAddressYet();
-    const ctx = setup({ bind: "192.168.1.5" });
-    // js-controller hands back no handle once the adapter is shutting down.
-    ctx.i.setTimeout.mockImplementation(() => undefined as never);
-    const ready = ctx.i.onReady();
-    await vi.waitFor(() => expect(ctx.i.setTimeout).toHaveBeenCalled());
-    ctx.i.onUnload(() => {});
-    await ready;
-    expect(ctx.ecp).toHaveLength(0);
-  });
-
   it("stops after the devices started, before the sweep", async () => {
     const ctx = setup();
     stopWhenWriting(ctx, "Wohnzimmer.keys.Home");
@@ -402,20 +362,6 @@ describe("Fakeroku — stop points that only one guard covers", () => {
     });
     await ctx.i.onReady();
     expect(ctx.i.extendForeignObjectAsync).not.toHaveBeenCalled();
-  });
-
-  it("a stop while the chosen address comes up neither warns nor sweeps an empty list", async () => {
-    noAddressYet();
-    const ctx = setup({ bind: "192.168.1.5", devices: [] });
-    const ready = ctx.i.onReady();
-    await vi.waitFor(() => expect(ctx.i.setTimeout).toHaveBeenCalledWith(expect.any(Function), 10_000));
-    osMock.interfaces = {
-      eth0: [{ family: "IPv4", address: "192.168.1.5", internal: false, cidr: "192.168.1.5/24" }],
-    };
-    ctx.i.onUnload(() => {});
-    lastTimer(ctx)();
-    await ready;
-    expect(ctx.i.log.warn).not.toHaveBeenCalledWith(expect.stringContaining("No emulated Roku devices configured"));
   });
 
   it("a stop between two devices builds no tree for the second one", async () => {

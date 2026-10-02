@@ -165,11 +165,12 @@ ioBroker-Container mit `network_mode: host` oder gib ihm über ein `macvlan`-Net
 Adresse im Heimnetz. Brücken von Docker, libvirt, VirtualBox und WSL auf dem Rechner
 selbst erkennt der Adapter und kündigt sie nicht an.
 
-**Im Protokoll steht „The network interface address … does not exist on this host".**
+**Im Protokoll steht „Address … does not exist on this host — listening on all addresses".**
 Die in den Einstellungen gewählte Adresse gibt es auf dem Rechner nicht mehr — neue
 Netzwerkkarte, geänderte DHCP-Adresse, eine Sicherung auf anderer Hardware
-zurückgespielt. Wähle die aktuelle Schnittstelle (oder „alle Schnittstellen") und
-speichere; die Instanz startet neu.
+zurückgespielt. Die emulierten Rokus laufen solange auf allen Adressen weiter, die Instanz
+zeigt gelb. Wähle die aktuelle Adresse (oder „alle Schnittstellen") und speichere; die
+Instanz startet neu.
 
 **Die Instanz bleibt „nicht verbunden".**
 Mindestens ein konfigurierter Roku konnte nicht starten. Das Protokoll nennt Gerät

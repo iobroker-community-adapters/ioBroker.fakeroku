@@ -15,15 +15,7 @@ vi.mock("node:os", async importOriginal => {
   return { ...actual, default: { ...actual, networkInterfaces }, networkInterfaces };
 });
 
-import {
-  setup,
-  settle,
-  type Ctx,
-  resetHarness,
-  noAddressYet,
-  lastTimer,
-  timerFor,
-} from "../test/helpers/fakeroku-harness";
+import { setup, settle, type Ctx, resetHarness, noAddressYet, timerFor } from "../test/helpers/fakeroku-harness";
 import { osMock } from "../test/helpers/os-double";
 
 afterEach(resetHarness);
@@ -94,39 +86,36 @@ describe("Fakeroku onReady — network interface", () => {
     expect(ctx.ssdps).toHaveLength(0);
   });
 
-  it("a chosen address that shows up during the start-up wait is served", async () => {
-    // The network comes up a few seconds after ioBroker: the chosen address is looked for every
-    // 10 s instead of being given up on at once.
-    noAddressYet();
-    const ctx = setup({ bind: "192.168.1.5" });
-    const ready = ctx.i.onReady();
-    await vi.waitFor(() => expect(ctx.i.setTimeout).toHaveBeenCalledWith(expect.any(Function), 10_000));
-    expect(ctx.i.log.info).toHaveBeenCalledWith(expect.stringContaining("Waiting for the network interface address"));
-    osMock.interfaces = { eth0: [{ family: "IPv4", address: "192.168.1.5", internal: false, cidr: "192.168.1.5/24" }] };
-    lastTimer(ctx)();
-    await ready;
-    expect(ctx.ecp).toHaveLength(1);
-    expect(ctx.ecp[0].options.bindIp).toBe("192.168.1.5");
-  });
-
-  it("a chosen address that never shows up is reported — nothing starts, nothing falls back", async () => {
-    // Serving on another address would leave the network the user chose. After the start-up
-    // wait the address is taken as gone: a clear line, info.connection false, no retry.
+  it("a chosen address the host does not carry: listens on all addresses, says so once, not healthy", async () => {
+    // A new address from the router, a restored backup on other hardware: the remotes still find the Roku, and the
+    // log names what to fix.
     osMock.interfaces = { eth0: [{ family: "IPv4", address: "10.0.0.9", internal: false, cidr: "10.0.0.9/24" }] };
     const ctx = setup({ bind: "192.168.1.5" });
-    const ready = ctx.i.onReady();
-    for (let n = 0; n < 12; n++) {
-      await vi.waitFor(() => expect(ctx.i.setTimeout).toHaveBeenCalledTimes(n + 1));
-      lastTimer(ctx)();
-    }
-    await ready;
-    expect(ctx.i.log.error).toHaveBeenCalledWith(
-      expect.stringContaining("192.168.1.5 does not exist on this host — choose another network interface"),
+    await ctx.i.onReady();
+    expect(ctx.ecp).toHaveLength(1);
+    expect(ctx.ecp[0].options.bindIp).toBeUndefined();
+    expect(ctx.ssdps[0].options).toMatchObject({
+      bindIp: undefined,
+      membershipInterfaces: [{ iface: "eth0", address: "10.0.0.9" }],
+    });
+    const missing = ctx.i.log.warn.mock.calls.filter(([text]) =>
+      String(text).includes("Address 192.168.1.5 does not exist on this host — listening on all addresses"),
     );
-    expect(ctx.ecp).toHaveLength(0);
-    expect(ctx.ssdps).toHaveLength(0);
+    expect(missing).toHaveLength(1);
     expect(ctx.i.states.get("info.connection")).toEqual({ val: false, ack: true });
-    expect(ctx.i.setTimeout).toHaveBeenCalledTimes(12);
+    // The setting stays the user's — nothing rewrites it.
+    expect(ctx.i.instanceNative.bind).toBe("192.168.1.5");
+    // No search for the address any more.
+    expect(ctx.i.setTimeout).not.toHaveBeenCalledWith(expect.any(Function), 10_000);
+  });
+
+  it("with the chosen address missing, every own network counts — the trust boundary follows the fallback", async () => {
+    osMock.interfaces = { eth0: [{ family: "IPv4", address: "10.0.0.9", internal: false, cidr: "10.0.0.9/24" }] };
+    const ctx = setup({ bind: "192.168.1.5" });
+    await ctx.i.onReady();
+    const allowed = ctx.ecp[0].options.isClientAllowed as (a: string) => boolean;
+    expect(allowed("10.0.0.77")).toBe(true);
+    expect(allowed("192.168.1.77")).toBe(false);
   });
 
   it("ECP and discovery answer only the chosen interface's network", async () => {
@@ -309,29 +298,6 @@ describe("Fakeroku — the late discovery start (all interfaces, no address at f
     ctx.i.setState.mockImplementationOnce(() => Promise.reject(new Error("states db gone")));
     fire();
     await vi.waitFor(() => expect(ctx.i.log.warn).toHaveBeenCalledWith(expect.stringContaining("states db gone")));
-  });
-});
-
-describe("Fakeroku — waiting for the chosen address", () => {
-  it("says once that it waits, not every ten seconds", async () => {
-    noAddressYet();
-    const ctx = setup({ bind: "192.168.1.5" });
-    const ready = ctx.i.onReady();
-    const waits = (): (() => void)[] =>
-      ctx.i.setTimeout.mock.calls.filter(([, ms]) => ms === 10_000).map(([fn]) => fn as () => void);
-    await vi.waitFor(() => expect(waits()).toHaveLength(1));
-    waits()[0]();
-    await vi.waitFor(() => expect(waits()).toHaveLength(2));
-    osMock.interfaces = {
-      eth0: [{ family: "IPv4", address: "192.168.1.5", internal: false, cidr: "192.168.1.5/24" }],
-    };
-    waits()[1]();
-    await ready;
-    const said = ctx.i.log.info.mock.calls.filter(([text]) =>
-      String(text).includes("Waiting for the network interface"),
-    );
-    expect(said).toHaveLength(1);
-    expect(ctx.ecp).toHaveLength(1);
   });
 });
 
