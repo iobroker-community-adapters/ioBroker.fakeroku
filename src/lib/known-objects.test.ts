@@ -31,6 +31,11 @@ describe("mergedWith — the merge of extendObject (node.extend, deep)", () => {
     expect(mergedWith({ a: 5 }, { a: { x: 1 } })).toEqual({ a: { x: 1 } });
   });
 
+  it("takes a patch array whole where nothing or no array is stored", () => {
+    expect(mergedWith(undefined, ["a", "b"])).toEqual(["a", "b"]);
+    expect(mergedWith({ x: 1 }, ["a"])).toEqual(["a"]);
+  });
+
   it("skips an undefined array element and merges an object without a prototype like any plain object", () => {
     expect(mergedWith([1, 2], [undefined, 3])).toEqual([1, 3]);
     const bare = Object.assign(Object.create(null) as Record<string, unknown>, { a: 1 });
@@ -49,6 +54,47 @@ describe("storedAfterSet — what setForeignObject leaves in the database (js-co
       _id: "demo.0.x",
       type: "state",
       common: { custom: { "history.0": { enabled: true } }, smartName: "Lamp" },
+    });
+  });
+
+  it("merges a recording attribute by attribute: the new object's attribute wins, an attribute it leaves out stays", () => {
+    const stored = {
+      type: "state",
+      common: { custom: { "history.0": { enabled: true }, "influxdb.0": { enabled: true } } },
+    };
+    expect(
+      storedAfterSet("demo.0.x", stored, { type: "state", common: { custom: { "history.0": { enabled: false } } } }),
+    ).toEqual({
+      _id: "demo.0.x",
+      type: "state",
+      common: { custom: { "history.0": { enabled: false }, "influxdb.0": { enabled: true } } },
+    });
+  });
+
+  it("deletes a preserved setting the new object sets to null", () => {
+    const stored = { type: "state", common: { name: "a", smartName: "Lamp" } };
+    expect(storedAfterSet("demo.0.x", stored, { type: "state", common: { name: "a", smartName: null } })).toEqual({
+      _id: "demo.0.x",
+      type: "state",
+      common: { name: "a" },
+    });
+  });
+
+  it("on a first write keeps nothing old: no stamps, no acl, no preserved setting", () => {
+    expect(storedAfterSet("demo.0.x", undefined, { type: "state", common: { name: "a" }, from: "x", ts: 1 })).toEqual({
+      _id: "demo.0.x",
+      type: "state",
+      common: { name: "a" },
+    });
+  });
+
+  it("preserves nothing from a stored object whose common is not an object", () => {
+    expect(
+      storedAfterSet("demo.0.x", { type: "state", common: "broken" }, { type: "state", common: { name: "a" } }),
+    ).toEqual({
+      _id: "demo.0.x",
+      type: "state",
+      common: { name: "a" },
     });
   });
 

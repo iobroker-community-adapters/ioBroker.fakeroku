@@ -100,6 +100,20 @@ describe("errText — shapes of a cause", () => {
     expect(errText(new Error("x", { cause: new Error("") }))).toBe("x");
     expect(errText(new TypeError(""))).toBe("TypeError");
   });
+  it("a cause with an empty message says its code only when the code is text", () => {
+    expect(errText(new Error("x", { cause: Object.assign(new Error(""), { code: "ENOTFOUND" }) }))).toBe(
+      "x (ENOTFOUND)",
+    );
+    expect(errText(new Error("x", { cause: Object.assign(new Error(""), { code: 42 }) }))).toBe("x");
+  });
+  it("a cause whose message is not text falls back to its code, else adds nothing", () => {
+    const coded = Object.assign(new Error("y"), { code: "ECONNRESET" });
+    Object.defineProperty(coded, "message", { value: 42 });
+    expect(errText(new Error("x", { cause: coded }))).toBe("x (ECONNRESET)");
+    const bare = new Error("y");
+    Object.defineProperty(bare, "message", { value: 42 });
+    expect(errText(new Error("x", { cause: bare }))).toBe("x");
+  });
   it("a cause that is an empty-message AggregateError says its code", () => {
     const agg = Object.assign(new AggregateError([], ""), {
       code: "ECONNREFUSED",
