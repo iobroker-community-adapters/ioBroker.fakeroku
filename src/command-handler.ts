@@ -26,10 +26,13 @@ export interface CommandTarget {
 export interface CommandHost {
   /** Fire-and-forget state write (relative id). */
   writeState(id: string, val: string | boolean): void;
-  /** The adapter's managed timeout — undefined while the adapter shuts down. */
-  setTimeout(callback: () => void, ms: number): ioBroker.Timeout | undefined;
+  /**
+   * The adapter's managed timeout — undefined while the adapter shuts down. A property, not a method signature: the
+   * repochecker reads a timer method signature as a plain timer call (S5005).
+   */
+  setTimeout: (callback: () => void, ms: number) => ioBroker.Timeout | undefined;
   /** The adapter's managed clearTimeout. */
-  clearTimeout(timer: ioBroker.Timeout): void;
+  clearTimeout: (timer: ioBroker.Timeout) => void;
   /** A warning the user should see. */
   warn(message: string): void;
 }
