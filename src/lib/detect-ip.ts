@@ -1,4 +1,4 @@
-import { BlockList, isIPv4, isIPv6 } from "node:net";
+import { BlockList, isIPv6 } from "node:net";
 import { networkInterfaces, type NetworkInterfaceInfo } from "node:os";
 
 /** The OS network-interface map (the `os.networkInterfaces()` shape). */
@@ -219,16 +219,12 @@ export function localAddressFor(remote: string, nets: readonly LocalNet[]): stri
  */
 export function inNet(address: string, net: LocalNet): boolean {
   const ip = address.split("%")[0];
-  const type = isIPv4(ip) ? "ipv4" : isIPv6(ip) ? "ipv6" : undefined;
-  if (!type) {
-    return false;
-  }
   try {
     const list = new BlockList();
     list.addSubnet(net.address, net.prefixLength, net.family === "IPv4" ? "ipv4" : "ipv6");
-    return list.check(ip, type);
+    return list.check(ip, isIPv6(ip) ? "ipv6" : "ipv4");
   } catch {
-    // A network the OS reported in a form the check refuses holds no address.
+    // An address or a network in a form the check refuses: nothing lies in it.
     return false;
   }
 }
