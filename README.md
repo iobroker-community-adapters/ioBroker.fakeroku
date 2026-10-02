@@ -103,6 +103,7 @@ becomes `true` — or watch `.command` for the last button as text.
 	Placeholder for the next version (at the beginning of the line):
 	### **WORK IN PROGRESS**
 -->
+
 ### 1.8.2 (2026-10-02)
 
 - (krobipd) Changed: a new instance starts switched off — check the settings, then switch it on.
