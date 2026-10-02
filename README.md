@@ -109,7 +109,7 @@ becomes `true` — or watch `.command` for the last button as text.
 - (krobipd) Changed: a new instance starts switched off — check the settings, then switch it on.
 - (krobipd) Fixed: the README and the user documentation name admin 8.0.14, the version the adapter actually requires.
 - (krobipd) Fixed: the device manager answers right after a restart instead of failing until the translations are loaded.
-- (krobipd) Improved: `commandType` shows the kind of the last command as a label in the system language instead of its protocol word.
+- (krobipd) Improved: the type of the last command shows a readable label in the language you set instead of a protocol word.
 - (krobipd) Improved: a start writes only datapoints that changed and reads the key states in one request — no needless updates for history adapters.
 - (krobipd) Improved: the README links the detailed user documentation in English and German.
 
