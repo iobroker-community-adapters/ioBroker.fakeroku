@@ -1,4 +1,4 @@
-// Guard of F-04 (krobi 2026-09-03 08:52, "dann mach das so, bau es ein"): fakeroku takes commands and searches only from
+// Guard of F-04 (krobi 2026-09-03 08:52, "then do it that way, build it in"): fakeroku takes commands and searches only from
 // its own networks — over IPv6 too, with an address from the own network; everything else stays out. Checked where
 // fakeroku hands the rule to its ECP server (commands) and its SSDP responder (searches). Sealed in the register — a
 // change goes through the Werkbank.

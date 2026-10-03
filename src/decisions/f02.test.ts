@@ -1,4 +1,4 @@
-// Guard of F-02 (krobi 2026-09-01 23:10, "1. würde ich sagen lassen"): two presses of the same key within 50 ms stay as
+// Guard of F-02 (krobi 2026-09-01 23:10, "1. I'd say leave it"): two presses of the same key within 50 ms stay as
 // they are — the second press does not re-arm or lengthen the pulse; the first release still ends it. Sealed in the
 // register — a change goes through the Werkbank.
 import { describe, expect, it } from "vitest";

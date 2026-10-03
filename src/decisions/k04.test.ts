@@ -1,4 +1,4 @@
-// Guard of K4 (krobi 2026-10-03 00:02, "dann muss man ihnen jetzt einen zuteilen, sonst hat man murx"): a device from
+// Guard of K4 (krobi 2026-10-03 00:02, "then they have to be given one now, otherwise it's a mess"): a device from
 // before 0.7.0 without a type gets it written into the settings ONCE — read from its tree (TV keys there make it a TV);
 // no later start derives it again. Sealed in the register — a change goes through the Werkbank.
 import { describe, expect, it, vi } from "vitest";
