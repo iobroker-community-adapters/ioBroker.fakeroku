@@ -17,6 +17,36 @@ Roku-Emulator im LAN: eine Logitech Harmony (höchstens noch eine Sofabaton) fin
 - **`ecp/device-info.ts`** — Profile Player/TV, `SOFTWARE_VERSION`, `DEFAULT_APPS`, die Abfrage-Antworten. **`ecp/ecp-command.ts`** — Parser POST-URL → `CommandEvent`. **`ecp/state-model.ts`** — `BASE_KEYS` + `TV_KEYS`, `canonicalKey`, `commandToStateWrite`.
 - **`lib/`** — `device-config` (EINE Lesestelle für `native.devices`, feste `objectId`), `device-identity`, `detect-ip` (Beitritte, Erstadresse, Adresse im Netz des Suchenden — auf dem Master), `rate-gate`, `log-throttle`, `object-cleanup`, `pure-helpers`, `constants` (`LANGUAGES`, `instanceObjectId`, `RESERVED_IDS`), `i18n`, `logger`; Flotten-Master byte-gleich: `err-text`, `known-objects`, `native-key-migration`, `network-address`; dazu `test/network-hook.js`.
 
+<!-- core-decisions:begin (generated from the sealed register — change only through the Werkbank) -->
+
+## Core decisions (sealed)
+
+krobi's decisions for this adapter. The register with his verbatim words lives in the locked Werkbank tool tree; a change is a request to the Werkbank, never an edit here. Each guarded rule has a test under `src/decisions/`.
+
+- **F-00** fakeroku provides a virtual Roku that a remote such as Logitech Harmony finds; there one puts Roku keys on own buttons and triggers ioBroker scripts with them. Beyond that at most Sofabaton, for which there may be more functions. No Home Assistant, no invented cases.
+- **F-01** Every emulated Roku has a rate limit for commands; what goes beyond it is dropped.
+- **F-02** Two presses of the same key within 50 ms stay as they are: the second pulse is not lengthened.
+- **F-03** The symbol is the existing admin/fakeroku.svg, for icon, extIcon and the README head; it is not drawn anew.
+- **F-04** fakeroku accepts commands and searches only from its own networks, over IPv6 too with an address from the own network; everything else stays out.
+- **F-07** The app list stays fixed; fakeroku does not become a dynamic adapter with apps to set.
+- **F-08** Green means everything runs. Yellow means something is wrong and a part runs. Red means nothing runs. Every problem gets one log line with its likely cause when it first occurs, repeats only at debug, and one info line when it works again. No Roku configured or none running: yellow with one error line (with no Roku, the request to add a device), the instance keeps running. There is no datapoint per Roku.
+- **F-09** The ECP port is a free field per Roku, default 8060; there is no automatic assignment.
+- **F-11** Every emulated Roku is either a player or a TV; only the TV has the keys for volume, power, channel and input.
+- **K2** A Roku keeps its identity when renamed; the remote does not have to learn it again.
+- **K3** A Roku's object id is fixed; renaming changes only the displayed name.
+- **K4** A device without a type (from a version before 0.7.0) gets its type written into the settings once, derived from its existing tree (TV keys make it a TV).
+- **K5** The old settings of the 2017 adapter in the instance object (`HTTP_PORT`, `MULTICAST_IP`, `UUID`, `BIND`, `license`, `singletonHost`) are removed in one write; identity and bind address are carried over.
+- **K7** The cards in the device manager carry the Roku's identity as their id.
+- **K9** Held keys have a 30-second watchdog; the release never runs into the rate limit.
+- **K10** Key states are set to false at the start, only where they are not false already.
+- **K13** Deleting a Roku in the device manager asks first; afterwards its datapoints are gone.
+- **K18** The queries a Harmony and a Sofabaton make are answered: device info and app list.
+- **K19** UDP 1900 is shared: several Rokus and instances per host.
+- **K20** The device dialog blocks “OK” while name or port collide and names the reason.
+- **K21** 25 commands per second and Roku, at most one warning per minute naming the device.
+
+<!-- core-decisions:end -->
+
 ## Design-Entscheidungen
 
 _Jede Entscheidung steht hier als Regel-Satz; Beleg, Messung und Verlauf stehen in `.claude/dev-history.md` (dort auch der frühere Wortlaut dieses Registers, Eintrag 2026-10-01)._

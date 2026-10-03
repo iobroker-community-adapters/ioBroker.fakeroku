@@ -62,7 +62,8 @@ const byHook = () => {
   }
   return hook;
 };
-const record = (entry, hook = byHook()) => fs.appendFileSync(log, `${JSON.stringify(hook ? { ...entry, hook } : entry)}\n`);
+const record = (entry, hook = byHook()) =>
+  fs.appendFileSync(log, `${JSON.stringify(hook ? { ...entry, hook } : entry)}\n`);
 const ids = new WeakMap();
 let nextId = 0;
 const idOf = socket => {
@@ -76,7 +77,9 @@ const refused = () => Object.assign(new Error("connect ECONNREFUSED (outage swit
 const reset = () => Object.assign(new Error("read ECONNRESET (outage switch)"), { code: "ECONNRESET" });
 const optionsOf = args => {
   const first = Array.isArray(args[0]) ? args[0][0] : args[0];
-  return first && typeof first === "object" ? first : { port: first, host: typeof args[1] === "string" ? args[1] : undefined };
+  return first && typeof first === "object"
+    ? first
+    : { port: first, host: typeof args[1] === "string" ? args[1] : undefined };
 };
 
 // Outgoing TCP and TLS (TLS opens its socket through net): http, MQTT clients, and undici behind fetch.
@@ -93,7 +96,12 @@ function cutConnect(...args) {
     return result;
   }
   if (opts.path === undefined) {
-    record({ kind: "connect", host: opts.host ?? "localhost", port: Number(opts.port), localAddress: opts.localAddress });
+    record({
+      kind: "connect",
+      host: opts.host ?? "localhost",
+      port: Number(opts.port),
+      localAddress: opts.localAddress,
+    });
   }
   track(this);
   if (down()) {
@@ -133,7 +141,8 @@ net.Server.prototype.emit = cutServerEmit;
 
 // fetch: wrapped at the call, so a fixture hook that assigns globalThis.fetch is cut as well.
 let current = globalThis.fetch;
-const cutFetch = (...args) => (down() ? Promise.reject(new TypeError("fetch failed", { cause: refused() })) : current(...args));
+const cutFetch = (...args) =>
+  down() ? Promise.reject(new TypeError("fetch failed", { cause: refused() })) : current(...args);
 function getFetch() {
   return current && cutFetch;
 }
@@ -206,7 +215,8 @@ function replaced() {
   if (Object.getOwnPropertyDescriptor(globalThis, "fetch")?.get !== getFetch) out.push("globalThis.fetch");
   if (dgram.Socket.prototype.bind !== recordBind) out.push("dgram.Socket.prototype.bind");
   if (dgram.Socket.prototype.addMembership !== recordJoin) out.push("dgram.Socket.prototype.addMembership");
-  if (dgram.Socket.prototype.setMulticastInterface !== recordEgress) out.push("dgram.Socket.prototype.setMulticastInterface");
+  if (dgram.Socket.prototype.setMulticastInterface !== recordEgress)
+    out.push("dgram.Socket.prototype.setMulticastInterface");
   if (dgram.Socket.prototype.send !== cutSend) out.push("dgram.Socket.prototype.send");
   if (dgram.Socket.prototype.emit !== cutEmit) out.push("dgram.Socket.prototype.emit");
   return out;
