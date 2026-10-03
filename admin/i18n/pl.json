@@ -27,7 +27,7 @@
   "donatePaypal": "PayPal",
   "channelInfo": "Informacje o adapterze",
   "connectionStatus": "Stan połączenia",
-  "connectionStatusDesc": "Prawda tylko wtedy, gdy każdy skonfigurowany emulowany Roku faktycznie nasłuchuje.",
+  "connectionStatusDesc": "Prawda tylko wtedy, gdy wszystko działa: każdy skonfigurowany emulowany Roku nasłuchuje, wykrywanie odpowiada, a wybrany adres istnieje.",
   "stateLastCommand": "Ostatnie polecenie",
   "stateLastCommandDesc": "Najnowsze polecenie odebrane przez ten emulowany Roku, jako zwykły tekst.",
   "channelKeys": "Klawisze pilota",

@@ -42,17 +42,17 @@
       "write": false,
       "def": false,
       "desc": {
-        "en": "True only while every configured emulated Roku is actually listening.",
-        "de": "Nur wahr, solange jeder konfigurierte emulierte Roku tatsächlich lauscht.",
-        "ru": "Истина только пока каждый настроенный эмулированный Roku действительно слушает.",
-        "pt": "Verdadeiro apenas enquanto todos os Roku emulados configurados estiverem realmente à escuta.",
-        "nl": "Alleen waar zolang elke geconfigureerde geëmuleerde Roku daadwerkelijk luistert.",
-        "fr": "Vrai uniquement tant que chaque Roku émulé configuré est réellement à l'écoute.",
-        "it": "Vero solo finché ogni Roku emulato configurato è effettivamente in ascolto.",
-        "es": "Verdadero solo mientras cada Roku emulado configurado esté realmente a la escucha.",
-        "pl": "Prawda tylko wtedy, gdy każdy skonfigurowany emulowany Roku faktycznie nasłuchuje.",
-        "uk": "Істина лише поки кожен налаштований емульований Roku справді слухає.",
-        "zh-cn": "仅当每个已配置的模拟 Roku 都在监听时才为真。"
+        "en": "True only while everything runs: every configured emulated Roku listens, discovery answers and the chosen address exists.",
+        "de": "Nur wahr, solange alles läuft: jeder konfigurierte emulierte Roku lauscht, die Erkennung antwortet und die gewählte Adresse existiert.",
+        "ru": "Истина только пока всё работает: каждый настроенный эмулированный Roku слушает, обнаружение отвечает и выбранный адрес существует.",
+        "pt": "Verdadeiro apenas enquanto tudo funciona: cada Roku emulado configurado está à escuta, a descoberta responde e o endereço escolhido existe.",
+        "nl": "Alleen waar zolang alles draait: elke geconfigureerde geëmuleerde Roku luistert, de detectie antwoordt en het gekozen adres bestaat.",
+        "fr": "Vrai uniquement tant que tout fonctionne : chaque Roku émulé configuré écoute, la découverte répond et l'adresse choisie existe.",
+        "it": "Vero solo finché tutto funziona: ogni Roku emulato configurato è in ascolto, il rilevamento risponde e l'indirizzo scelto esiste.",
+        "es": "Verdadero solo mientras todo funciona: cada Roku emulado configurado escucha, la detección responde y la dirección elegida existe.",
+        "pl": "Prawda tylko wtedy, gdy wszystko działa: każdy skonfigurowany emulowany Roku nasłuchuje, wykrywanie odpowiada, a wybrany adres istnieje.",
+        "uk": "Істина лише поки все працює: кожен налаштований емульований Roku слухає, виявлення відповідає і вибрана адреса існує.",
+        "zh-cn": "仅当一切正常运行时才为真：每个已配置的模拟 Roku 都在监听、发现服务有应答且所选地址存在。"
       }
     },
     "native": {}

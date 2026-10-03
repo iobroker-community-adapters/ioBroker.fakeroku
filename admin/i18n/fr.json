@@ -27,7 +27,7 @@
   "donatePaypal": "PayPal",
   "channelInfo": "Informations sur l'adaptateur",
   "connectionStatus": "État de la connexion",
-  "connectionStatusDesc": "Vrai uniquement tant que chaque Roku émulé configuré est réellement à l'écoute.",
+  "connectionStatusDesc": "Vrai uniquement tant que tout fonctionne : chaque Roku émulé configuré écoute, la découverte répond et l'adresse choisie existe.",
   "stateLastCommand": "Dernière commande",
   "stateLastCommandDesc": "La commande la plus récente reçue par ce Roku émulé, en texte brut.",
   "channelKeys": "Touches de la télécommande",

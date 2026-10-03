@@ -27,7 +27,7 @@
   "donatePaypal": "PayPal",
   "channelInfo": "Інформація про адаптер",
   "connectionStatus": "Стан з'єднання",
-  "connectionStatusDesc": "Істина лише поки кожен налаштований емульований Roku справді слухає.",
+  "connectionStatusDesc": "Істина лише поки все працює: кожен налаштований емульований Roku слухає, виявлення відповідає і вибрана адреса існує.",
   "stateLastCommand": "Остання команда",
   "stateLastCommandDesc": "Найновіша команда, яку отримав цей емульований Roku, у вигляді тексту.",
   "channelKeys": "Кнопки пульта",

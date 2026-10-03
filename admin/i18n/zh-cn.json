@@ -27,7 +27,7 @@
   "donatePaypal": "PayPal",
   "channelInfo": "适配器信息",
   "connectionStatus": "连接状态",
-  "connectionStatusDesc": "仅当每个已配置的模拟 Roku 都在监听时才为真。",
+  "connectionStatusDesc": "仅当一切正常运行时才为真：每个已配置的模拟 Roku 都在监听、发现服务有应答且所选地址存在。",
   "stateLastCommand": "最后一条命令",
   "stateLastCommandDesc": "该模拟 Roku 最近收到的命令，以纯文本表示。",
   "channelKeys": "遥控器按键",

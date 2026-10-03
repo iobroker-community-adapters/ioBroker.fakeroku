@@ -27,7 +27,7 @@
   "donatePaypal": "PayPal",
   "channelInfo": "Informação do adaptador",
   "connectionStatus": "Estado da ligação",
-  "connectionStatusDesc": "Verdadeiro apenas enquanto todos os Roku emulados configurados estiverem realmente à escuta.",
+  "connectionStatusDesc": "Verdadeiro apenas enquanto tudo funciona: cada Roku emulado configurado está à escuta, a descoberta responde e o endereço escolhido existe.",
   "stateLastCommand": "Último comando",
   "stateLastCommandDesc": "O comando mais recente recebido por este Roku emulado, em texto simples.",
   "channelKeys": "Teclas do comando",

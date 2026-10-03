@@ -101,6 +101,10 @@ becomes `true` — or watch `.command` for the last button as text.
 	### **WORK IN PROGRESS**
 -->
 
+### **WORK IN PROGRESS**
+
+- (krobipd) Fixed: the connection datapoint's description says what green means — every Roku listening, discovery answering and the chosen address present.
+
 ### 1.9.0 (2026-10-03)
 
 - (krobipd) Changed: the emulated Roku answers only what a Harmony or Sofabaton reads — Home Assistant and openHAB can no longer set it up.

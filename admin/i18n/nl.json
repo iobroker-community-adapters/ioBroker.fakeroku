@@ -27,7 +27,7 @@
   "donatePaypal": "PayPal",
   "channelInfo": "Adapterinformatie",
   "connectionStatus": "Verbindingsstatus",
-  "connectionStatusDesc": "Alleen waar zolang elke geconfigureerde geëmuleerde Roku daadwerkelijk luistert.",
+  "connectionStatusDesc": "Alleen waar zolang alles draait: elke geconfigureerde geëmuleerde Roku luistert, de detectie antwoordt en het gekozen adres bestaat.",
   "stateLastCommand": "Laatste opdracht",
   "stateLastCommandDesc": "De meest recente opdracht die deze geëmuleerde Roku ontving, als platte tekst.",
   "channelKeys": "Afstandsbedieningstoetsen",
