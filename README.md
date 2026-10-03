@@ -100,8 +100,7 @@ becomes `true` — or watch `.command` for the last button as text.
 	Placeholder for the next version (at the beginning of the line):
 	### **WORK IN PROGRESS**
 -->
-
-### **WORK IN PROGRESS**
+### 1.9.0 (2026-10-03)
 
 - (krobipd) Changed: the emulated Roku answers only what a Harmony or Sofabaton reads — Home Assistant and openHAB can no longer set it up.
 - (krobipd) Changed: the instance shows green only while every Roku and discovery run, and yellow otherwise.
@@ -140,16 +139,6 @@ becomes `true` — or watch `.command` for the last button as text.
 ### 1.7.1 (2026-09-16) — stable
 
 - (krobipd) Changed: the instance restarts once after this update to clear a setting left behind by an older version; nothing else changes for you.
-
-### 1.7.0 (2026-09-16)
-
-- (krobipd) Fixed: button datapoints keep their value and their room and function assignment when the adapter starts.
-- (krobipd) Fixed: after an emulated Roku drops out, its port is free again instead of staying blocked until ioBroker restarts.
-- (krobipd) Fixed: stopping the instance no longer leaves it reported as connected.
-- (krobipd) Fixed: a key you hold right after a short press stays pressed instead of being released early.
-- (krobipd) Fixed: the device dialog now also refuses a name that would collide with an existing device in the object tree.
-- (krobipd) Improved: after the host gets a new IP address, remotes find the emulated Rokus again without restarting the instance.
-- (krobipd) Changed: the network interface setting moved to the standard settings key (bind); the instance restarts once after this update.
 
 [Older changelogs can be found there](CHANGELOG_OLD.md)
 

@@ -1,4 +1,13 @@
 # Older changes
+## 1.7.0 (2026-09-16)
+
+- (krobipd) Fixed: button datapoints keep their value and their room and function assignment when the adapter starts.
+- (krobipd) Fixed: after an emulated Roku drops out, its port is free again instead of staying blocked until ioBroker restarts.
+- (krobipd) Fixed: stopping the instance no longer leaves it reported as connected.
+- (krobipd) Fixed: a key you hold right after a short press stays pressed instead of being released early.
+- (krobipd) Fixed: the device dialog now also refuses a name that would collide with an existing device in the object tree.
+- (krobipd) Improved: after the host gets a new IP address, remotes find the emulated Rokus again without restarting the instance.
+- (krobipd) Changed: the network interface setting moved to the standard settings key (bind); the instance restarts once after this update.
 
 ## 1.6.1 (2026-09-07) — stable
 
