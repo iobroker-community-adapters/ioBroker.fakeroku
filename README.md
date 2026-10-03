@@ -105,6 +105,7 @@ becomes `true` — or watch `.command` for the last button as text.
 	Placeholder for the next version (at the beginning of the line):
 	### **WORK IN PROGRESS**
 -->
+
 ### 1.10.0 (2026-10-03)
 
 - (krobipd) New: every emulated Roku shows whether it runs and, if not, why — a green or grey symbol in the object tree, online or offline on its card with the reason.
