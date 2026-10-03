@@ -80,19 +80,6 @@
         "pl": "Punkty danych przycisków zachowują swoją wartość oraz przypisanie do pomieszczenia i funkcji, a instancja uruchamia się raz ponownie zaraz po tej aktualizacji.",
         "uk": "Точки даних кнопок зберігають значення та прив'язку до кімнати й функції, а екземпляр один раз перезапускається одразу після цього оновлення.",
         "zh-cn": "按键数据点保留其数值以及房间和功能分配，实例会在本次更新后自动重启一次。"
-      },
-      "1.6.1": {
-        "en": "Installing straight from GitHub is no longer offered: the adapter is built before publishing, so it is installed from the ioBroker repository instead.",
-        "de": "Die Installation direkt von GitHub wird nicht mehr angeboten: Der Adapter wird vor der Veröffentlichung gebaut und kommt daher aus dem ioBroker-Repository.",
-        "ru": "Установка напрямую с GitHub больше не предлагается: адаптер собирается перед публикацией и поэтому устанавливается из репозитория ioBroker.",
-        "pt": "A instalação diretamente do GitHub deixou de ser oferecida: o adaptador é compilado antes da publicação e por isso é instalado a partir do repositório ioBroker.",
-        "nl": "Installeren rechtstreeks vanaf GitHub wordt niet meer aangeboden: de adapter wordt vóór publicatie gebouwd en komt daarom uit de ioBroker-repository.",
-        "fr": "L’installation directe depuis GitHub n’est plus proposée : l’adaptateur est compilé avant publication et s’installe donc depuis le dépôt ioBroker.",
-        "it": "L’installazione diretta da GitHub non è più proposta: l’adattatore viene compilato prima della pubblicazione e quindi si installa dal repository ioBroker.",
-        "es": "La instalación directa desde GitHub ya no se ofrece: el adaptador se compila antes de publicarse y por eso se instala desde el repositorio de ioBroker.",
-        "pl": "Instalacja bezpośrednio z GitHuba nie jest już oferowana: adapter jest budowany przed publikacją, dlatego instaluje się go z repozytorium ioBroker.",
-        "uk": "Встановлення безпосередньо з GitHub більше не пропонується: адаптер збирається перед публікацією, тому встановлюється з репозиторію ioBroker.",
-        "zh-cn": "不再提供直接从 GitHub 安装：适配器在发布前完成构建，因此请从 ioBroker 仓库安装。"
       }
     },
     "titleLang": {
