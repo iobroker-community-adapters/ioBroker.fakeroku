@@ -42,6 +42,9 @@ describe("Fakeroku onReady — network interface", () => {
       const ctx = setup({ bind: value });
       await ctx.i.onReady();
       expect(ctx.ecp[0].options.bindIp, value).toBeUndefined();
+      // "Every address" is a choice of its own, not a missing address: green, and no line about it.
+      expect(ctx.i.log.warn, value).not.toHaveBeenCalledWith(expect.stringContaining("does not exist on this host"));
+      expect(ctx.i.states.get("info.connection"), value).toEqual({ val: true, ack: true });
       expect(ctx.ssdps[0].options.advertiseIp, value).toBe("192.168.1.20");
       // Multi-homed: joining only one interface makes the emulator invisible on
       // the other LAN.

@@ -126,7 +126,7 @@ function recordingLog(): { debug: Mock; warn: Mock; error: Mock } {
 }
 const sharedLog = recordingLog();
 // Every client counts as local unless a test says otherwise — which clients are local is
-// lan-guard's question (lan-guard.test.ts), not this file's.
+// the fleet master's question (network-address.test.ts), not this file's.
 const baseCfg = {
   devices: [{ uuid: "abc123", port: 8060 }],
   advertiseIp: "10.0.0.9",

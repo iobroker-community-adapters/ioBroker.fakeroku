@@ -3,8 +3,7 @@ import * as net from "node:net";
 import type { CommandEvent } from "./ecp-command";
 import { SOFTWARE_VERSION } from "./device-info";
 import { EcpHttpServer, type EcpServerConfig } from "./ecp-http-server";
-import type { LocalNet } from "../lib/detect-ip";
-import { isLanClient } from "../lib/lan-guard";
+import { isOwnPeer, type LocalNet } from "../lib/network-address";
 import { LogThrottle } from "../lib/log-throttle";
 
 /** A port the OS just had free — fixed numbers collide with whatever else runs on the machine. */
@@ -51,7 +50,7 @@ function serverConfig(overrides: Partial<EcpServerConfig>): EcpServerConfig {
     onCommand: () => true,
     onFatalError: () => {},
     // The real guard, with loopback handed in as the one own network — the test client sits there.
-    isClientAllowed: a => isLanClient(a, () => [LOOPBACK_NET]),
+    isClientAllowed: a => isOwnPeer(a, undefined, [LOOPBACK_NET]),
     ...overrides,
   };
 }

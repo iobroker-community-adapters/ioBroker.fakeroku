@@ -37,8 +37,8 @@ export interface RokuSsdpResponderConfig {
   /** Logger. */
   logger: AdapterLogger;
   /**
-   * Whether a searching client may be answered — the adapter's trust boundary (`lib/lan-guard.ts`), narrowed to the
-   * chosen interface's network when there is one.
+   * Whether a searching client may be answered — the adapter's trust boundary (`isOwnPeer` of the fleet master
+   * `lib/network-address.ts`), narrowed to the chosen interface's network when there is one.
    */
   isClientAllowed: (address: string) => boolean;
   /**

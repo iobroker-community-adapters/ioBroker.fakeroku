@@ -11,19 +11,12 @@ import { type DeviceType, keysForType } from "./ecp/state-model";
 import { instanceObjectId, RESERVED_IDS } from "./lib/constants";
 import { deviceTreeOf, toDeviceRows, type DeviceRow } from "./lib/device-config";
 import { randomIdentity } from "./lib/device-identity";
-import {
-  detectLocalIPv4s,
-  detectLocalNets,
-  detectPrimaryIPv4,
-  hasLocalAddress,
-  localAddressFor,
-  netsOfInterface,
-} from "./lib/detect-ip";
+import { detectLocalIPv4s, detectPrimaryIPv4, localAddressFor } from "./lib/detect-ip";
 import { errText } from "./lib/err-text";
 import { migrateNativeKeys, type NativeKeyMigration } from "./lib/native-key-migration";
 import { tDesc, tName, tRaw } from "./lib/i18n";
 import { coveredBy, KnownObjects } from "./lib/known-objects";
-import { isLanClient } from "./lib/lan-guard";
+import { carriesAddress, chosenAddress, isOwnPeer, localNets } from "./lib/network-address";
 import { planNativePrune, planObjectCleanup } from "./lib/object-cleanup";
 
 /** Managed timeout for a stuck SSDP start (a busy port 1900 must not hang onReady). */
@@ -312,16 +305,14 @@ export class Fakeroku extends utils.Adapter {
         return;
       }
 
-      // Empty AND "0.0.0.0" both mean "auto": bind all interfaces, answer every network with the
-      // host's own address in it. js-controller never rewrites an existing native default, so
-      // instances from before 0.5.1 still carry "" — both must take the auto path.
-      const configuredIp = this.config.bind;
-      this.bindIp = configuredIp && configuredIp !== "0.0.0.0" ? configuredIp : undefined;
+      // The fleet master reads "every address" ("", "0.0.0.0", "::" — instances from before 0.5.1 still carry ""):
+      // then all interfaces are bound and every network is answered with the host's own address in it.
+      this.bindIp = chosenAddress(this.config.bind);
 
       // A chosen interface is the user's decision: everything stays in its network. An address the host does not carry
       // (a new address from the router, a restored backup on other hardware) cannot be served — then the Rokus listen on
       // all addresses, so the remotes still find them, and the log says once what to fix.
-      if (this.bindIp && !hasLocalAddress(this.bindIp, detectLocalNets())) {
+      if (this.bindIp && !carriesAddress(this.bindIp)) {
         this.log.warn(
           `Address ${this.bindIp} does not exist on this host — listening on all addresses; choose another address in the instance settings`,
         );
@@ -402,11 +393,7 @@ export class Fakeroku extends utils.Adapter {
    * @param address the client address
    * @returns true if the client may be answered
    */
-  private readonly isOwnClient = (address: string | undefined): boolean =>
-    isLanClient(address, () => {
-      const nets = detectLocalNets();
-      return this.bindIp ? netsOfInterface(this.bindIp, nets) : nets;
-    });
+  private readonly isOwnClient = (address: string | undefined): boolean => isOwnPeer(address, this.bindIp);
 
   /**
    * Create the object tree and start the ECP server for every configured device.
@@ -598,7 +585,7 @@ export class Fakeroku extends utils.Adapter {
       return;
     }
     const membershipInterfaces = bindIp
-      ? [{ iface: detectLocalNets().find(net => net.address === bindIp)?.iface ?? bindIp, address: bindIp }]
+      ? [{ iface: localNets().find(net => net.address === bindIp)?.iface ?? bindIp, address: bindIp }]
       : detectLocalIPv4s();
     const ssdp = this.makeSsdpResponder({
       devices: [...this.running],
@@ -609,7 +596,7 @@ export class Fakeroku extends utils.Adapter {
       isClientAllowed: this.isOwnClient,
       // "All interfaces": every search is answered with the host's address in the searcher's own
       // network. A chosen interface answers with its address only (the responder uses bindIp).
-      advertiseFor: bindIp ? undefined : remote => localAddressFor(remote, detectLocalNets()),
+      advertiseFor: bindIp ? undefined : remote => localAddressFor(remote),
       onFatalError: err => this.onSsdpFatal(err),
     });
     this.ssdp = ssdp;

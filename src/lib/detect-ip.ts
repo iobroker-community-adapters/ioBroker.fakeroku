@@ -1,20 +1,5 @@
-import { BlockList, isIPv6 } from "node:net";
-import { networkInterfaces, type NetworkInterfaceInfo } from "node:os";
-
-/** The OS network-interface map (the `os.networkInterfaces()` shape). */
-export type InterfaceMap = NodeJS.Dict<NetworkInterfaceInfo[]>;
-
-/** One network the host itself sits in: an address of one of its interfaces, with its prefix. */
-export interface LocalNet {
-  /** The interface name (`eth0`, `wlan0`, `docker0` …). */
-  iface: string;
-  /** The address family. */
-  family: "IPv4" | "IPv6";
-  /** The host's own address in this network (IPv6 without a zone suffix). */
-  address: string;
-  /** The prefix length of the network (from `cidr`, or derived from the netmask). */
-  prefixLength: number;
-}
+import { networkInterfaces } from "node:os";
+import { type InterfaceMap, isOwnPeer, type LocalNet, localNets } from "./network-address";
 
 /** One interface to join the SSDP multicast group on: its name and its IPv4 address. */
 export interface Membership {
@@ -22,43 +7,6 @@ export interface Membership {
   iface: string;
   /** The IPv4 address the membership and the outgoing NOTIFY use. */
   address: string;
-}
-
-/**
- * The prefix length of an interface address, from `cidr`. Node computes `cidr` from the netmask itself and sets it to
- * null only for a netmask that is not contiguous — then there is no prefix to take.
- *
- * @param addr one entry of an os.networkInterfaces() list
- * @returns the prefix length, or null when the OS gives none
- */
-function prefixLengthOf(addr: NetworkInterfaceInfo): number | null {
-  const bits = typeof addr.cidr === "string" ? Number(addr.cidr.split("/")[1]) : NaN;
-  return Number.isInteger(bits) ? bits : null;
-}
-
-/**
- * Every network the host sits in, from an interface map. Pure — takes the map so it can be
- * unit-tested without real network cards. Loopback is left out; an interface the OS reports
- * without addresses is skipped.
- *
- * @param interfaces the OS network-interface map
- * @returns the host's networks, in enumeration order
- */
-export function listLocalNets(interfaces: InterfaceMap): LocalNet[] {
-  const out: LocalNet[] = [];
-  for (const [iface, addrs] of Object.entries(interfaces)) {
-    for (const addr of addrs ?? []) {
-      if (addr.internal || (addr.family !== "IPv4" && addr.family !== "IPv6")) {
-        continue;
-      }
-      // Without a usable prefix only the address itself counts as the network (/32, /128): it
-      // stays usable to bind and advertise, and the trust boundary grows by nothing.
-      const prefixLength = prefixLengthOf(addr) ?? (addr.family === "IPv4" ? 32 : 128);
-      const address = addr.family === "IPv6" ? addr.address.split("%")[0].toLowerCase() : addr.address;
-      out.push({ iface, family: addr.family, address, prefixLength });
-    }
-  }
-  return out;
 }
 
 /**
@@ -70,7 +18,7 @@ export function listLocalNets(interfaces: InterfaceMap): LocalNet[] {
  * @returns the first IPv4 address, or "" if the host has none
  */
 export function pickPrimaryIPv4(interfaces: InterfaceMap): string {
-  return listLocalNets(interfaces).find(net => net.family === "IPv4")?.address ?? "";
+  return localNets(interfaces).find(net => net.family === "IPv4")?.address ?? "";
 }
 
 /**
@@ -83,7 +31,7 @@ export function pickPrimaryIPv4(interfaces: InterfaceMap): string {
  */
 export function pickMembershipIPv4s(interfaces: InterfaceMap): Membership[] {
   const byIface = new Map<string, LocalNet>();
-  for (const net of listLocalNets(interfaces)) {
+  for (const net of localNets(interfaces)) {
     if (net.family === "IPv4" && !byIface.has(net.iface)) {
       byIface.set(net.iface, net);
     }
@@ -110,42 +58,8 @@ export function detectLocalIPv4s(): Membership[] {
 }
 
 /**
- * The host's networks, read fresh — an address change (DHCP, a provider's IPv6 prefix) is seen on
- * the next call instead of being frozen at start-up.
- *
- * @returns the host's networks
- */
-export function detectLocalNets(): LocalNet[] {
-  return listLocalNets(networkInterfaces());
-}
-
-/**
- * Does the host carry this IPv4 address on one of its interfaces?
- *
- * @param address the address to look for
- * @param nets the host's networks
- * @returns true if an interface carries it
- */
-export function hasLocalAddress(address: string, nets: readonly LocalNet[]): boolean {
-  return nets.some(net => net.address === address);
-}
-
-/**
- * The networks of the interface that carries the given address — what "stay in the chosen
- * interface's network" means.
- *
- * @param address an address of the host
- * @param nets the host's networks
- * @returns the networks of that interface (empty if no interface carries the address)
- */
-export function netsOfInterface(address: string, nets: readonly LocalNet[]): LocalNet[] {
-  const owner = nets.find(net => net.address === address)?.iface;
-  return owner === undefined ? [] : nets.filter(net => net.iface === owner);
-}
-
-/**
  * An address as the socket reports it, without the IPv4-mapped prefix a dual-stack socket puts in front of an IPv4
- * client (`::ffff:192.168.1.5` → `192.168.1.5`).
+ * client (`::ffff:192.168.1.5` → `192.168.1.5`) — for the log line that names the client.
  *
  * @param address the socket address
  * @returns the plain address
@@ -158,32 +72,12 @@ export function stripMappedPrefix(address: string): string {
  * The host's own IPv4 address in the network a remote sits in — the address that remote can
  * reach. On a host with several networks a search from the IoT VLAN must be answered with the
  * host's IoT VLAN address, not with the address of another network the remote cannot route to.
+ * Each network is asked on its own, through the fleet master's network check.
  *
  * @param remote the remote's address
  * @param nets the host's networks
  * @returns the host's address in the remote's network, or undefined if it shares none
  */
-export function localAddressFor(remote: string, nets: readonly LocalNet[]): string | undefined {
-  // An IPv4-mapped remote (`::ffff:192.168.1.5`) lies in the IPv4 network it carries — inNet answers that itself.
-  return nets.find(net => net.family === "IPv4" && inNet(remote, net))?.address;
-}
-
-/**
- * Is an address inside one of the host's networks (by the network's prefix length)? Node's own subnet check decides;
- * anything that is not a plain IPv4 or IPv6 address is in no network.
- *
- * @param address the address to test (IPv4, or IPv6 with an optional zone suffix)
- * @param net the network
- * @returns true if the address lies in the network
- */
-export function inNet(address: string, net: LocalNet): boolean {
-  const ip = address.split("%")[0];
-  try {
-    const list = new BlockList();
-    list.addSubnet(net.address, net.prefixLength, net.family === "IPv4" ? "ipv4" : "ipv6");
-    return list.check(ip, isIPv6(ip) ? "ipv6" : "ipv4");
-  } catch {
-    // An address or a network in a form the check refuses: nothing lies in it.
-    return false;
-  }
+export function localAddressFor(remote: string, nets: readonly LocalNet[] = localNets()): string | undefined {
+  return nets.find(net => net.family === "IPv4" && isOwnPeer(remote, net.address, [net]))?.address;
 }

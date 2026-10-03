@@ -42,8 +42,8 @@ export interface EcpServerConfig {
    */
   onFatalError: (err: Error) => void;
   /**
-   * Whether a client may talk to this Roku — the adapter's trust boundary (`lib/lan-guard.ts`), narrowed to the chosen
-   * interface's network when there is one.
+   * Whether a client may talk to this Roku — the adapter's trust boundary (`isOwnPeer` of the fleet master
+   * `lib/network-address.ts`), narrowed to the chosen interface's network when there is one.
    */
   isClientAllowed: (address: string | undefined) => boolean;
 }
