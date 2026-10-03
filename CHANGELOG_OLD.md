@@ -1,4 +1,5 @@
 # Older changes
+
 ## 1.7.0 (2026-09-16)
 
 - (krobipd) Fixed: button datapoints keep their value and their room and function assignment when the adapter starts.
