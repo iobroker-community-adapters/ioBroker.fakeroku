@@ -109,8 +109,7 @@ becomes `true` — or watch `.command` for the last button as text.
 - (krobipd) Changed: with no Roku configured or none running, the instance stays up so the device manager works, and asks you to add a Roku.
 - (krobipd) Changed: a chosen address that is missing on the host no longer leaves the Rokus off — they listen on all addresses until you choose another.
 - (krobipd) Changed: requests from the ioBroker host itself or from self-assigned addresses outside the host's networks are refused.
-- (krobipd) Changed: a Roku set up before 0.7.0 gets its type (player or TV) written into its settings once; the instance restarts once.
-- (krobipd) Changed: the datapoint `commandType` is gone — `command` carries every command; an existing installation removes it on the next start.
+- (krobipd) Changed: the datapoint with the kind of the last command is gone — the last command itself still arrives as before; existing installations drop it on the next start.
 
 ### 1.8.2 (2026-10-02)
 
