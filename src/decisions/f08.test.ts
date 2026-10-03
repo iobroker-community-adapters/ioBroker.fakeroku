@@ -1,8 +1,9 @@
 // Guard of F-08 (krobi 2026-10-03 00:14 / 00:17 / 00:18 / 00:36): green means everything runs, yellow means something is
 // wrong and a part runs, red is only a process that is gone — no Roku configured or none running is yellow with a line,
 // the instance stays up for the device manager; a busy port, a dead server and a failed discovery are retried every
-// minute; there is no datapoint per Roku. (The log wording beyond the two lines krobi named is the fleet gate's.)
-// Sealed in the register — a change goes through the Werkbank.
+// minute; there is no datapoint per Roku. Every problem writes one line with its likely cause when it first occurs,
+// repeats only on debug, and one info line when it works again. Sealed in the register — a change goes through the
+// Werkbank.
 import { describe, expect, it, vi } from "vitest";
 // The adapter runtime without js-controller: an inline stand-in for @iobroker/adapter-core that keeps objects, states
 // and the instance object in maps, managed timers that fire only when a test fires them, and a log of spies. The device
@@ -289,5 +290,88 @@ describe("F-08 — green, yellow, and no datapoint per Roku", () => {
       status.every(id => id === "info" || id === "info.connection"),
       status.join(", "),
     ).toBe(true);
+  });
+});
+
+/**
+ * The lines above debug the adapter wrote since the spies were last cleared.
+ *
+ * @param run the adapter
+ * @returns level and text of each
+ */
+function loud(run: Run): string[] {
+  return (["info", "warn", "error"] as const).flatMap(level =>
+    run.log[level].mock.calls.map(([text]) => `${level}: ${String(text)}`),
+  );
+}
+
+/**
+ * Forget the lines written so far.
+ *
+ * @param run the adapter
+ */
+function quiet(run: Run): void {
+  for (const level of ["debug", "info", "warn", "error"] as const) {
+    run.log[level].mockClear();
+  }
+}
+
+describe("F-08 — one line with the cause, repeats on debug, one info line on the return", () => {
+  it("a busy port", async () => {
+    const { run, fakes } = adapterWith(two, { busy: [8061] });
+    await run.onReady();
+    const first = loud(run).filter(line => !line.startsWith("info: Emulating"));
+    expect(first).toHaveLength(1);
+    expect(first[0]).toMatch(/^warn: .*"Kueche".*port 8061 is already in use/);
+
+    quiet(run);
+    await fireRetry(run);
+    expect(loud(run)).toEqual([]);
+
+    fakes.busyPorts.clear();
+    await fireRetry(run);
+    expect(loud(run)).toEqual(['info: Emulated Roku "Kueche" is listening on port 8061 again.']);
+  });
+
+  it("a server that died", async () => {
+    const { run, fakes } = adapterWith(two);
+    await run.onReady();
+    quiet(run);
+    (fakes.ecp[1].options.onFatalError as (err: Error) => void)(new Error("network gone"));
+    expect(loud(run)).toHaveLength(1);
+    expect(loud(run)[0]).toMatch(/^error: .*"Kueche".*network gone/);
+
+    quiet(run);
+    fakes.busyPorts.add(8061);
+    await fireRetry(run);
+    expect(loud(run)).toEqual([]);
+
+    fakes.busyPorts.clear();
+    await fireRetry(run);
+    expect(loud(run)).toEqual(['info: Emulated Roku "Kueche" is listening on port 8061 again.']);
+  });
+
+  it("discovery that cannot start", async () => {
+    const { run, fakes } = adapterWith(two, { ssdpFails: true });
+    await run.onReady();
+    const first = loud(run).filter(line => !line.startsWith("info: Emulating"));
+    expect(first).toHaveLength(1);
+    expect(first[0]).toMatch(/^warn: SSDP discovery unavailable: bind EADDRINUSE/);
+
+    quiet(run);
+    await fireRetry(run);
+    expect(loud(run)).toEqual([]);
+
+    fakes.ssdpFails.value = false;
+    await fireRetry(run);
+    expect(loud(run)).toEqual(["info: SSDP discovery is running again — remotes can find the emulated Rokus."]);
+  });
+
+  it("a chosen address the host does not carry", async () => {
+    const { run } = adapterWith({ ...two, bind: "192.0.2.1" });
+    await run.onReady();
+    const first = loud(run).filter(line => !line.startsWith("info: Emulating"));
+    expect(first).toHaveLength(1);
+    expect(first[0]).toMatch(/^warn: Address 192\.0\.2\.1 does not exist on this host/);
   });
 });
