@@ -31,5 +31,17 @@
   "stateLastCommand": "Último comando",
   "stateLastCommandDesc": "El comando más reciente que recibió este Roku emulado, como texto simple.",
   "channelKeys": "Teclas del mando",
-  "channelKeysDesc": "Un estado por cada tecla que ofrece este dispositivo; una pulsación lo pone brevemente en verdadero."
+  "channelKeysDesc": "Un estado por cada tecla que ofrece este dispositivo; una pulsación lo pone brevemente en verdadero.",
+  "channelDeviceInfo": "Estado",
+  "channelDeviceInfoDesc": "Si este Roku emulado funciona y, si no, por qué.",
+  "stateOnline": "En línea",
+  "stateOnlineDesc": "Verdadero mientras este Roku emulado escucha en su puerto ECP.",
+  "stateError": "Error",
+  "stateErrorDesc": "Por qué este Roku emulado no funciona; vacío mientras funciona, Unknown mientras el adaptador está apagado o arrancando.",
+  "devicesTotal": "Rokus emulados",
+  "devicesTotalDesc": "Cuántos Rokus emulados están configurados.",
+  "devicesOnline": "Rokus emulados en línea",
+  "devicesOnlineDesc": "Cuántos Rokus emulados escuchan ahora mismo.",
+  "devicesAllOnline": "Todos los Rokus emulados en línea",
+  "devicesAllOnlineDesc": "Verdadero mientras cada Roku emulado configurado escucha; falso mientras no hay ninguno configurado."
 }

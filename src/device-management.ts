@@ -252,15 +252,24 @@ export class FakerokuDeviceManagement extends DeviceManagement {
    * The name needs no fallback: a row without a usable one never becomes a DeviceRow
    * (lib/device-config.ts drops it).
    *
+   * The status follows the Roku's own `info.online` and `info.error` live — the admin reads
+   * and subscribes the states itself, so a port that frees up turns the card green without a
+   * reload. An empty reason shows no warning.
+   *
    * @param device the stored device
    * @returns the card descriptor
    */
   private toDeviceInfo(device: DeviceRow): DeviceInfo<string> {
+    const info = `${this.adapter.namespace}.${device.objectId}.info`;
     return {
       id: device.identity,
       name: device.name,
       identifier: String(device.port),
       model: t(device.type === "tv" ? "deviceTypeTv" : "deviceTypePlayer"),
+      status: {
+        connection: { stateId: `${info}.online`, mapping: { true: "connected", false: "disconnected" } },
+        warning: { stateId: `${info}.error` },
+      },
       actions: [
         {
           id: "edit",

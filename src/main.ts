@@ -25,6 +25,8 @@ const SSDP_START_TIMEOUT_MS = 5000;
 const SSDP_NOTIFY_INTERVAL_MS = 300_000;
 /** How long to wait before trying again what does not run: a device whose ECP server is down, and discovery. */
 const RETRY_INTERVAL_MS = 60_000;
+/** The fleet's reason text while the adapter has nothing to report: it is off, or started and has not tried yet. */
+const UNKNOWN_REASON = "Unknown";
 
 /**
  * Keys the 0.1.x adapter declared and nothing reads any more: its own HTTP port and multicast
@@ -116,6 +118,8 @@ interface DeviceRuntime {
   readonly keys: ReadonlySet<string>;
   /** Its ECP server while it listens; none while it waits for a retry or after its server died. */
   server?: EcpHttpServer;
+  /** Why it does not listen, in words the user can act on — set when a start fails or the server dies. */
+  reason?: string;
 }
 
 /**
@@ -154,10 +158,10 @@ export class Fakeroku extends utils.Adapter {
    */
   private stopping = false;
   /**
-   * The read-only states this adapter writes outside the command hot path (`info.connection`, the key reset at
-   * start), as last known, keyed relative to the namespace. Primed once at start by one bulk read, so a restart writes
-   * nothing blindly and no such state is ever read one by one; `info.connection` is kept current by
-   * {@link writeIndicator}.
+   * The read-only states this adapter writes outside the command hot path (`info.connection`, the device counts, every
+   * Roku's status, the key reset at start), as last known, keyed relative to the namespace. Primed once at start by
+   * one bulk read, so a restart writes nothing blindly and no such state is ever read one by one; the indicators are
+   * kept current by {@link writeIndicator}.
    */
   private readonly lastState = new Map<string, Pick<ioBroker.State, "val" | "ack" | "q">>();
   /** The adapter's objects as read at start, keyed relative to the namespace. */
@@ -224,12 +228,71 @@ export class Fakeroku extends utils.Adapter {
   }
 
   /**
-   * Write {@link healthy} to `info.connection` — only on a change.
+   * Write what runs, in one pass from the same runtime state: every Roku's `info.online` and `info.error`, the three
+   * device counts, and {@link healthy} to `info.connection` — each only on a change.
    *
-   * @returns once the write landed (or nothing had to be written)
+   * @returns once the writes landed (or nothing had to be written)
    */
-  private updateConnection(): Promise<void> {
-    return this.writeIndicator("info.connection", this.healthy);
+  private async updateConnection(): Promise<void> {
+    const total = this.expectedDevices;
+    const online = this.running.length;
+    await Promise.all([
+      ...[...this.devices.values()].map(device =>
+        this.markDevice(device.id, device.server ? "" : (device.reason ?? UNKNOWN_REASON)),
+      ),
+      this.writeIndicator("info.devicesTotal", total),
+      this.writeIndicator("info.devicesOnline", online),
+      this.writeIndicator("info.devicesAllOnline", total > 0 && online === total),
+      this.writeIndicator("info.connection", this.healthy),
+    ]);
+  }
+
+  /**
+   * Write one Roku's status: online exactly while there is no reason against it.
+   *
+   * @param deviceId the id-safe device path segment
+   * @param reason empty while it listens, `Unknown` while nothing is known, else why it does not listen
+   * @returns once both writes landed (or nothing had to be written)
+   */
+  private async markDevice(deviceId: string, reason: string): Promise<void> {
+    await Promise.all([
+      this.writeIndicator(`${deviceId}.info.online`, reason === ""),
+      this.writeIndicator(`${deviceId}.info.error`, reason),
+    ]);
+  }
+
+  /**
+   * Show the given Rokus as not running for a reason nobody knows yet, the counts with them, and `info.connection`
+   * false — the start stamp (a crash or a power cut runs no shutdown code) and the last write of onUnload.
+   * `info.devicesTotal` keeps its value: how many Rokus there are does not change because nobody looks.
+   *
+   * @param deviceIds the id-safe device path segments to mark
+   * @returns once the writes landed (or nothing had to be written)
+   */
+  private async markOffline(deviceIds: readonly string[]): Promise<void> {
+    await Promise.all([
+      ...deviceIds.map(id => this.markDevice(id, UNKNOWN_REASON)),
+      this.writeIndicator("info.devicesOnline", 0),
+      this.writeIndicator("info.devicesAllOnline", false),
+      this.writeIndicator("info.connection", false),
+    ]);
+  }
+
+  /**
+   * The Rokus whose status datapoints hold a value — the only ones the start stamp touches, so it creates nothing a
+   * tree does not have.
+   *
+   * @returns their id-safe device path segments
+   */
+  private storedStatusDevices(): string[] {
+    const ids = new Set<string>();
+    for (const id of this.lastState.keys()) {
+      const parts = id.split(".");
+      if (parts.length === 3 && parts[1] === "info" && (parts[2] === "online" || parts[2] === "error")) {
+        ids.add(parts[0]);
+      }
+    }
+    return [...ids];
   }
 
   /**
@@ -278,7 +341,7 @@ export class Fakeroku extends utils.Adapter {
 
       await this.known.load();
       await this.primeStates();
-      await this.writeIndicator("info.connection", false);
+      await this.markOffline(this.storedStatusDevices());
       await this.refreshOwnObjects();
 
       // The object tree as it is before this start touches it: the rows resolve their object id
@@ -324,6 +387,7 @@ export class Fakeroku extends utils.Adapter {
         // Yellow, not an exit: the device manager runs inside this process, and it is where a Roku is added.
         this.log.error("No Roku device configured — add one in the instance settings (device manager)");
         await this.sweepOrphans(configured);
+        await this.updateConnection();
         return;
       }
 
@@ -458,6 +522,7 @@ export class Fakeroku extends utils.Adapter {
       this.devices.set(deviceId, device);
       const failed = await this.startDeviceServer(device);
       if (failed !== null && !this.stopping) {
+        device.reason = failed;
         this.pending.push(device);
         failures.push({ name: row.name, reason: failed, retried: true });
       }
@@ -542,6 +607,7 @@ export class Fakeroku extends utils.Adapter {
           this.log.info(`Emulated Roku "${device.name}" is listening on port ${device.advert.port} again.`);
         } else {
           this.log.debug(`Emulated Roku "${device.name}" still not running — ${failed}`);
+          device.reason = failed;
           stillPending.push(device);
         }
       }
@@ -668,8 +734,8 @@ export class Fakeroku extends utils.Adapter {
   }
 
   /**
-   * Re-apply the adapter's OWN objects — the `info` channel and `info.connection`
-   * — on every start.
+   * Re-apply the adapter's OWN objects — the `info` channel, `info.connection` and the three
+   * device counts — on every start.
    *
    * js-controller extends the manifest's instanceObjects on every start, but it preserves
    * `common.name` of an existing object (7.2.2 `_extendObjects`, `preserve: { common: ["name"] }`):
@@ -692,12 +758,24 @@ export class Fakeroku extends utils.Adapter {
     if (!coveredBy(connection, this.known.get("info.connection"))) {
       await this.extendObject("info.connection", connection);
     }
+    const devicesTotal = { common: { name: tName("devicesTotal"), desc: tDesc("devicesTotalDesc") } };
+    if (!coveredBy(devicesTotal, this.known.get("info.devicesTotal"))) {
+      await this.extendObject("info.devicesTotal", devicesTotal);
+    }
+    const devicesOnline = { common: { name: tName("devicesOnline"), desc: tDesc("devicesOnlineDesc") } };
+    if (!coveredBy(devicesOnline, this.known.get("info.devicesOnline"))) {
+      await this.extendObject("info.devicesOnline", devicesOnline);
+    }
+    const devicesAllOnline = { common: { name: tName("devicesAllOnline"), desc: tDesc("devicesAllOnlineDesc") } };
+    if (!coveredBy(devicesAllOnline, this.known.get("info.devicesAllOnline"))) {
+      await this.extendObject("info.devicesAllOnline", devicesAllOnline);
+    }
   }
 
   /**
-   * Create the fixed object tree for one emulated Roku: the device, `command`, and one
-   * `sensor` boolean state per key the device type exposes — all up front, so the tree
-   * is usable before any key is ever pressed.
+   * Create the fixed object tree for one emulated Roku: the device with its status symbol, its
+   * `info.online` and `info.error`, `command`, and one `sensor` boolean state per key the device
+   * type exposes — all up front, so the tree is usable before any key is ever pressed.
    *
    * Every key state is also RESET to false here. A key is a momentary signal, but
    * nothing writes its release when the adapter goes down: a keypress pulses true
@@ -722,7 +800,43 @@ export class Fakeroku extends utils.Adapter {
     await Promise.all([
       // The device name is the user's own text — nothing to translate, but it must
       // still BE a translation object like every other common.name (tRaw).
-      this.known.extend(deviceId, { type: "device", common: { name: tRaw(friendlyName) }, native: {} }),
+      // The symbol in the object browser comes from statusStates; a relative id is read below the device itself.
+      this.known.extend(deviceId, {
+        type: "device",
+        common: { name: tRaw(friendlyName), statusStates: { onlineId: "info.online" } },
+        native: {},
+      }),
+      this.known.extend(`${deviceId}.info`, {
+        type: "channel",
+        common: { name: tName("channelDeviceInfo"), desc: tDesc("channelDeviceInfoDesc") },
+        native: {},
+      }),
+      this.known.extend(`${deviceId}.info.online`, {
+        type: "state",
+        common: {
+          name: tName("stateOnline"),
+          desc: tDesc("stateOnlineDesc"),
+          type: "boolean",
+          role: "indicator.reachable",
+          read: true,
+          write: false,
+          def: false,
+        },
+        native: {},
+      }),
+      this.known.extend(`${deviceId}.info.error`, {
+        type: "state",
+        common: {
+          name: tName("stateError"),
+          desc: tDesc("stateErrorDesc"),
+          type: "string",
+          role: "text",
+          read: true,
+          write: false,
+          def: UNKNOWN_REASON,
+        },
+        native: {},
+      }),
       this.known.extend(`${deviceId}.command`, {
         type: "state",
         common: {
@@ -805,13 +919,14 @@ export class Fakeroku extends utils.Adapter {
 
   /**
    * Write a read-only indicator only when it differs from what it holds (`val` strictly, `ack`, `q` — the fields
-   * js-controller's own changed-check compares). The one place `info.connection` is written. The value is remembered
-   * before the write, so two calls in a row write once; a failed write is forgotten again so the next call retries.
+   * js-controller's own changed-check compares). The one place `info.connection`, the device counts and every Roku's
+   * status are written. The value is remembered before the write, so two calls in a row write once; a failed write is
+   * forgotten again so the next call retries.
    *
    * @param id the state id relative to the namespace
    * @param val the value to show
    */
-  private async writeIndicator(id: string, val: boolean): Promise<void> {
+  private async writeIndicator(id: string, val: boolean | number | string): Promise<void> {
     const last = this.lastState.get(id);
     if (last && last.val === val && last.ack && !last.q) {
       return;
@@ -1054,6 +1169,7 @@ export class Fakeroku extends utils.Adapter {
     // idempotent and safe on a dead server.
     device.server?.stop();
     device.server = undefined;
+    device.reason = `stopped answering: ${errText(err)}`;
     this.ssdp?.removeDevice(device.advert.uuid);
     if (!this.pending.includes(device)) {
       this.pending.push(device);
@@ -1123,10 +1239,12 @@ export class Fakeroku extends utils.Adapter {
    * Teardown: drop the timers and sockets synchronously, then report done only
    * once the farewell and the last write have landed.
    *
-   * `info.connection` is the only status this adapter carries, and nothing else
-   * resets it: the host means to, but writes its reset to the namespace root
-   * instead of the datapoint (js-controller#3472). So if the final write is
-   * lost, the instance shows "connected" while the adapter is off.
+   * Nothing else resets this adapter's status — `info.connection`, every Roku's
+   * `info.online` and `info.error`, the device counts: the host means to reset
+   * `info.connection`, but writes its reset to the namespace root instead of the
+   * datapoint (js-controller#3472), and it knows nothing of the rest. So if the
+   * final writes are lost, the instance and every Roku show "running" while the
+   * adapter is off.
    *
    * A fire-and-forget write plus an immediate callback is a race; waiting closes it for the
    * slow or busy case. It is safe because without `common.supportedMessages.stopInstance` the
@@ -1157,20 +1275,21 @@ export class Fakeroku extends utils.Adapter {
       for (const device of this.devices.values()) {
         device.server?.stop();
       }
+      const marked = [...this.devices.keys()];
       this.devices.clear();
       this.pending = [];
       // The SSDP socket is the one thing that cannot close yet — the farewell goes out
       // through it. It is closed in the callback below, whichever way that arrives.
       const farewell = this.ssdp ? this.ssdp.byebye() : Promise.resolve();
-      const connection = this.writeIndicator("info.connection", false)
+      const status = this.markOffline(marked)
         // A rejected write must not become an unhandled rejection — that is a
         // crash (exit code 6) instead of an orderly stop. The trace stays at
         // debug: it explains a stale "connected" afterwards, and nobody can act
         // on it while the adapter is already going down.
         .catch((e: unknown) => {
-          this.log.debug(`Final connection write failed: ${errText(e)}`);
+          this.log.debug(`Final status write failed: ${errText(e)}`);
         });
-      void Promise.all([farewell, connection]).finally(() => {
+      void Promise.all([farewell, status]).finally(() => {
         this.ssdp?.stop();
         this.ssdp = undefined;
         callback();

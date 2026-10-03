@@ -79,16 +79,21 @@ im selben Netz ist; sie findet den emulierten Roku über die Erkennung.
 
 Auf Instanz-Ebene:
 
-| Datenpunkt        | Typ                 | Bedeutung                                                                                                                                                                                                                                                                                                                       |
-| ----------------- | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `info.connection` | boolean, nur lesbar | Nur wahr, solange alles läuft: **jeder** konfigurierte Roku lauscht, die Erkennung antwortet und die gewählte Adresse existiert. Alles darunter zeigt die Instanz gelb; das Protokoll nennt die Ursache einmal, und der Adapter versucht einen ausgefallenen Roku oder die Erkennung jede Minute erneut, bis sie wieder laufen. |
+| Datenpunkt              | Typ                 | Bedeutung                                                                                                                                                                                                                                                                                                                       |
+| ----------------------- | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `info.connection`       | boolean, nur lesbar | Nur wahr, solange alles läuft: **jeder** konfigurierte Roku lauscht, die Erkennung antwortet und die gewählte Adresse existiert. Alles darunter zeigt die Instanz gelb; das Protokoll nennt die Ursache einmal, und der Adapter versucht einen ausgefallenen Roku oder die Erkennung jede Minute erneut, bis sie wieder laufen. |
+| `info.devicesTotal`     | number, nur lesbar  | Wie viele emulierte Rokus eingerichtet sind.                                                                                                                                                                                                                                                                                    |
+| `info.devicesOnline`    | number, nur lesbar  | Wie viele davon gerade lauschen.                                                                                                                                                                                                                                                                                                |
+| `info.devicesAllOnline` | boolean, nur lesbar | `true`, solange jeder eingerichtete Roku lauscht; `false`, solange keiner eingerichtet ist.                                                                                                                                                                                                                                     |
 
 Je emuliertem Roku, unterhalb von `fakeroku.0.<Name>`:
 
-| Datenpunkt     | Typ                 | Bedeutung                                                                                                                                                |
-| -------------- | ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `command`      | string, nur lesbar  | Der letzte Befehl als lesbarer Text: `Home`, `Lit_a`, `launch:12`, `search:news`.                                                                        |
-| `keys.<Taste>` | boolean, nur lesbar | Ein Datenpunkt je Taste. Ein Tastendruck setzt ihn kurz auf `true` und wieder auf `false`; eine gehaltene Taste bleibt `true`, bis sie losgelassen wird. |
+| Datenpunkt     | Typ                 | Bedeutung                                                                                                                                                                                                                        |
+| -------------- | ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `info.online`  | boolean, nur lesbar | `true`, solange dieser Roku auf seinem Anschluss lauscht. Das Gerät zeigt im Objektbaum ein grünes oder graues Symbol, seine Karte im Gerätemanager online oder offline.                                                         |
+| `info.error`   | string, nur lesbar  | Warum dieser Roku nicht läuft, z. B. `port 8061 is already in use (another program or another instance holds it)`; leer, solange er läuft, `Unknown`, solange der Adapter aus ist oder startet. Die Karte zeigt ihn als Warnung. |
+| `command`      | string, nur lesbar  | Der letzte Befehl als lesbarer Text: `Home`, `Lit_a`, `launch:12`, `search:news`.                                                                                                                                                |
+| `keys.<Taste>` | boolean, nur lesbar | Ein Datenpunkt je Taste. Ein Tastendruck setzt ihn kurz auf `true` und wieder auf `false`; eine gehaltene Taste bleibt `true`, bis sie losgelassen wird.                                                                         |
 
 Tastatureingaben der Fernbedienung (`Lit_a`) und App-Starts erscheinen nur in
 `command` — sie bekommen keine eigenen Datenpunkte. Die App-Taste einer Fernbedienung,
@@ -172,7 +177,9 @@ zeigt gelb. Wähle die aktuelle Adresse (oder „alle Schnittstellen") und speic
 Instanz startet neu.
 
 **Die Instanz bleibt gelb.**
-Etwas läuft nicht, und das Protokoll sagt einmal, was. Meist konnte ein konfigurierter
+Etwas läuft nicht, und das Protokoll sagt einmal, was. Welcher Roku es ist, zeigen seine
+Karte im Gerätemanager (offline, mit dem Grund) und sein `info.error`; `info.devicesOnline`
+sagt, wie viele laufen. Meist konnte ein konfigurierter
 Roku nicht starten, weil sein Anschluss schon von etwas anderem belegt ist (auch von
 einem zweiten emulierten Roku mit demselben Anschluss) — gib ihm einen freien. Der
 Adapter versucht so einen Roku jede Minute erneut, auch einen, dessen Server im Betrieb

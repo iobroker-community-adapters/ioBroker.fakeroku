@@ -31,5 +31,17 @@
   "stateLastCommand": "最后一条命令",
   "stateLastCommandDesc": "该模拟 Roku 最近收到的命令，以纯文本表示。",
   "channelKeys": "遥控器按键",
-  "channelKeysDesc": "该设备提供的每个遥控器按键各有一个状态；按下时会短暂置为真。"
+  "channelKeysDesc": "该设备提供的每个遥控器按键各有一个状态；按下时会短暂置为真。",
+  "channelDeviceInfo": "状态",
+  "channelDeviceInfoDesc": "此模拟 Roku 是否在运行，如未运行则说明原因。",
+  "stateOnline": "在线",
+  "stateOnlineDesc": "此模拟 Roku 在其 ECP 端口上监听时为真。",
+  "stateError": "错误",
+  "stateErrorDesc": "此模拟 Roku 未运行的原因；运行时为空，适配器关闭或启动时为 Unknown。",
+  "devicesTotal": "模拟 Roku 数量",
+  "devicesTotalDesc": "已配置的模拟 Roku 数量。",
+  "devicesOnline": "在线的模拟 Roku",
+  "devicesOnlineDesc": "当前正在监听的模拟 Roku 数量。",
+  "devicesAllOnline": "所有模拟 Roku 均在线",
+  "devicesAllOnlineDesc": "每个已配置的模拟 Roku 都在监听时为真；未配置任何 Roku 时为假。"
 }

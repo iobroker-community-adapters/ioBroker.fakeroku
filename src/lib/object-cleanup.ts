@@ -17,7 +17,7 @@ const RETIRED_DEVICE_CHILDREN: ReadonlySet<string> = new Set(["apps", "commandTy
  *  - a `<device>.keys.<Key>` state whose key is no longer part of the device's
  *    type (e.g. the TV keys after switching a device from "tv" back to "player").
  *
- * The adapter's own objects — `info` and `info.connection` — are never touched.
+ * The adapter's own objects — `info`, `info.connection` and the three device counts — are never touched.
  * Anything ELSE below `info` is: a hand-edited device row called "info" used to
  * create `info.command` / `info.keys.*` there, and blanket-skipping the whole
  * subtree meant those leftovers stayed for good, even after the row was removed.

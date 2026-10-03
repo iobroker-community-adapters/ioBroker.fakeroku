@@ -133,6 +133,10 @@ interface Card {
   identifier: string;
   model: string;
   actions: DmAction[];
+  status: {
+    connection: { stateId: string; mapping: Record<string, string> };
+    warning: { stateId: string };
+  };
 }
 const internalOf = (dm: FakerokuDeviceManagement): DmInternals => dm as unknown as DmInternals;
 
@@ -214,6 +218,19 @@ describe("FakerokuDeviceManagement", () => {
     // "0" as the port line would tell the user the wrong thing — the adapter binds 8060.
     expect(out[0].name).toBe("⏻");
     expect(out[0].identifier).toBe("8060");
+  });
+
+  it("shows each card's status from that device's own marker and reason", async () => {
+    // The admin subscribes the states itself: the card turns green or grey and shows the
+    // reason without the adapter pushing anything. The object id, not the name, addresses them.
+    const [card] = await cards([livingStored]);
+    expect(card.status).toEqual({
+      connection: {
+        stateId: "fakeroku.0.Living_room.info.online",
+        mapping: { true: "connected", false: "disconnected" },
+      },
+      warning: { stateId: "fakeroku.0.Living_room.info.error" },
+    });
   });
 
   it("shows no card at all for a row without a usable name", async () => {

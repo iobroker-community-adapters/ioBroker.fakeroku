@@ -118,6 +118,20 @@ describe("Fakeroku collaborator wiring", () => {
     expect(ctx.ecp[0].stop).toHaveBeenCalledTimes(1);
   });
 
+  it("names why a Roku does not run — its death, then the reason of the latest failed retry", async () => {
+    const opts: { failEcpPort?: number } = {};
+    const ctx = setup({ devices: [{ name: "Wohnzimmer", port: 8060, type: "player" }] }, opts);
+    await ctx.i.onReady();
+    (ctx.ecp[0].options.onFatalError as (err: Error) => void)(new Error("listen EADDRNOTAVAIL"));
+    await settle();
+    expect(ctx.i.states.get("Wohnzimmer.info.error")?.val).toBe("stopped answering: listen EADDRNOTAVAIL");
+
+    opts.failEcpPort = 8060;
+    await ctx.i.retryPendingDevices();
+    expect(ctx.i.states.get("Wohnzimmer.info.online")?.val).toBe(false);
+    expect(ctx.i.states.get("Wohnzimmer.info.error")?.val).toMatch(/^port 8060 is already in use/);
+  });
+
   it("survives a failing status write when a device dies", async () => {
     // onEcpFatal runs from a socket event, outside any await. An unhandled rejection
     // there is an adapter crash (exit code 6) over a state write that failed because
@@ -481,11 +495,24 @@ describe("Fakeroku onUnload", () => {
 
     await new Promise<void>(resolve => ctx.i.onUnload(() => (order.push("callback"), resolve())));
 
-    // Fire-and-forget plus an immediate callback loses the write: the process is
-    // gone before it reaches the database, and the instance keeps showing
-    // "connected" while the adapter is off.
-    expect(order).toEqual(["write:info.connection", "callback"]);
+    // Fire-and-forget plus an immediate callback loses the writes: the process is
+    // gone before they reach the database, and the instance and the Roku keep
+    // showing "running" while the adapter is off. info.devicesTotal is not among
+    // them — how many Rokus there are does not change at a stop.
+    expect(order).toEqual([
+      "write:Wohnzimmer.info.online",
+      "write:Wohnzimmer.info.error",
+      "write:info.devicesOnline",
+      "write:info.devicesAllOnline",
+      "write:info.connection",
+      "callback",
+    ]);
     expect(ctx.i.states.get("info.connection")).toEqual({ val: false, ack: true });
+    expect(ctx.i.states.get("Wohnzimmer.info.online")).toEqual({ val: false, ack: true });
+    expect(ctx.i.states.get("Wohnzimmer.info.error")).toEqual({ val: "Unknown", ack: true });
+    expect(ctx.i.states.get("info.devicesOnline")).toEqual({ val: 0, ack: true });
+    expect(ctx.i.states.get("info.devicesAllOnline")).toEqual({ val: false, ack: true });
+    expect(ctx.i.states.get("info.devicesTotal")).toEqual({ val: 1, ack: true });
   });
 
   it("still reports done when the last write is rejected", async () => {
@@ -500,7 +527,7 @@ describe("Fakeroku onUnload", () => {
     const callback = vi.fn();
     await new Promise<void>(resolve => ctx.i.onUnload(() => (callback(), resolve())));
     expect(callback).toHaveBeenCalledTimes(1);
-    expect(ctx.i.log.debug).toHaveBeenCalledWith(expect.stringContaining("Final connection write failed"));
+    expect(ctx.i.log.debug).toHaveBeenCalledWith(expect.stringContaining("Final status write failed"));
   });
 
   it("still calls back when a teardown step throws", async () => {

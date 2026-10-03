@@ -74,16 +74,21 @@ same network; it finds the emulated Roku through discovery.
 
 At instance level:
 
-| Datapoint         | Type               | Meaning                                                                                                                                                                                                                                                                                 |
-| ----------------- | ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `info.connection` | boolean, read-only | True only while everything runs: **every** configured Roku listens, discovery answers, and the chosen address exists. Anything less shows the instance yellow; the log names the cause once, and the adapter retries a Roku or discovery that is down every minute until it runs again. |
+| Datapoint               | Type               | Meaning                                                                                                                                                                                                                                                                                 |
+| ----------------------- | ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `info.connection`       | boolean, read-only | True only while everything runs: **every** configured Roku listens, discovery answers, and the chosen address exists. Anything less shows the instance yellow; the log names the cause once, and the adapter retries a Roku or discovery that is down every minute until it runs again. |
+| `info.devicesTotal`     | number, read-only  | How many emulated Rokus are configured.                                                                                                                                                                                                                                                 |
+| `info.devicesOnline`    | number, read-only  | How many of them listen right now.                                                                                                                                                                                                                                                      |
+| `info.devicesAllOnline` | boolean, read-only | `true` while every configured Roku listens; `false` while none is configured.                                                                                                                                                                                                           |
 
 For each emulated Roku, below `fakeroku.0.<name>`:
 
-| Datapoint    | Type               | Meaning                                                                                                                                           |
-| ------------ | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `command`    | string, read-only  | The last command as readable text: `Home`, `Lit_a`, `launch:12`, `search:news`.                                                                   |
-| `keys.<Key>` | boolean, read-only | One datapoint per remote key. A key press sets it to `true` for a moment and back to `false`; holding a key keeps it `true` until it is released. |
+| Datapoint     | Type               | Meaning                                                                                                                                                                                                             |
+| ------------- | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `info.online` | boolean, read-only | `true` while this Roku listens on its port. The device shows a green or grey symbol in the object tree, its card in the device manager online or offline.                                                           |
+| `info.error`  | string, read-only  | Why this Roku does not run, e.g. `port 8061 is already in use (another program or another instance holds it)`; empty while it runs, `Unknown` while the adapter is off or starting. The card shows it as a warning. |
+| `command`     | string, read-only  | The last command as readable text: `Home`, `Lit_a`, `launch:12`, `search:news`.                                                                                                                                     |
+| `keys.<Key>`  | boolean, read-only | One datapoint per remote key. A key press sets it to `true` for a moment and back to `false`; holding a key keeps it `true` until it is released.                                                                   |
 
 Typing on the remote's keyboard (`Lit_a`) and app launches appear in `command` only —
 they do not get datapoints of their own. An app button of a remote that sends app
@@ -162,9 +167,11 @@ on all addresses meanwhile, and the instance shows yellow. Choose the current ad
 "all interfaces") and save; the instance restarts.
 
 **The instance stays yellow.**
-Something does not run, and the log says what, once. Most often a configured Roku could
-not start because its port is already used by something else (including another
-emulated Roku with the same port) — give it a free port. The adapter keeps trying such a
+Something does not run, and the log says what, once. The Roku's card in the device
+manager shows which one it is (offline, with the reason), and so does its `info.error`;
+`info.devicesOnline` says how many run. Most often a configured Roku could not start
+because its port is already used by something else (including another emulated Roku
+with the same port) — give it a free port. The adapter keeps trying such a
 Roku once a minute, also one whose server stopped while running, and says so in the log
 when it comes up, so a port that was still held by the previous process after a restart
 sorts itself out without you doing anything. With no Roku configured at all, the log asks

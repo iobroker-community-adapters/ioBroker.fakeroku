@@ -57,6 +57,120 @@
     },
     "native": {}
   },
+  "fakeroku.0.info.devicesAllOnline": {
+    "_id": "fakeroku.0.info.devicesAllOnline",
+    "type": "state",
+    "common": {
+      "role": "indicator",
+      "name": {
+        "en": "All emulated Rokus online",
+        "de": "Alle emulierten Rokus online",
+        "ru": "Все эмулированные Roku в сети",
+        "pt": "Todos os Rokus emulados online",
+        "nl": "Alle geëmuleerde Roku's online",
+        "fr": "Tous les Rokus émulés en ligne",
+        "it": "Tutti i Roku emulati online",
+        "es": "Todos los Rokus emulados en línea",
+        "pl": "Wszystkie emulowane Roku online",
+        "uk": "Усі емульовані Roku у мережі",
+        "zh-cn": "所有模拟 Roku 均在线"
+      },
+      "type": "boolean",
+      "read": true,
+      "write": false,
+      "def": false,
+      "desc": {
+        "en": "True while every configured emulated Roku listens; false while none is configured.",
+        "de": "Wahr, solange jeder eingerichtete emulierte Roku lauscht; falsch, solange keiner eingerichtet ist.",
+        "ru": "Истина, пока слушает каждый настроенный эмулированный Roku; ложь, пока ни один не настроен.",
+        "pt": "Verdadeiro enquanto cada Roku emulado configurado está à escuta; falso enquanto nenhum está configurado.",
+        "nl": "Waar zolang elke ingestelde geëmuleerde Roku luistert; onwaar zolang er geen is ingesteld.",
+        "fr": "Vrai tant que chaque Roku émulé configuré écoute ; faux tant qu'aucun n'est configuré.",
+        "it": "Vero finché ogni Roku emulato configurato è in ascolto; falso finché nessuno è configurato.",
+        "es": "Verdadero mientras cada Roku emulado configurado escucha; falso mientras no hay ninguno configurado.",
+        "pl": "Prawda, dopóki nasłuchuje każdy skonfigurowany emulowany Roku; fałsz, dopóki żaden nie jest skonfigurowany.",
+        "uk": "Істина, поки слухає кожен налаштований емульований Roku; хибність, поки жоден не налаштований.",
+        "zh-cn": "每个已配置的模拟 Roku 都在监听时为真；未配置任何 Roku 时为假。"
+      }
+    },
+    "native": {}
+  },
+  "fakeroku.0.info.devicesOnline": {
+    "_id": "fakeroku.0.info.devicesOnline",
+    "type": "state",
+    "common": {
+      "role": "value",
+      "name": {
+        "en": "Emulated Rokus online",
+        "de": "Emulierte Rokus online",
+        "ru": "Эмулированные Roku в сети",
+        "pt": "Rokus emulados online",
+        "nl": "Geëmuleerde Roku's online",
+        "fr": "Rokus émulés en ligne",
+        "it": "Roku emulati online",
+        "es": "Rokus emulados en línea",
+        "pl": "Emulowane Roku online",
+        "uk": "Емульовані Roku у мережі",
+        "zh-cn": "在线的模拟 Roku"
+      },
+      "type": "number",
+      "read": true,
+      "write": false,
+      "def": 0,
+      "desc": {
+        "en": "How many emulated Rokus listen right now.",
+        "de": "Wie viele emulierte Rokus gerade lauschen.",
+        "ru": "Сколько эмулированных Roku сейчас слушают.",
+        "pt": "Quantos Rokus emulados estão à escuta neste momento.",
+        "nl": "Hoeveel geëmuleerde Roku's op dit moment luisteren.",
+        "fr": "Combien de Rokus émulés écoutent en ce moment.",
+        "it": "Quanti Roku emulati sono in ascolto in questo momento.",
+        "es": "Cuántos Rokus emulados escuchan ahora mismo.",
+        "pl": "Ile emulowanych Roku nasłuchuje w tej chwili.",
+        "uk": "Скільки емульованих Roku зараз слухають.",
+        "zh-cn": "当前正在监听的模拟 Roku 数量。"
+      }
+    },
+    "native": {}
+  },
+  "fakeroku.0.info.devicesTotal": {
+    "_id": "fakeroku.0.info.devicesTotal",
+    "type": "state",
+    "common": {
+      "role": "value",
+      "name": {
+        "en": "Emulated Rokus",
+        "de": "Emulierte Rokus",
+        "ru": "Эмулированные Roku",
+        "pt": "Rokus emulados",
+        "nl": "Geëmuleerde Roku's",
+        "fr": "Rokus émulés",
+        "it": "Roku emulati",
+        "es": "Rokus emulados",
+        "pl": "Emulowane Roku",
+        "uk": "Емульовані Roku",
+        "zh-cn": "模拟 Roku 数量"
+      },
+      "type": "number",
+      "read": true,
+      "write": false,
+      "def": 0,
+      "desc": {
+        "en": "How many emulated Rokus are configured.",
+        "de": "Wie viele emulierte Rokus eingerichtet sind.",
+        "ru": "Сколько эмулированных Roku настроено.",
+        "pt": "Quantos Rokus emulados estão configurados.",
+        "nl": "Hoeveel geëmuleerde Roku's er zijn ingesteld.",
+        "fr": "Combien de Rokus émulés sont configurés.",
+        "it": "Quanti Roku emulati sono configurati.",
+        "es": "Cuántos Rokus emulados están configurados.",
+        "pl": "Ile emulowanych Roku jest skonfigurowanych.",
+        "uk": "Скільки емульованих Roku налаштовано.",
+        "zh-cn": "已配置的模拟 Roku 数量。"
+      }
+    },
+    "native": {}
+  },
   "fakeroku.0.Player": {
     "type": "device",
     "common": {
@@ -72,6 +186,9 @@
         "pl": "Player",
         "uk": "Player",
         "zh-cn": "Player"
+      },
+      "statusStates": {
+        "onlineId": "info.online"
       }
     },
     "native": {},
@@ -114,6 +231,115 @@
     },
     "native": {},
     "_id": "fakeroku.0.Player.command"
+  },
+  "fakeroku.0.Player.info": {
+    "type": "channel",
+    "common": {
+      "name": {
+        "de": "Status",
+        "en": "Status",
+        "es": "Estado",
+        "fr": "État",
+        "it": "Stato",
+        "nl": "Status",
+        "pl": "Stan",
+        "pt": "Estado",
+        "ru": "Состояние",
+        "uk": "Стан",
+        "zh-cn": "状态"
+      },
+      "desc": {
+        "de": "Ob dieser emulierte Roku läuft und, falls nicht, warum.",
+        "en": "Whether this emulated Roku runs and, if not, why.",
+        "es": "Si este Roku emulado funciona y, si no, por qué.",
+        "fr": "Si ce Roku émulé fonctionne et, sinon, pourquoi.",
+        "it": "Se questo Roku emulato è in funzione e, in caso contrario, perché.",
+        "nl": "Of deze geëmuleerde Roku draait en, zo niet, waarom.",
+        "pl": "Czy ten emulowany Roku działa, a jeśli nie, to dlaczego.",
+        "pt": "Se este Roku emulado está a funcionar e, se não, porquê.",
+        "ru": "Работает ли этот эмулированный Roku и, если нет, почему.",
+        "uk": "Чи працює цей емульований Roku і, якщо ні, чому.",
+        "zh-cn": "此模拟 Roku 是否在运行，如未运行则说明原因。"
+      }
+    },
+    "native": {},
+    "_id": "fakeroku.0.Player.info"
+  },
+  "fakeroku.0.Player.info.error": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Fehler",
+        "en": "Error",
+        "es": "Error",
+        "fr": "Erreur",
+        "it": "Errore",
+        "nl": "Fout",
+        "pl": "Błąd",
+        "pt": "Erro",
+        "ru": "Ошибка",
+        "uk": "Помилка",
+        "zh-cn": "错误"
+      },
+      "desc": {
+        "de": "Warum dieser emulierte Roku nicht läuft; leer, solange er läuft, Unknown, solange der Adapter aus ist oder startet.",
+        "en": "Why this emulated Roku does not run; empty while it runs, Unknown while the adapter is off or starting.",
+        "es": "Por qué este Roku emulado no funciona; vacío mientras funciona, Unknown mientras el adaptador está apagado o arrancando.",
+        "fr": "Pourquoi ce Roku émulé ne fonctionne pas ; vide tant qu'il fonctionne, Unknown tant que l'adaptateur est arrêté ou démarre.",
+        "it": "Perché questo Roku emulato non è in funzione; vuoto finché funziona, Unknown finché l'adattatore è spento o si avvia.",
+        "nl": "Waarom deze geëmuleerde Roku niet draait; leeg zolang hij draait, Unknown zolang de adapter uit staat of start.",
+        "pl": "Dlaczego ten emulowany Roku nie działa; puste, gdy działa, Unknown, gdy adapter jest wyłączony lub się uruchamia.",
+        "pt": "Porque é que este Roku emulado não funciona; vazio enquanto funciona, Unknown enquanto o adaptador está desligado ou a arrancar.",
+        "ru": "Почему этот эмулированный Roku не работает; пусто, пока он работает, Unknown, пока адаптер выключен или запускается.",
+        "uk": "Чому цей емульований Roku не працює; порожньо, поки він працює, Unknown, поки адаптер вимкнений або запускається.",
+        "zh-cn": "此模拟 Roku 未运行的原因；运行时为空，适配器关闭或启动时为 Unknown。"
+      },
+      "type": "string",
+      "role": "text",
+      "read": true,
+      "write": false,
+      "def": "Unknown"
+    },
+    "native": {},
+    "_id": "fakeroku.0.Player.info.error"
+  },
+  "fakeroku.0.Player.info.online": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Online",
+        "en": "Online",
+        "es": "En línea",
+        "fr": "En ligne",
+        "it": "Online",
+        "nl": "Online",
+        "pl": "Online",
+        "pt": "Online",
+        "ru": "В сети",
+        "uk": "У мережі",
+        "zh-cn": "在线"
+      },
+      "desc": {
+        "de": "Wahr, solange dieser emulierte Roku auf seinem ECP-Port lauscht.",
+        "en": "True while this emulated Roku listens on its ECP port.",
+        "es": "Verdadero mientras este Roku emulado escucha en su puerto ECP.",
+        "fr": "Vrai tant que ce Roku émulé écoute sur son port ECP.",
+        "it": "Vero finché questo Roku emulato è in ascolto sulla sua porta ECP.",
+        "nl": "Waar zolang deze geëmuleerde Roku op zijn ECP-poort luistert.",
+        "pl": "Prawda, dopóki ten emulowany Roku nasłuchuje na swoim porcie ECP.",
+        "pt": "Verdadeiro enquanto este Roku emulado está à escuta na sua porta ECP.",
+        "ru": "Истина, пока этот эмулированный Roku слушает свой порт ECP.",
+        "uk": "Істина, поки цей емульований Roku слухає свій порт ECP.",
+        "zh-cn": "此模拟 Roku 在其 ECP 端口上监听时为真。"
+      },
+      "type": "boolean",
+      "role": "indicator.reachable",
+      "read": true,
+      "write": false,
+      "def": false
+    },
+    "native": {},
+    "_id": "fakeroku.0.Player.info.online"
   },
   "fakeroku.0.Player.keys": {
     "type": "channel",
@@ -563,6 +789,9 @@
         "pl": "TV",
         "uk": "TV",
         "zh-cn": "TV"
+      },
+      "statusStates": {
+        "onlineId": "info.online"
       }
     },
     "native": {},
@@ -605,6 +834,115 @@
     },
     "native": {},
     "_id": "fakeroku.0.TV.command"
+  },
+  "fakeroku.0.TV.info": {
+    "type": "channel",
+    "common": {
+      "name": {
+        "de": "Status",
+        "en": "Status",
+        "es": "Estado",
+        "fr": "État",
+        "it": "Stato",
+        "nl": "Status",
+        "pl": "Stan",
+        "pt": "Estado",
+        "ru": "Состояние",
+        "uk": "Стан",
+        "zh-cn": "状态"
+      },
+      "desc": {
+        "de": "Ob dieser emulierte Roku läuft und, falls nicht, warum.",
+        "en": "Whether this emulated Roku runs and, if not, why.",
+        "es": "Si este Roku emulado funciona y, si no, por qué.",
+        "fr": "Si ce Roku émulé fonctionne et, sinon, pourquoi.",
+        "it": "Se questo Roku emulato è in funzione e, in caso contrario, perché.",
+        "nl": "Of deze geëmuleerde Roku draait en, zo niet, waarom.",
+        "pl": "Czy ten emulowany Roku działa, a jeśli nie, to dlaczego.",
+        "pt": "Se este Roku emulado está a funcionar e, se não, porquê.",
+        "ru": "Работает ли этот эмулированный Roku и, если нет, почему.",
+        "uk": "Чи працює цей емульований Roku і, якщо ні, чому.",
+        "zh-cn": "此模拟 Roku 是否在运行，如未运行则说明原因。"
+      }
+    },
+    "native": {},
+    "_id": "fakeroku.0.TV.info"
+  },
+  "fakeroku.0.TV.info.error": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Fehler",
+        "en": "Error",
+        "es": "Error",
+        "fr": "Erreur",
+        "it": "Errore",
+        "nl": "Fout",
+        "pl": "Błąd",
+        "pt": "Erro",
+        "ru": "Ошибка",
+        "uk": "Помилка",
+        "zh-cn": "错误"
+      },
+      "desc": {
+        "de": "Warum dieser emulierte Roku nicht läuft; leer, solange er läuft, Unknown, solange der Adapter aus ist oder startet.",
+        "en": "Why this emulated Roku does not run; empty while it runs, Unknown while the adapter is off or starting.",
+        "es": "Por qué este Roku emulado no funciona; vacío mientras funciona, Unknown mientras el adaptador está apagado o arrancando.",
+        "fr": "Pourquoi ce Roku émulé ne fonctionne pas ; vide tant qu'il fonctionne, Unknown tant que l'adaptateur est arrêté ou démarre.",
+        "it": "Perché questo Roku emulato non è in funzione; vuoto finché funziona, Unknown finché l'adattatore è spento o si avvia.",
+        "nl": "Waarom deze geëmuleerde Roku niet draait; leeg zolang hij draait, Unknown zolang de adapter uit staat of start.",
+        "pl": "Dlaczego ten emulowany Roku nie działa; puste, gdy działa, Unknown, gdy adapter jest wyłączony lub się uruchamia.",
+        "pt": "Porque é que este Roku emulado não funciona; vazio enquanto funciona, Unknown enquanto o adaptador está desligado ou a arrancar.",
+        "ru": "Почему этот эмулированный Roku не работает; пусто, пока он работает, Unknown, пока адаптер выключен или запускается.",
+        "uk": "Чому цей емульований Roku не працює; порожньо, поки він працює, Unknown, поки адаптер вимкнений або запускається.",
+        "zh-cn": "此模拟 Roku 未运行的原因；运行时为空，适配器关闭或启动时为 Unknown。"
+      },
+      "type": "string",
+      "role": "text",
+      "read": true,
+      "write": false,
+      "def": "Unknown"
+    },
+    "native": {},
+    "_id": "fakeroku.0.TV.info.error"
+  },
+  "fakeroku.0.TV.info.online": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Online",
+        "en": "Online",
+        "es": "En línea",
+        "fr": "En ligne",
+        "it": "Online",
+        "nl": "Online",
+        "pl": "Online",
+        "pt": "Online",
+        "ru": "В сети",
+        "uk": "У мережі",
+        "zh-cn": "在线"
+      },
+      "desc": {
+        "de": "Wahr, solange dieser emulierte Roku auf seinem ECP-Port lauscht.",
+        "en": "True while this emulated Roku listens on its ECP port.",
+        "es": "Verdadero mientras este Roku emulado escucha en su puerto ECP.",
+        "fr": "Vrai tant que ce Roku émulé écoute sur son port ECP.",
+        "it": "Vero finché questo Roku emulato è in ascolto sulla sua porta ECP.",
+        "nl": "Waar zolang deze geëmuleerde Roku op zijn ECP-poort luistert.",
+        "pl": "Prawda, dopóki ten emulowany Roku nasłuchuje na swoim porcie ECP.",
+        "pt": "Verdadeiro enquanto este Roku emulado está à escuta na sua porta ECP.",
+        "ru": "Истина, пока этот эмулированный Roku слушает свой порт ECP.",
+        "uk": "Істина, поки цей емульований Roku слухає свій порт ECP.",
+        "zh-cn": "此模拟 Roku 在其 ECP 端口上监听时为真。"
+      },
+      "type": "boolean",
+      "role": "indicator.reachable",
+      "read": true,
+      "write": false,
+      "def": false
+    },
+    "native": {},
+    "_id": "fakeroku.0.TV.info.online"
   },
   "fakeroku.0.TV.keys": {
     "type": "channel",

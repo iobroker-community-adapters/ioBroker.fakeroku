@@ -293,6 +293,120 @@
         }
       },
       "native": {}
+    },
+    {
+      "_id": "info.devicesTotal",
+      "type": "state",
+      "common": {
+        "role": "value",
+        "name": {
+          "en": "Emulated Rokus",
+          "de": "Emulierte Rokus",
+          "ru": "Эмулированные Roku",
+          "pt": "Rokus emulados",
+          "nl": "Geëmuleerde Roku's",
+          "fr": "Rokus émulés",
+          "it": "Roku emulati",
+          "es": "Rokus emulados",
+          "pl": "Emulowane Roku",
+          "uk": "Емульовані Roku",
+          "zh-cn": "模拟 Roku 数量"
+        },
+        "type": "number",
+        "read": true,
+        "write": false,
+        "def": 0,
+        "desc": {
+          "en": "How many emulated Rokus are configured.",
+          "de": "Wie viele emulierte Rokus eingerichtet sind.",
+          "ru": "Сколько эмулированных Roku настроено.",
+          "pt": "Quantos Rokus emulados estão configurados.",
+          "nl": "Hoeveel geëmuleerde Roku's er zijn ingesteld.",
+          "fr": "Combien de Rokus émulés sont configurés.",
+          "it": "Quanti Roku emulati sono configurati.",
+          "es": "Cuántos Rokus emulados están configurados.",
+          "pl": "Ile emulowanych Roku jest skonfigurowanych.",
+          "uk": "Скільки емульованих Roku налаштовано.",
+          "zh-cn": "已配置的模拟 Roku 数量。"
+        }
+      },
+      "native": {}
+    },
+    {
+      "_id": "info.devicesOnline",
+      "type": "state",
+      "common": {
+        "role": "value",
+        "name": {
+          "en": "Emulated Rokus online",
+          "de": "Emulierte Rokus online",
+          "ru": "Эмулированные Roku в сети",
+          "pt": "Rokus emulados online",
+          "nl": "Geëmuleerde Roku's online",
+          "fr": "Rokus émulés en ligne",
+          "it": "Roku emulati online",
+          "es": "Rokus emulados en línea",
+          "pl": "Emulowane Roku online",
+          "uk": "Емульовані Roku у мережі",
+          "zh-cn": "在线的模拟 Roku"
+        },
+        "type": "number",
+        "read": true,
+        "write": false,
+        "def": 0,
+        "desc": {
+          "en": "How many emulated Rokus listen right now.",
+          "de": "Wie viele emulierte Rokus gerade lauschen.",
+          "ru": "Сколько эмулированных Roku сейчас слушают.",
+          "pt": "Quantos Rokus emulados estão à escuta neste momento.",
+          "nl": "Hoeveel geëmuleerde Roku's op dit moment luisteren.",
+          "fr": "Combien de Rokus émulés écoutent en ce moment.",
+          "it": "Quanti Roku emulati sono in ascolto in questo momento.",
+          "es": "Cuántos Rokus emulados escuchan ahora mismo.",
+          "pl": "Ile emulowanych Roku nasłuchuje w tej chwili.",
+          "uk": "Скільки емульованих Roku зараз слухають.",
+          "zh-cn": "当前正在监听的模拟 Roku 数量。"
+        }
+      },
+      "native": {}
+    },
+    {
+      "_id": "info.devicesAllOnline",
+      "type": "state",
+      "common": {
+        "role": "indicator",
+        "name": {
+          "en": "All emulated Rokus online",
+          "de": "Alle emulierten Rokus online",
+          "ru": "Все эмулированные Roku в сети",
+          "pt": "Todos os Rokus emulados online",
+          "nl": "Alle geëmuleerde Roku's online",
+          "fr": "Tous les Rokus émulés en ligne",
+          "it": "Tutti i Roku emulati online",
+          "es": "Todos los Rokus emulados en línea",
+          "pl": "Wszystkie emulowane Roku online",
+          "uk": "Усі емульовані Roku у мережі",
+          "zh-cn": "所有模拟 Roku 均在线"
+        },
+        "type": "boolean",
+        "read": true,
+        "write": false,
+        "def": false,
+        "desc": {
+          "en": "True while every configured emulated Roku listens; false while none is configured.",
+          "de": "Wahr, solange jeder eingerichtete emulierte Roku lauscht; falsch, solange keiner eingerichtet ist.",
+          "ru": "Истина, пока слушает каждый настроенный эмулированный Roku; ложь, пока ни один не настроен.",
+          "pt": "Verdadeiro enquanto cada Roku emulado configurado está à escuta; falso enquanto nenhum está configurado.",
+          "nl": "Waar zolang elke ingestelde geëmuleerde Roku luistert; onwaar zolang er geen is ingesteld.",
+          "fr": "Vrai tant que chaque Roku émulé configuré écoute ; faux tant qu'aucun n'est configuré.",
+          "it": "Vero finché ogni Roku emulato configurato è in ascolto; falso finché nessuno è configurato.",
+          "es": "Verdadero mientras cada Roku emulado configurado escucha; falso mientras no hay ninguno configurado.",
+          "pl": "Prawda, dopóki nasłuchuje każdy skonfigurowany emulowany Roku; fałsz, dopóki żaden nie jest skonfigurowany.",
+          "uk": "Істина, поки слухає кожен налаштований емульований Roku; хибність, поки жоден не налаштований.",
+          "zh-cn": "每个已配置的模拟 Roku 都在监听时为真；未配置任何 Roku 时为假。"
+        }
+      },
+      "native": {}
     }
   ]
 }

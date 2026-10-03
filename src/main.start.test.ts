@@ -426,6 +426,20 @@ describe("Fakeroku onReady — names and descriptions", () => {
     });
   });
 
+  it("re-applies the names of the three device counts on every start", async () => {
+    const ctx = setup();
+    const counts = ["devicesTotal", "devicesOnline", "devicesAllOnline"];
+    for (const key of counts) {
+      ctx.i.objects.set(`info.${key}`, { type: "state", common: { name: "an older name" }, native: {} });
+    }
+    await ctx.i.onReady();
+    for (const key of counts) {
+      expect(ctx.i.objects.get(`info.${key}`), key).toMatchObject({
+        common: { name: { en: key }, desc: { en: `${key}Desc` } },
+      });
+    }
+  });
+
   it("leaves its own info objects alone once they carry the current texts — no rewrite on every start", async () => {
     // Every unchanged write still stamps ts and reaches every subscriber.
     const ctx = setup();
@@ -535,6 +549,41 @@ describe("Fakeroku onReady — key states are released at start-up", () => {
     await comesUp.i.onReady();
     expect(comesUp.i.written.filter(id => id === "info.connection")).toHaveLength(1);
     expect(comesUp.i.states.get("info.connection")).toEqual({ val: true, ack: true });
+  });
+
+  it("writes a Roku's marker, reason and the counts only when they change", async () => {
+    // A restart after a clean stop finds offline/Unknown and the counts as the stop left them:
+    // the start stamp writes none of them, the report after the start writes each once.
+    const ctx = setup();
+    ctx.i.states.set("Wohnzimmer.info.online", { val: false, ack: true });
+    ctx.i.states.set("Wohnzimmer.info.error", { val: "Unknown", ack: true });
+    ctx.i.states.set("info.devicesTotal", { val: 1, ack: true });
+    ctx.i.states.set("info.devicesOnline", { val: 0, ack: true });
+    ctx.i.states.set("info.devicesAllOnline", { val: false, ack: true });
+    await ctx.i.onReady();
+    for (const id of [
+      "Wohnzimmer.info.online",
+      "Wohnzimmer.info.error",
+      "info.devicesOnline",
+      "info.devicesAllOnline",
+    ]) {
+      expect(
+        ctx.i.written.filter(w => w === id),
+        id,
+      ).toHaveLength(1);
+    }
+    expect(ctx.i.written).not.toContain("info.devicesTotal");
+    expect(ctx.i.states.get("Wohnzimmer.info.online")).toEqual({ val: true, ack: true });
+    expect(ctx.i.states.get("Wohnzimmer.info.error")).toEqual({ val: "", ack: true });
+  });
+
+  it("stamps no Roku that has no status yet", async () => {
+    // The start stamp only touches status datapoints that hold a value; a Roku that never had
+    // one gets its first value from the report after the start.
+    const ctx = setup();
+    await ctx.i.onReady();
+    expect(ctx.i.written.filter(id => id === "Wohnzimmer.info.error")).toHaveLength(1);
+    expect(ctx.i.states.get("Wohnzimmer.info.error")).toEqual({ val: "", ack: true });
   });
 
   it("touches no key that is already false", async () => {

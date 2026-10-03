@@ -31,5 +31,17 @@
   "stateLastCommand": "Last command",
   "stateLastCommandDesc": "The most recent command this emulated Roku received, as plain text.",
   "channelKeys": "Remote keys",
-  "channelKeysDesc": "One state per remote key this device offers; a key press pulses it briefly."
+  "channelKeysDesc": "One state per remote key this device offers; a key press pulses it briefly.",
+  "channelDeviceInfo": "Status",
+  "channelDeviceInfoDesc": "Whether this emulated Roku runs and, if not, why.",
+  "stateOnline": "Online",
+  "stateOnlineDesc": "True while this emulated Roku listens on its ECP port.",
+  "stateError": "Error",
+  "stateErrorDesc": "Why this emulated Roku does not run; empty while it runs, Unknown while the adapter is off or starting.",
+  "devicesTotal": "Emulated Rokus",
+  "devicesTotalDesc": "How many emulated Rokus are configured.",
+  "devicesOnline": "Emulated Rokus online",
+  "devicesOnlineDesc": "How many emulated Rokus listen right now.",
+  "devicesAllOnline": "All emulated Rokus online",
+  "devicesAllOnlineDesc": "True while every configured emulated Roku listens; false while none is configured."
 }

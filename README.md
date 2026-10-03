@@ -75,11 +75,16 @@ At instance level:
 | Datapoint | Type | Meaning |
 |---|---|---|
 | `info.connection` | boolean, read-only | `true` only while everything runs: **every** configured Roku listens, discovery answers, and the chosen address exists. Anything less shows the instance yellow; the log names the cause once, and the adapter retries a Roku or discovery that is down every minute. |
+| `info.devicesTotal` | number, read-only | How many emulated Rokus are configured. |
+| `info.devicesOnline` | number, read-only | How many of them listen right now. |
+| `info.devicesAllOnline` | boolean, read-only | `true` while every configured Roku listens; `false` while none is configured. |
 
 For every emulated Roku (`fakeroku.0.<name>`):
 
 | Datapoint | Type | Meaning |
 |---|---|---|
+| `.info.online` | boolean, read-only | `true` while this Roku listens on its port. The device shows a green or grey symbol in the object tree, its card in the device manager online or offline. |
+| `.info.error` | string, read-only | Why this Roku does not run, e.g. `port 8061 is already in use (another program or another instance holds it)`; empty while it runs, `Unknown` while the adapter is off or starting. The card shows it as a warning. |
 | `.command` | string, read-only | The last command as plain text (`Home`, `Lit_a`, `launch:12`, `search:news`). One datapoint for everything — no object-per-character sprawl. |
 | `.keys.<Key>` | boolean, read-only | One state per remote key the device type exposes — a *Player* has the 16 navigation/playback keys, a *TV* adds Volume\*, PowerOn/PowerOff/Power, Sleep, Channel\*, Tuner/HDMI/AV inputs — all created up front. A keypress pulses it `true` for a moment; keydown/keyup hold it. Key names are read in any case (`home` is `Home`). |
 
@@ -103,6 +108,8 @@ becomes `true` — or watch `.command` for the last button as text.
 
 ### **WORK IN PROGRESS**
 
+- (krobipd) New: every emulated Roku shows whether it runs and, if not, why — a green or grey symbol in the object tree, online or offline on its card with the reason.
+- (krobipd) New: three datapoints count the emulated Rokus — how many are configured, how many run, and whether all of them run.
 - (krobipd) Fixed: the connection datapoint's description says what green means — every Roku listening, discovery answering and the chosen address present.
 
 ### 1.9.0 (2026-10-03)

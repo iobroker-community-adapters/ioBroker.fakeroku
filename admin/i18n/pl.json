@@ -31,5 +31,17 @@
   "stateLastCommand": "Ostatnie polecenie",
   "stateLastCommandDesc": "Najnowsze polecenie odebrane przez ten emulowany Roku, jako zwykły tekst.",
   "channelKeys": "Klawisze pilota",
-  "channelKeysDesc": "Jeden stan na każdy klawisz oferowany przez to urządzenie; naciśnięcie ustawia go na krótko na wartość true."
+  "channelKeysDesc": "Jeden stan na każdy klawisz oferowany przez to urządzenie; naciśnięcie ustawia go na krótko na wartość true.",
+  "channelDeviceInfo": "Stan",
+  "channelDeviceInfoDesc": "Czy ten emulowany Roku działa, a jeśli nie, to dlaczego.",
+  "stateOnline": "Online",
+  "stateOnlineDesc": "Prawda, dopóki ten emulowany Roku nasłuchuje na swoim porcie ECP.",
+  "stateError": "Błąd",
+  "stateErrorDesc": "Dlaczego ten emulowany Roku nie działa; puste, gdy działa, Unknown, gdy adapter jest wyłączony lub się uruchamia.",
+  "devicesTotal": "Emulowane Roku",
+  "devicesTotalDesc": "Ile emulowanych Roku jest skonfigurowanych.",
+  "devicesOnline": "Emulowane Roku online",
+  "devicesOnlineDesc": "Ile emulowanych Roku nasłuchuje w tej chwili.",
+  "devicesAllOnline": "Wszystkie emulowane Roku online",
+  "devicesAllOnlineDesc": "Prawda, dopóki nasłuchuje każdy skonfigurowany emulowany Roku; fałsz, dopóki żaden nie jest skonfigurowany."
 }

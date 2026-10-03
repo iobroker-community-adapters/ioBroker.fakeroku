@@ -31,5 +31,17 @@
   "stateLastCommand": "Laatste opdracht",
   "stateLastCommandDesc": "De meest recente opdracht die deze geëmuleerde Roku ontving, als platte tekst.",
   "channelKeys": "Afstandsbedieningstoetsen",
-  "channelKeysDesc": "Eén status per toets die dit apparaat biedt; een toetsdruk zet hem kort op waar."
+  "channelKeysDesc": "Eén status per toets die dit apparaat biedt; een toetsdruk zet hem kort op waar.",
+  "channelDeviceInfo": "Status",
+  "channelDeviceInfoDesc": "Of deze geëmuleerde Roku draait en, zo niet, waarom.",
+  "stateOnline": "Online",
+  "stateOnlineDesc": "Waar zolang deze geëmuleerde Roku op zijn ECP-poort luistert.",
+  "stateError": "Fout",
+  "stateErrorDesc": "Waarom deze geëmuleerde Roku niet draait; leeg zolang hij draait, Unknown zolang de adapter uit staat of start.",
+  "devicesTotal": "Geëmuleerde Roku's",
+  "devicesTotalDesc": "Hoeveel geëmuleerde Roku's er zijn ingesteld.",
+  "devicesOnline": "Geëmuleerde Roku's online",
+  "devicesOnlineDesc": "Hoeveel geëmuleerde Roku's op dit moment luisteren.",
+  "devicesAllOnline": "Alle geëmuleerde Roku's online",
+  "devicesAllOnlineDesc": "Waar zolang elke ingestelde geëmuleerde Roku luistert; onwaar zolang er geen is ingesteld."
 }

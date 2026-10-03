@@ -31,5 +31,17 @@
   "stateLastCommand": "Letzter Befehl",
   "stateLastCommandDesc": "Der zuletzt empfangene Befehl dieses emulierten Roku als Klartext.",
   "channelKeys": "Fernbedienungstasten",
-  "channelKeysDesc": "Ein Datenpunkt je Taste, die dieses Gerät anbietet; ein Tastendruck setzt ihn kurz auf wahr."
+  "channelKeysDesc": "Ein Datenpunkt je Taste, die dieses Gerät anbietet; ein Tastendruck setzt ihn kurz auf wahr.",
+  "channelDeviceInfo": "Status",
+  "channelDeviceInfoDesc": "Ob dieser emulierte Roku läuft und, falls nicht, warum.",
+  "stateOnline": "Online",
+  "stateOnlineDesc": "Wahr, solange dieser emulierte Roku auf seinem ECP-Port lauscht.",
+  "stateError": "Fehler",
+  "stateErrorDesc": "Warum dieser emulierte Roku nicht läuft; leer, solange er läuft, Unknown, solange der Adapter aus ist oder startet.",
+  "devicesTotal": "Emulierte Rokus",
+  "devicesTotalDesc": "Wie viele emulierte Rokus eingerichtet sind.",
+  "devicesOnline": "Emulierte Rokus online",
+  "devicesOnlineDesc": "Wie viele emulierte Rokus gerade lauschen.",
+  "devicesAllOnline": "Alle emulierten Rokus online",
+  "devicesAllOnlineDesc": "Wahr, solange jeder eingerichtete emulierte Roku lauscht; falsch, solange keiner eingerichtet ist."
 }

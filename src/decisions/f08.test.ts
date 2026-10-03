@@ -1,9 +1,12 @@
-// Guard of F-08 (krobi 2026-10-03 00:14 / 00:17 / 00:18 / 00:36): green means everything runs, yellow means something is
-// wrong and a part runs, red is only a process that is gone — no Roku configured or none running is yellow with a line,
-// the instance stays up for the device manager; a busy port, a dead server and a failed discovery are retried every
-// minute; there is no datapoint per Roku. Every problem writes one line with its likely cause when it first occurs,
-// repeats only on debug, and one info line when it works again. Sealed in the register — a change goes through the
-// Werkbank.
+// Guard of F-08 (krobi 2026-10-03 00:14 / 00:17 / 00:18 / 00:36, extended 15:18): green means everything runs, yellow
+// means something is wrong and a part runs, red is only a process that is gone — no Roku configured or none running is
+// yellow with a line, the instance stays up for the device manager; a busy port, a dead server and a failed discovery
+// are retried every minute. Every problem writes one line with its likely cause when it first occurs, repeats only on
+// debug, and one info line when it works again. Every Roku has `info.online` (its ECP server listens) and `info.error`
+// (`Unknown` while the adapter is off or has not started it yet, empty while it runs, else the cause); the device shows
+// its symbol through `statusStates`, its card in the device manager shows online/offline and the reason; beside them
+// `info.devicesTotal`, `info.devicesOnline` and `info.devicesAllOnline`. Sealed in the register — a change goes through
+// the Werkbank.
 import { describe, expect, it, vi } from "vitest";
 // The adapter runtime without js-controller: an inline stand-in for @iobroker/adapter-core that keeps objects, states
 // and the instance object in maps, managed timers that fire only when a test fires them, and a log of spies. The device
@@ -107,15 +110,18 @@ vi.mock("node:os", async importOriginal => {
   });
   return { ...actual, default: { ...actual, networkInterfaces }, networkInterfaces };
 });
+import type * as DeviceManagementModule from "../device-management";
 import { Fakeroku } from "../main";
 
 /** What a guard reaches in the adapter under test: its private start, its stand-in maps and spies. */
 interface Run {
   onReady(): Promise<void>;
+  onUnload(callback: () => void): void;
   config: Record<string, unknown>;
   log: Record<"debug" | "info" | "warn" | "error", ReturnType<typeof vi.fn>>;
   terminate: ReturnType<typeof vi.fn>;
   objects: Map<string, Record<string, unknown>>;
+  getAdapterObjectsAsync(): Promise<unknown>;
   states: Map<string, { val: unknown; ack: boolean }>;
   instance: { common: Record<string, unknown>; native: Record<string, unknown> };
   nativeWrites: Record<string, unknown>[];
@@ -216,7 +222,7 @@ const two = {
   ],
 };
 
-describe("F-08 — green, yellow, and no datapoint per Roku", () => {
+describe("F-08 — green and yellow", () => {
   it("is green while every Roku and discovery run", async () => {
     const { run } = adapterWith(two);
     await run.onReady();
@@ -277,21 +283,166 @@ describe("F-08 — green, yellow, and no datapoint per Roku", () => {
     expect(lines[0]).toMatch(/^No emulated Roku is running — "Wohnzimmer": port 8060 .* · "Kueche": port 8061 /);
     expect(run.terminate).not.toHaveBeenCalled();
   });
+});
 
-  it("creates no datapoint per Roku that shows whether it runs", async () => {
-    const { run } = adapterWith(two, { busy: [8061] });
+/**
+ * One Roku's marker and reason as the adapter wrote them.
+ *
+ * @param run the adapter
+ * @param device the device's object id
+ * @returns its online marker and its reason text
+ */
+function status(run: Run, device: string): { online: unknown; error: unknown } {
+  return { online: run.states.get(`${device}.info.online`)?.val, error: run.states.get(`${device}.info.error`)?.val };
+}
+
+/**
+ * The three device counts as the adapter wrote them.
+ *
+ * @param run the adapter
+ * @returns total, online and all-online
+ */
+function counts(run: Run): { total: unknown; online: unknown; all: unknown } {
+  return {
+    total: run.states.get("info.devicesTotal")?.val,
+    online: run.states.get("info.devicesOnline")?.val,
+    all: run.states.get("info.devicesAllOnline")?.val,
+  };
+}
+
+/**
+ * Stop the adapter and wait for its callback.
+ *
+ * @param run the adapter
+ */
+async function stop(run: Run): Promise<void> {
+  await new Promise<void>(resolve => run.onUnload(resolve));
+}
+
+describe("F-08 — every Roku shows whether it runs and why not, the counts beside them", () => {
+  it("every Roku has its marker and reason, and the device its status symbol", async () => {
+    const { run } = adapterWith(two);
     await run.onReady();
     for (const device of ["Wohnzimmer", "Kueche"]) {
-      const children = [...run.objects.keys()].filter(id => id.startsWith(`${device}.`)).map(id => id.split(".")[1]);
-      expect(new Set(children), device).toEqual(new Set(["command", "keys"]));
+      expect(run.objects.get(device)?.common, device).toMatchObject({ statusStates: { onlineId: "info.online" } });
+      expect(run.objects.get(`${device}.info.online`)?.common, device).toMatchObject({
+        type: "boolean",
+        role: "indicator.reachable",
+      });
+      expect(run.objects.get(`${device}.info.error`)?.common, device).toMatchObject({ type: "string", role: "text" });
     }
-    const status = [...run.objects.keys()].filter(id => !id.startsWith("Wohnzimmer") && !id.startsWith("Kueche"));
-    expect(
-      status.every(id => id === "info" || id === "info.connection"),
-      status.join(", "),
-    ).toBe(true);
+  });
+
+  it("all running: every Roku online with an empty reason, all counted", async () => {
+    const { run } = adapterWith(two);
+    await run.onReady();
+    expect(status(run, "Wohnzimmer")).toEqual({ online: true, error: "" });
+    expect(status(run, "Kueche")).toEqual({ online: true, error: "" });
+    expect(counts(run)).toEqual({ total: 2, online: 2, all: true });
+  });
+
+  it("a busy port: that Roku offline with the cause, and online with an empty reason once it is free", async () => {
+    const { run, fakes } = adapterWith(two, { busy: [8061] });
+    await run.onReady();
+    expect(status(run, "Wohnzimmer")).toEqual({ online: true, error: "" });
+    expect(status(run, "Kueche").online).toBe(false);
+    expect(status(run, "Kueche").error).toMatch(/port 8061 is already in use/);
+    expect(counts(run)).toEqual({ total: 2, online: 1, all: false });
+    fakes.busyPorts.clear();
+    await fireRetry(run);
+    expect(status(run, "Kueche")).toEqual({ online: true, error: "" });
+    expect(counts(run)).toEqual({ total: 2, online: 2, all: true });
+  });
+
+  it("a server that died: that Roku offline with the cause, and online again on its return", async () => {
+    const { run, fakes } = adapterWith(two);
+    await run.onReady();
+    (fakes.ecp[1].options.onFatalError as (err: Error) => void)(new Error("network gone"));
+    await new Promise(resolve => setImmediate(resolve));
+    expect(status(run, "Kueche").online).toBe(false);
+    expect(status(run, "Kueche").error).toMatch(/network gone/);
+    expect(counts(run)).toEqual({ total: 2, online: 1, all: false });
+    await fireRetry(run);
+    expect(status(run, "Kueche")).toEqual({ online: true, error: "" });
+    expect(counts(run)).toEqual({ total: 2, online: 2, all: true });
+  });
+
+  it("a stop: every Roku offline with Unknown, none online, the total stays", async () => {
+    const { run } = adapterWith(two);
+    await run.onReady();
+    await stop(run);
+    expect(status(run, "Wohnzimmer")).toEqual({ online: false, error: "Unknown" });
+    expect(status(run, "Kueche")).toEqual({ online: false, error: "Unknown" });
+    expect(counts(run)).toEqual({ total: 2, online: 0, all: false });
+  });
+
+  it("a start after a crash: a Roku left online shows offline with Unknown before any server starts", async () => {
+    const { run } = adapterWith(two);
+    for (const device of ["Wohnzimmer", "Kueche"]) {
+      run.objects.set(`${device}.info.online`, { type: "state" });
+      run.states.set(`${device}.info.online`, { val: true, ack: true });
+      run.states.set(`${device}.info.error`, { val: "", ack: true });
+    }
+    run.states.set("info.devicesTotal", { val: 2, ack: true });
+    run.states.set("info.devicesOnline", { val: 2, ack: true });
+    run.states.set("info.devicesAllOnline", { val: true, ack: true });
+    const seen: unknown[] = [];
+    const make = run.makeEcpServer;
+    run.makeEcpServer = options => {
+      seen.push({ kitchen: status(run, "Kueche"), counts: counts(run) });
+      return make(options);
+    };
+    await run.onReady();
+    expect(seen[0]).toEqual({
+      kitchen: { online: false, error: "Unknown" },
+      counts: { total: 2, online: 0, all: false },
+    });
+  });
+
+  it("no Roku configured: the counts say none, and not all online", async () => {
+    const { run } = adapterWith({ bind: "0.0.0.0", devices: [] });
+    await run.onReady();
+    expect(counts(run)).toEqual({ total: 0, online: 0, all: false });
+  });
+
+  it("the card in the device manager follows each Roku's marker and shows its reason", async () => {
+    const { run } = adapterWith(two, { busy: [8061] });
+    await run.onReady();
+    const { FakerokuDeviceManagement } = await vi.importActual<typeof DeviceManagementModule>("../device-management");
+    const manager = new FakerokuDeviceManagement({
+      namespace: "fakeroku.0",
+      on: () => {},
+      getAdapterObjectsAsync: () => run.getAdapterObjectsAsync(),
+      getForeignObjectAsync: () => Promise.resolve({ native: { devices: structuredClone(two.devices) } }),
+    } as never) as unknown as {
+      loadDevices(context: { addDevice: (card: Card) => void }): Promise<void>;
+    };
+    const cards: Card[] = [];
+    await manager.loadDevices({ addDevice: card => cards.push(card) });
+    // What the admin shows: the mapped value of the marker, and the reason text as the warning.
+    const shown = (card: Card): { connection: unknown; warning: unknown } => {
+      const { connection, warning } = card.status;
+      const marker = run.states.get(connection.stateId.slice("fakeroku.0.".length))?.val;
+      return {
+        connection: connection.mapping[String(marker)],
+        warning: run.states.get(warning.stateId.slice("fakeroku.0.".length))?.val,
+      };
+    };
+    expect(shown(cards.find(card => card.name === "Wohnzimmer")!)).toEqual({ connection: "connected", warning: "" });
+    const kitchen = shown(cards.find(card => card.name === "Kueche")!);
+    expect(kitchen.connection).toBe("disconnected");
+    expect(kitchen.warning).toMatch(/port 8061 is already in use/);
   });
 });
+
+/** A device-manager card as far as its status goes. */
+interface Card {
+  name: string;
+  status: {
+    connection: { stateId: string; mapping: Record<string, string> };
+    warning: { stateId: string };
+  };
+}
 
 /**
  * The lines above debug the adapter wrote since the spies were last cleared.

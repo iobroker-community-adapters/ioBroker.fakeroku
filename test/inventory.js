@@ -195,8 +195,8 @@ async function watchObjectWrites(harness) {
   return watch;
 }
 
-/** Objects the adapter creates for the fixture configuration: 2 own + (3 + 16) + (3 + 31). */
-const EXPECTED_OBJECTS = 55;
+/** Objects the adapter creates for the fixture configuration: 5 own + (6 + 16) + (6 + 31). */
+const EXPECTED_OBJECTS = 64;
 
 /**
  * Adapter-specific: wait until the object tree is complete.

@@ -31,5 +31,17 @@
   "stateLastCommand": "Dernière commande",
   "stateLastCommandDesc": "La commande la plus récente reçue par ce Roku émulé, en texte brut.",
   "channelKeys": "Touches de la télécommande",
-  "channelKeysDesc": "Un état par touche proposée par cet appareil ; un appui le met brièvement à vrai."
+  "channelKeysDesc": "Un état par touche proposée par cet appareil ; un appui le met brièvement à vrai.",
+  "channelDeviceInfo": "État",
+  "channelDeviceInfoDesc": "Si ce Roku émulé fonctionne et, sinon, pourquoi.",
+  "stateOnline": "En ligne",
+  "stateOnlineDesc": "Vrai tant que ce Roku émulé écoute sur son port ECP.",
+  "stateError": "Erreur",
+  "stateErrorDesc": "Pourquoi ce Roku émulé ne fonctionne pas ; vide tant qu'il fonctionne, Unknown tant que l'adaptateur est arrêté ou démarre.",
+  "devicesTotal": "Rokus émulés",
+  "devicesTotalDesc": "Combien de Rokus émulés sont configurés.",
+  "devicesOnline": "Rokus émulés en ligne",
+  "devicesOnlineDesc": "Combien de Rokus émulés écoutent en ce moment.",
+  "devicesAllOnline": "Tous les Rokus émulés en ligne",
+  "devicesAllOnlineDesc": "Vrai tant que chaque Roku émulé configuré écoute ; faux tant qu'aucun n'est configuré."
 }

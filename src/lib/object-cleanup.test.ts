@@ -46,6 +46,21 @@ describe("planObjectCleanup", () => {
     expect(plan).toEqual([]);
   });
 
+  it("never touches the three device counts below info", () => {
+    const counts = ["info.devicesTotal", "info.devicesOnline", "info.devicesAllOnline"];
+    const plan = planObjectCleanup(["info", "info.connection", ...counts], new Set(["ioBroker"]), BASE);
+    expect(plan).toEqual([]);
+  });
+
+  it("keeps a configured device's own status channel", () => {
+    const plan = planObjectCleanup(
+      ["ioBroker", "ioBroker.info", "ioBroker.info.online", "ioBroker.info.error"],
+      new Set(["ioBroker"]),
+      BASE,
+    );
+    expect(plan).toEqual([]);
+  });
+
   it("sweeps the leftovers of a hand-edited device row named 'info'", () => {
     // Such a row turned the adapter's own channel into a device and hung its
     // states underneath. Skipping the whole `info` subtree kept them for good.
