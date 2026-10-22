@@ -121,8 +121,19 @@ const dgramMock = vi.hoisted(() => {
 vi.mock("node:dgram", () => ({ createSocket: (options: unknown) => dgramMock.make(options) }));
 
 /** A logger that records what the responder said, so warn-vs-silence is assertable. */
-function recordingLog(): { debug: Mock; warn: Mock; error: Mock } {
-  return { debug: vi.fn(), warn: vi.fn(), error: vi.fn() };
+function recordingLog(): ioBroker.Logger & { debug: Mock; info: Mock; warn: Mock; error: Mock } {
+  return { silly: vi.fn(), debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn(), level: "debug" };
+}
+
+/**
+ * The lines of one level that contain a text.
+ *
+ * @param level the recorded level
+ * @param text what the line contains
+ * @returns the matching lines
+ */
+function lines(level: Mock, text: string): string[] {
+  return level.mock.calls.map(c => String(c[0])).filter(l => l.includes(text));
 }
 const sharedLog = recordingLog();
 // Every client counts as local unless a test says otherwise — which clients are local is
@@ -288,8 +299,9 @@ describe("RokuSsdpResponder", () => {
     s.emit("error", new Error("ENOBUFS"));
     expect(fatal).not.toHaveBeenCalled();
     expect(s.closed).toBe(false);
-    // Throttled: one line, not one per error.
-    expect(sharedLog.warn.mock.calls.filter(c => String(c[0]).includes("SSDP socket error"))).toHaveLength(1);
+    // One loud line, the repeat on debug.
+    expect(lines(sharedLog.warn, "SSDP socket error")).toHaveLength(1);
+    expect(lines(sharedLog.debug, "SSDP socket error")).toHaveLength(1);
   });
 
   it("reports a socket that closed on its own exactly once — not one stop() closed", async () => {
@@ -453,7 +465,7 @@ describe("RokuSsdpResponder", () => {
     expect(s.sent).toEqual([]);
   });
 
-  it("warns when a search answer cannot be sent — once a minute, not once per search", async () => {
+  it("warns when a search answer cannot be sent — once, not once per search", async () => {
     const r = responder();
     await r.start();
     dgramMock.fail.send = true;
@@ -462,7 +474,8 @@ describe("RokuSsdpResponder", () => {
     // Warn, not throw: the send callback runs outside any try/catch, so an unhandled throw
     // here would take the adapter process down. A remote that keeps searching from an
     // unreachable address (EHOSTUNREACH) must not fill the log.
-    expect(sharedLog.warn.mock.calls.filter(c => String(c[0]).includes("response send failed"))).toHaveLength(1);
+    expect(lines(sharedLog.warn, "response send failed")).toHaveLength(1);
+    expect(lines(sharedLog.debug, "response send failed")).toHaveLength(1);
   });
 
   it("announces every device to the multicast group", async () => {
@@ -728,5 +741,107 @@ describe("RokuSsdpResponder — the farewell", () => {
     r.removeDevice("abc123");
     await expect(r.byebye()).resolves.toBeUndefined();
     expect(dgramMock.sockets[0].sent).toHaveLength(0);
+  });
+});
+
+describe("RokuSsdpResponder — every problem once loud, repeats on debug, its return once on info (F-08)", () => {
+  it("a failed group join: the refresh's retries go to debug, the join that works says so once", async () => {
+    const log = recordingLog();
+    dgramMock.fail.join = true;
+    const r = responder({ logger: log, membershipInterfaces: [m("10.0.0.9")] });
+    await r.start();
+    // The five-minute refresh tries the interface again on every pass.
+    r.refreshAdvertise(baseCfg.advertiseIp, [m("10.0.0.9")]);
+    r.refreshAdvertise(baseCfg.advertiseIp, [m("10.0.0.9")]);
+    expect(lines(log.warn, "multicast join failed on if-10.0.0.9")).toHaveLength(1);
+    expect(lines(log.debug, "multicast join failed on if-10.0.0.9")).toHaveLength(2);
+
+    dgramMock.fail.join = false;
+    r.refreshAdvertise(baseCfg.advertiseIp, [m("10.0.0.9")]);
+    expect(log.info.mock.calls).toEqual([["SSDP multicast join on if-10.0.0.9 (10.0.0.9) works again"]]);
+  });
+
+  it("a join that never failed writes no line", async () => {
+    const log = recordingLog();
+    const r = responder({ logger: log, membershipInterfaces: [m("10.0.0.9")] });
+    await r.start();
+    r.refreshAdvertise(baseCfg.advertiseIp, [m("10.0.0.9"), m("192.168.50.2")]);
+    expect(log.info).not.toHaveBeenCalled();
+    expect(log.warn).not.toHaveBeenCalled();
+  });
+
+  it("each interface is its own problem: a second one that fails is loud too", async () => {
+    const log = recordingLog();
+    dgramMock.fail.join = true;
+    const r = responder({ logger: log, membershipInterfaces: [m("10.0.0.9"), m("192.168.50.2")] });
+    await r.start();
+    expect(lines(log.warn, "multicast join failed")).toEqual([
+      expect.stringContaining("if-10.0.0.9"),
+      expect.stringContaining("if-192.168.50.2"),
+    ]);
+  });
+
+  it("a sender that cannot be opened: retries on debug, the sender that opens says so once", async () => {
+    const log = recordingLog();
+    const r = responder({ logger: log, membershipInterfaces: [] });
+    await r.start();
+    dgramMock.fail.create = true;
+    r.refreshAdvertise(baseCfg.advertiseIp, [m("192.168.50.2")]);
+    r.refreshAdvertise(baseCfg.advertiseIp, [m("192.168.50.2")]);
+    expect(lines(log.warn, "SSDP sender on if-192.168.50.2 could not open")).toHaveLength(1);
+    expect(lines(log.debug, "SSDP sender on if-192.168.50.2 could not open")).toHaveLength(1);
+
+    dgramMock.fail.create = false;
+    r.refreshAdvertise(baseCfg.advertiseIp, [m("192.168.50.2")]);
+    expect(log.info.mock.calls).toEqual([["SSDP sender on if-192.168.50.2 works again"]]);
+  });
+
+  it("a second error of the same sender is the same problem — debug, not a second warning", async () => {
+    const log = recordingLog();
+    const r = responder({ logger: log, membershipInterfaces: [m("10.0.0.9")] });
+    await r.start();
+    const sender = dgramMock.sockets[1];
+    sender.emit("error", new Error("ENETDOWN"));
+    sender.emit("error", new Error("EHOSTDOWN"));
+    expect(lines(log.warn, "SSDP sender on if-10.0.0.9")).toEqual(["SSDP sender on if-10.0.0.9: ENETDOWN"]);
+    expect(lines(log.debug, "SSDP sender on if-10.0.0.9")).toEqual(["SSDP sender on if-10.0.0.9: EHOSTDOWN"]);
+  });
+
+  it("a receive error: the next datagram that arrives says once that the socket receives again", async () => {
+    const log = recordingLog();
+    const r = responder({ logger: log });
+    await r.start();
+    const s = dgramMock.sockets[0];
+    s.emit("error", new Error("ENOBUFS"));
+    s.emit("message", Buffer.from(MSEARCH), { address: "10.0.0.50", port: 41234 });
+    s.emit("message", Buffer.from(MSEARCH), { address: "10.0.0.50", port: 41234 });
+    expect(log.info.mock.calls).toEqual([["SSDP socket receives again"]]);
+
+    // Back means a new problem is loud again.
+    s.emit("error", new Error("ENOBUFS"));
+    expect(lines(log.warn, "SSDP socket error")).toHaveLength(2);
+  });
+
+  it("a failed answer: the next answer that goes out says so once", async () => {
+    const log = recordingLog();
+    const r = responder({ logger: log });
+    await r.start();
+    const s = dgramMock.sockets[0];
+    dgramMock.fail.send = true;
+    s.emit("message", Buffer.from(MSEARCH), { address: "10.0.0.50", port: 41234 });
+    dgramMock.fail.send = false;
+    s.emit("message", Buffer.from(MSEARCH), { address: "10.0.0.50", port: 41234 });
+    s.emit("message", Buffer.from(MSEARCH), { address: "10.0.0.50", port: 41234 });
+    expect(lines(log.warn, "response send failed")).toHaveLength(1);
+    expect(log.info.mock.calls).toEqual([["SSDP responses go out again"]]);
+  });
+
+  it("answers that never failed write no line", async () => {
+    const log = recordingLog();
+    const r = responder({ logger: log });
+    await r.start();
+    dgramMock.sockets[0].emit("message", Buffer.from(MSEARCH), { address: "10.0.0.50", port: 41234 });
+    expect(log.info).not.toHaveBeenCalled();
+    expect(log.debug).not.toHaveBeenCalledWith(expect.stringContaining("again"));
   });
 });

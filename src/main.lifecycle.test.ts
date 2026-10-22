@@ -270,6 +270,29 @@ describe("Fakeroku — a device whose port was busy is retried", () => {
     expect(ctx.i.log.warn).toHaveBeenCalledWith(expect.stringContaining("states db gone"));
   });
 
+  it("a retry pass that throws: one warning, its repeats on debug, the next good pass once on info", async () => {
+    const ctx = setup(twoPlayers(), { failEcpPort: 8061 });
+    await ctx.i.onReady();
+    ctx.i.log.warn.mockClear();
+    ctx.freeEcpPort();
+    // The states database refuses every write until it is back: both passes fail at the status write.
+    const real = ctx.i.setState.getMockImplementation() as (...a: unknown[]) => Promise<void>;
+    ctx.i.setState.mockImplementation(() => Promise.reject(new Error("states db gone")));
+    await ctx.i.retryPendingDevices();
+    await ctx.i.retryPendingDevices();
+    ctx.i.setState.mockImplementation(real);
+
+    const said = (level: { mock: { calls: unknown[][] } }): string[] =>
+      level.mock.calls.map(c => String(c[0])).filter(l => l.includes("Retrying the emulated Rokus"));
+    expect(said(ctx.i.log.warn)).toEqual(["Retrying the emulated Rokus failed: states db gone"]);
+    expect(said(ctx.i.log.debug)).toEqual(["Retrying the emulated Rokus failed again: states db gone"]);
+    expect(said(ctx.i.log.info)).toEqual([]);
+
+    await ctx.i.retryPendingDevices();
+    await ctx.i.retryPendingDevices();
+    expect(said(ctx.i.log.info)).toEqual(["Retrying the emulated Rokus works again."]);
+  });
+
   it("keeps quiet about a retry that fails again — one warning, not one a minute", async () => {
     const ctx = setup({ devices: [kueche()] }, { failEcpPort: 8061 });
     await ctx.i.onReady();

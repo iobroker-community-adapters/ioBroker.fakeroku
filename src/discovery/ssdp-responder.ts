@@ -1,8 +1,7 @@
 import * as dgram from "node:dgram";
 import type { Membership } from "../lib/detect-ip";
 import { errText } from "../lib/err-text";
-import { LogThrottle } from "../lib/log-throttle";
-import type { AdapterLogger } from "../lib/logger";
+import { LogOnce } from "../lib/log-once";
 import {
   answersSearch,
   buildAliveNotify,
@@ -14,8 +13,6 @@ import {
 
 const SSDP_PORT = 1900;
 const MULTICAST_ADDR = "239.255.255.250";
-/** How often at most a repeating socket problem (a failed answer, a receive error) is logged. */
-const PROBLEM_LOG_INTERVAL_MS = 60_000;
 
 /** Configuration for the Roku SSDP responder. */
 export interface RokuSsdpResponderConfig {
@@ -34,8 +31,8 @@ export interface RokuSsdpResponderConfig {
    * multi-homed host hears M-SEARCH on all its LANs. Empty → OS default only.
    */
   membershipInterfaces: Membership[];
-  /** Logger. */
-  logger: AdapterLogger;
+  /** The adapter's log — the whole of it: a problem that went away gets its one line on info. */
+  logger: ioBroker.Logger;
   /**
    * Whether a searching client may be answered — the adapter's trust boundary (`isOwnPeer` of the fleet master
    * `lib/network-address.ts`), narrowed to the chosen interface's network when there is one.
@@ -89,8 +86,10 @@ export class RokuSsdpResponder {
   private readonly joined = new Set<string>();
   /** The per-interface NOTIFY senders of the auto case. */
   private readonly senders = new Map<string, Sender>();
-  /** Repeating problems, logged at most once per minute and kind. */
-  private readonly problems = new LogThrottle(PROBLEM_LOG_INTERVAL_MS);
+  /** The fleet log rule for the problems below: the first line loud, repeats on debug, the return once on info. */
+  private readonly problems: LogOnce;
+  /** The problems reported and not back yet — only these get a line when they work again. */
+  private readonly open = new Set<string>();
   /**
    * The devices this responder answers for — its OWN list, not the caller's array. A device whose
    * port was busy at start-up joins when its retry succeeds, one whose server died leaves;
@@ -107,6 +106,7 @@ export class RokuSsdpResponder {
    */
   public constructor(private readonly config: Readonly<RokuSsdpResponderConfig>) {
     this.devices = [...config.devices];
+    this.problems = new LogOnce(config.logger);
     this.advertiseIp = config.advertiseIp;
     this.memberships = [...config.membershipInterfaces];
   }
@@ -222,23 +222,27 @@ export class RokuSsdpResponder {
 
   /**
    * Join the group on one interface; a failure warns but does not throw, so one bad interface
-   * cannot stop the responder.
+   * cannot stop the responder. The five-minute refresh tries a failed interface again: its
+   * repeats go to debug, a join that works after all says so once.
    *
    * @param socket the bound SSDP socket
    * @param m the interface to join on, or undefined for the OS default
    */
   private tryJoin(socket: dgram.Socket, m: Membership | undefined): void {
+    const where = m ? `${m.iface} (${m.address})` : "default interface";
     try {
       socket.addMembership(MULTICAST_ADDR, m?.address);
       if (m) {
         this.joined.add(m.iface);
       }
+      this.problemGone(`join ${where}`, `SSDP multicast join on ${where} works again`);
     } catch (e) {
       // Usually an OS routing issue (the interface is not in the multicast table), or ENOBUFS on
       // a host past the kernel's limit of group memberships per socket. Don't die: a paired
       // controller still reaches the ECP port. Warn so the "no discovery" symptom is findable.
-      this.config.logger.warn(
-        `SSDP multicast join failed on ${m ? `${m.iface} (${m.address})` : "default interface"}: ${errText(e)} — discovery may be incomplete`,
+      this.problem(
+        `join ${where}`,
+        `SSDP multicast join failed on ${where}: ${errText(e)} — discovery may be incomplete`,
       );
     }
   }
@@ -258,21 +262,19 @@ export class RokuSsdpResponder {
       try {
         const socket = dgram.createSocket({ type: "udp4", reuseAddr: true });
         socket.on("error", (err: Error) =>
-          this.logProblem(`sender ${m.iface}`, `SSDP sender on ${m.iface}: ${errText(err)}`),
+          this.problem(`sender ${m.iface}`, `SSDP sender on ${m.iface}: ${errText(err)}`),
         );
         socket.bind({ address: m.address, port: 0 }, () => {
           try {
             socket.setMulticastInterface(m.address);
+            this.problemGone(`sender ${m.iface}`, `SSDP sender on ${m.iface} works again`);
           } catch (e) {
-            this.logProblem(
-              `sender ${m.iface}`,
-              `SSDP sender on ${m.iface} could not pin its interface: ${errText(e)}`,
-            );
+            this.problem(`sender ${m.iface}`, `SSDP sender on ${m.iface} could not pin its interface: ${errText(e)}`);
           }
         });
         this.senders.set(key, { iface: m.iface, address: m.address, socket });
       } catch (e) {
-        this.logProblem(`sender ${m.iface}`, `SSDP sender on ${m.iface} could not open: ${errText(e)}`);
+        this.problem(`sender ${m.iface}`, `SSDP sender on ${m.iface} could not open: ${errText(e)}`);
       }
     }
   }
@@ -296,12 +298,12 @@ export class RokuSsdpResponder {
    * An error on the receiving socket after a good start. On Linux/macOS this is a receive error
    * (`recvmsg`, e.g. ENOBUFS under memory pressure): Node reports it, and the socket keeps
    * receiving. Closing it here would turn a passing hiccup into discovery that stays off until a
-   * restart — so it is logged (throttled) and the socket stays.
+   * restart — so it is logged (once, repeats on debug) and the socket stays.
    *
    * @param err the socket error
    */
   private onSocketError(err: Error): void {
-    this.logProblem("socket", `SSDP socket error: ${errText(err)}`);
+    this.problem("socket", `SSDP socket error: ${errText(err)}`);
   }
 
   /** The receiving socket closed. If {@link stop} did not close it, discovery is gone — report once. */
@@ -317,19 +319,32 @@ export class RokuSsdpResponder {
   }
 
   /**
-   * Log a problem that can repeat — at most once per minute and kind, so a remote that keeps
-   * searching from an unreachable address cannot fill the log.
+   * Log a problem that can repeat: the first time loud, every repeat on debug until it works again — a remote that
+   * keeps searching from an unreachable address cannot fill the log.
    *
-   * @param kind what the problem is about
+   * @param key what the problem is about — also what decides "the same problem again"
    * @param line the log line
    */
-  private logProblem(kind: string, line: string): void {
-    if (this.problems.due(kind)) {
-      this.config.logger.warn(line);
+  private problem(key: string, line: string): void {
+    this.open.add(key);
+    this.problems.report(key, line, { kind: key });
+  }
+
+  /**
+   * A reported problem works again: one info line. Nothing for a problem that was never reported — this runs on
+   * every good join, sender and answer.
+   *
+   * @param key the key the problem was reported under
+   * @param line the log line
+   */
+  private problemGone(key: string, line: string): void {
+    if (this.open.delete(key)) {
+      this.problems.recovered(key, line);
     }
   }
 
   private onMessage(text: string, address: string, port: number): void {
+    this.problemGone("socket", "SSDP socket receives again");
     const target = rokuSearchTarget(text);
     if (!target) {
       return;
@@ -346,7 +361,9 @@ export class RokuSsdpResponder {
       const response = Buffer.from(buildSearchResponse(device, location, target));
       this.socket?.send(response, port, address, err => {
         if (err) {
-          this.logProblem("answer", `SSDP response send failed: ${errText(err)}`);
+          this.problem("answer", `SSDP response send failed: ${errText(err)}`);
+        } else {
+          this.problemGone("answer", "SSDP responses go out again");
         }
       });
     }

@@ -149,6 +149,8 @@ export class Fakeroku extends utils.Adapter {
   private discoveryUp = false;
   /** Discovery is down and the warning about it is written: repeats go to debug, its return to info. */
   private discoveryDown = false;
+  /** A retry pass threw and the warning about it is written: repeats go to debug, the next good pass to info. */
+  private retryBroken = false;
 
   /**
    * Set as the very first thing onUnload does. Everything that can still be in flight at
@@ -624,9 +626,18 @@ export class Fakeroku extends utils.Adapter {
       }
       // A stop during the start above finds nothing to write: onUnload wrote false and emptied what the retry would arm.
       await this.updateConnection();
+      if (this.retryBroken) {
+        this.retryBroken = false;
+        this.log.info("Retrying the emulated Rokus works again.");
+      }
       this.scheduleRetry();
     } catch (e) {
-      this.log.warn(`Retrying the emulated Rokus failed: ${errText(e)}`);
+      if (this.retryBroken) {
+        this.log.debug(`Retrying the emulated Rokus failed again: ${errText(e)}`);
+      } else {
+        this.retryBroken = true;
+        this.log.warn(`Retrying the emulated Rokus failed: ${errText(e)}`);
+      }
       // No stopping check: onUnload empties the queue, and scheduleRetry arms nothing for
       // an empty one.
       this.scheduleRetry();
