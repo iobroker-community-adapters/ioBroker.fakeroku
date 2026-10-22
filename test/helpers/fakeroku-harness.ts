@@ -81,7 +81,7 @@ export function internalOf(adapter: Fakeroku): {
   getStatesAsync: ReturnType<typeof vi.fn>;
   getAdapterObjectsAsync: ReturnType<typeof vi.fn>;
   getObjectListAsync: ReturnType<typeof vi.fn>;
-  lastState: Map<string, { val: unknown; ack: boolean; q?: number }>;
+  status: unknown;
   extendObject: ReturnType<typeof vi.fn>;
   setForeignObject: ReturnType<typeof vi.fn>;
   instanceNative: Record<string, unknown>;
@@ -258,7 +258,7 @@ export function privateMembersExist(adapter: Fakeroku): unknown[] {
     adapter["retryPendingDevices"],
     adapter["devices"],
     adapter["commands"],
-    adapter["lastState"],
+    adapter["status"],
     adapter["deviceManagement"],
     adapter["makeEcpServer"],
     adapter["makeSsdpResponder"],

@@ -19,6 +19,7 @@ import { carriesAddress, chosenAddress, isOwnPeer, localNets } from "./lib/netwo
 import { planNativePrune, planObjectCleanup } from "./lib/object-cleanup";
 import { ownRelativeId } from "./lib/pure-helpers";
 import { type DeviceType, keysForType } from "./lib/roku-keys";
+import { StatusBoard, UNKNOWN_REASON } from "./status-board";
 
 /** Managed timeout for a stuck SSDP start (a busy port 1900 must not hang onReady). */
 const SSDP_START_TIMEOUT_MS = 5000;
@@ -26,8 +27,6 @@ const SSDP_START_TIMEOUT_MS = 5000;
 const SSDP_NOTIFY_INTERVAL_MS = 300_000;
 /** How long to wait before trying again what does not run: a device whose ECP server is down, and discovery. */
 const RETRY_INTERVAL_MS = 60_000;
-/** The fleet's reason text while the adapter has nothing to report: it is off, or started and has not tried yet. */
-const UNKNOWN_REASON = "Unknown";
 /** The tail of every line about something that does not run and comes back on its own. */
 const RETRY_NOTE = `retrying every ${RETRY_INTERVAL_MS / 1000} s`;
 /**
@@ -171,13 +170,8 @@ export class Fakeroku extends utils.Adapter {
    * an already-cleared map and write info.connection TRUE after the closing FALSE.
    */
   private stopping = false;
-  /**
-   * The read-only states this adapter writes outside the command hot path (`info.connection`, the device counts, every
-   * Roku's status, the key reset at start), as last known, keyed relative to the namespace. Primed once at start by
-   * one bulk read, so a restart writes nothing blindly and no such state is ever read one by one; the indicators are
-   * kept current by {@link writeIndicator}.
-   */
-  private readonly lastState = new Map<string, Pick<ioBroker.State, "val" | "ack" | "q">>();
+  /** The read-only states this adapter writes outside the command hot path, each written only on a change. */
+  private readonly status = new StatusBoard(this);
   /** The adapter's objects before this start created a device object — taken from {@link known}, keyed relative to the namespace. */
   private ownObjects: ReadonlyMap<string, ioBroker.Object> = new Map();
   /** The own object tree, read once at start: every object write goes through it and reaches the database only on a change. */
@@ -265,65 +259,16 @@ export class Fakeroku extends utils.Adapter {
    * @returns once the writes landed (or nothing had to be written)
    */
   private async updateConnection(): Promise<void> {
-    await Promise.all([
-      ...[...this.devices.values()].map(device =>
-        this.markDevice(device.id, device.server ? "" : (device.reason ?? UNKNOWN_REASON)),
-      ),
-      this.writeIndicator("info.devicesTotal", this.expectedDevices),
-      this.writeIndicator("info.devicesOnline", this.running.length),
-      this.writeIndicator("info.devicesAllOnline", this.allRunning),
-      this.writeIndicator("info.connection", this.healthy),
-    ]);
-  }
-
-  /**
-   * Write one Roku's status: online exactly while there is no reason against it.
-   *
-   * @param deviceId the id-safe device path segment
-   * @param reason empty while it listens, `Unknown` while nothing is known, else why it does not listen
-   * @returns once both writes landed (or nothing had to be written)
-   */
-  private async markDevice(deviceId: string, reason: string): Promise<void> {
-    await Promise.all([
-      this.writeIndicator(`${deviceId}.${DEVICE_ONLINE_ID}`, reason === ""),
-      this.writeIndicator(`${deviceId}.${DEVICE_ERROR_ID}`, reason),
-    ]);
-  }
-
-  /**
-   * Show the given Rokus as not running for a reason nobody knows yet, the counts with them, and `info.connection`
-   * false — the start stamp (a crash or a power cut runs no shutdown code) and the last write of onUnload.
-   * `info.devicesTotal` keeps its value: how many Rokus there are does not change because nobody looks.
-   *
-   * @param deviceIds the id-safe device path segments to mark
-   * @returns once the writes landed (or nothing had to be written)
-   */
-  private async markOffline(deviceIds: readonly string[]): Promise<void> {
-    await Promise.all([
-      ...deviceIds.map(id => this.markDevice(id, UNKNOWN_REASON)),
-      this.writeIndicator("info.devicesOnline", 0),
-      this.writeIndicator("info.devicesAllOnline", false),
-      this.writeIndicator("info.connection", false),
-    ]);
-  }
-
-  /**
-   * The Rokus whose status datapoints hold a value — the only ones the start stamp touches, so it creates nothing a
-   * tree does not have.
-   *
-   * @returns their id-safe device path segments
-   */
-  private storedStatusDevices(): string[] {
-    const ids = new Set<string>();
-    for (const id of this.lastState.keys()) {
-      // A device id carries no dot (sanitizeId), so the status id is everything after the first one.
-      const dot = id.indexOf(".");
-      const status = id.slice(dot + 1);
-      if (dot > 0 && (status === DEVICE_ONLINE_ID || status === DEVICE_ERROR_ID)) {
-        ids.add(id.slice(0, dot));
-      }
-    }
-    return [...ids];
+    await this.status.show({
+      devices: [...this.devices.values()].map(device => [
+        device.id,
+        device.server ? "" : (device.reason ?? UNKNOWN_REASON),
+      ]),
+      total: this.expectedDevices,
+      online: this.running.length,
+      allOnline: this.allRunning,
+      healthy: this.healthy,
+    });
   }
 
   /**
@@ -371,8 +316,8 @@ export class Fakeroku extends utils.Adapter {
       }
 
       await this.known.load();
-      await this.primeStates();
-      await this.markOffline(this.storedStatusDevices());
+      await this.status.primeStates();
+      await this.status.markOffline(this.status.storedStatusDevices());
       await this.refreshOwnObjects();
 
       if (this.stopping) {
@@ -917,7 +862,7 @@ export class Fakeroku extends utils.Adapter {
    * @returns true if the key needs the write
    */
   private needsKeyReset(id: string): boolean {
-    const last = this.lastState.get(id);
+    const last = this.status.stored(id);
     return last ? last.val !== false : this.ownObjects.has(id);
   }
 
@@ -928,43 +873,7 @@ export class Fakeroku extends utils.Adapter {
    */
   private async resetKey(id: string): Promise<void> {
     await this.setState(id, { val: false, ack: true });
-    this.lastState.set(id, { val: false, ack: true, q: 0 });
-  }
-
-  /**
-   * Fill {@link lastState} with ONE bulk read of the adapter's own states.
-   */
-  private async primeStates(): Promise<void> {
-    const states = await this.getStatesAsync(`${this.namespace}.*`);
-    this.lastState.clear();
-    for (const [id, state] of Object.entries(states)) {
-      if (state) {
-        this.lastState.set(ownRelativeId(this.namespace, id) ?? id, { val: state.val, ack: state.ack, q: state.q });
-      }
-    }
-  }
-
-  /**
-   * Write a read-only indicator only when it differs from what it holds (`val` strictly, `ack`, `q` — the fields
-   * js-controller's own changed-check compares). The one place `info.connection`, the device counts and every Roku's
-   * status are written. The value is remembered before the write, so two calls in a row write once; a failed write is
-   * forgotten again so the next call retries.
-   *
-   * @param id the state id relative to the namespace
-   * @param val the value to show
-   */
-  private async writeIndicator(id: string, val: boolean | number | string): Promise<void> {
-    const last = this.lastState.get(id);
-    if (last && last.val === val && last.ack && !last.q) {
-      return;
-    }
-    this.lastState.set(id, { val, ack: true, q: 0 });
-    try {
-      await this.setState(id, { val, ack: true });
-    } catch (e) {
-      this.lastState.delete(id);
-      throw e;
-    }
+    this.status.remember(id, false);
   }
 
   /**
@@ -1293,7 +1202,8 @@ export class Fakeroku extends utils.Adapter {
       // The SSDP socket is the one thing that cannot close yet — the farewell goes out
       // through it. It is closed in the callback below, whichever way that arrives.
       const farewell = this.ssdp ? this.ssdp.byebye() : Promise.resolve();
-      const status = this.markOffline(marked)
+      const status = this.status
+        .markOffline(marked)
         // A rejected write must not become an unhandled rejection — that is a
         // crash (exit code 6) instead of an orderly stop. The trace stays at
         // debug: it explains a stale "connected" afterwards, and nobody can act
