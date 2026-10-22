@@ -16,8 +16,8 @@ ein Gerät steuert, steuert ein Gerät den ioBroker.
 ## Voraussetzungen
 
 - Node.js 22 oder neuer
-- js-controller 7.2.2 oder neuer
-- admin 8.0.14 oder neuer
+- js-controller 7.2.5 oder neuer
+- admin 8.2.0 oder neuer
 - Eine Fernbedienung bzw. ein Hub im **selben Heimnetz** wie der ioBroker-Rechner
 
 ## Einrichtung

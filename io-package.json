@@ -136,7 +136,7 @@
     "platform": "Javascript/Node.js",
     "mode": "daemon",
     "icon": "fakeroku.svg",
-    "extIcon": "https://raw.githubusercontent.com/iobroker-community-adapters/ioBroker.fakeroku/master/admin/fakeroku.svg",
+    "extIcon": "https://cdn.jsdelivr.net/gh/iobroker-community-adapters/ioBroker.fakeroku@master/admin/fakeroku.svg",
     "readme": "https://github.com/iobroker-community-adapters/ioBroker.fakeroku/blob/master/README.md",
     "docs": {
       "en": [
@@ -161,12 +161,12 @@
     "restartAdapters": [],
     "dependencies": [
       {
-        "js-controller": ">=7.2.2"
+        "js-controller": ">=7.2.5"
       }
     ],
     "globalDependencies": [
       {
-        "admin": ">=8.0.14"
+        "admin": ">=8.2.0"
       }
     ],
     "adminUI": {
@@ -209,6 +209,20 @@
           "pl": "Uruchomienia aplikacji przychodzą teraz jako launch:<id> w punkcie danych command.",
           "uk": "Запуски застосунків тепер надходять як launch:<id> у точці даних command.",
           "zh-cn": "应用启动现以 launch:<id> 形式出现在数据点 command 中。"
+        },
+        "link": "https://github.com/iobroker-community-adapters/ioBroker.fakeroku/blob/master/docs/en/README.md#what-you-get-in-the-object-tree",
+        "linkText": {
+          "en": "The object tree in the documentation",
+          "de": "Der Objektbaum in der Dokumentation",
+          "ru": "Дерево объектов в документации",
+          "pt": "A árvore de objetos na documentação",
+          "nl": "De objectboom in de documentatie",
+          "fr": "L'arborescence des objets dans la documentation",
+          "it": "L'albero degli oggetti nella documentazione",
+          "es": "El árbol de objetos en la documentación",
+          "pl": "Drzewo obiektów w dokumentacji",
+          "uk": "Дерево об'єктів у документації",
+          "zh-cn": "文档中的对象树"
         },
         "level": "warn",
         "buttons": [

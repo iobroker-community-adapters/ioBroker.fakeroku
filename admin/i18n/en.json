@@ -1,6 +1,6 @@
 {
   "headerNetwork": "Network",
-  "bind": "Network interface (bind + advertise)",
+  "bind": "Network interface",
   "bindTooltip": "The network card the emulated Rokus bind to and advertise on. Leave it on 'all interfaces' — the routable IP is detected automatically, so it works out of the box. Only pick a specific address on a host with several network cards.",
   "headerDevices": "Emulated Roku devices",
   "devicesHelp": "Each card is one emulated Roku. Add one, then add a <b>Roku</b> device in your Harmony or Sofabaton app pointing at this ioBroker host — every keypress lands in the device's objects.",

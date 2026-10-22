@@ -39,8 +39,8 @@ For details and how to disable it, see the [Sentry plugin documentation](https:/
 ## Requirements
 
 - Node.js >= 22
-- js-controller >= 7.2.2
-- admin >= 8.0.14
+- js-controller >= 7.2.5
+- admin >= 8.2.0
 
 ## Ports
 
@@ -100,6 +100,16 @@ buttons to the emulated Roku.
 
 In a script or Blockly rule, react to a key — e.g. when `fakeroku.0.<name>.keys.Play`
 becomes `true` — or watch `.command` for the last button as text.
+
+## Troubleshooting
+
+- **The remote does not find any device** — the hub and the ioBroker host must be in the same network, and no firewall
+  may block UDP port 1900. In Docker, run ioBroker with `network_mode: host` or a `macvlan` network: the default bridge
+  network never sees the remote's search.
+- **The instance stays yellow** — the log says once what does not run, and the Roku's card in the device manager shows
+  the reason; most often a port another program (or another emulated Roku) already uses.
+
+More cases: [documentation](./docs/en/README.md#troubleshooting).
 
 ## Changelog
 <!--

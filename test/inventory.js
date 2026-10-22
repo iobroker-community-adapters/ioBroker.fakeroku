@@ -262,7 +262,7 @@ async function feedFixtures(harness) {
         devices: stored.map((row, i) => (i === 0 ? { ...row, name: `${row.name} renamed` } : row)),
       }),
     );
-    await restartAsTheHost(harness, undefined, "for the renamed Roku");
+    await restartAsTheHost(harness, null, "for the renamed Roku");
   }
   let last = -1;
   let stable = 0;
@@ -443,7 +443,7 @@ async function feedReservedNames(harness) {
     harness,
     await fixtureNative({ devices: [...FIXTURE_NATIVE.devices, { name: "info", port: 18062, type: "player" }] }),
   );
-  await restartAsTheHost(harness, undefined, "for the reserved name");
+  await restartAsTheHost(harness, null, "for the reserved name");
 }
 
 async function dumpObjects(harness) {

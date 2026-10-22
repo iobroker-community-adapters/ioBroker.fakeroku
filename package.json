@@ -74,7 +74,7 @@
     "test:inventory": "mocha test/inventory.js --exit",
     "test": "npm run test:ts && npm run test:package",
     "coverage": "vitest run --coverage",
-    "lint": "eslint",
+    "lint": "eslint --max-warnings 0",
     "lint:fix": "eslint --fix",
     "format": "prettier --write . \"!build/**\" \"!admin/custom/**\" \"!src-admin/.__mf__temp/**\" \"!src-admin/package.json\" \"!src-admin/package-lock.json\" \"!.github/**\" \"!.vscode/**\" \"!io-package.json\" \"!README.md\" \"!CHANGELOG_OLD.md\" \"!package-lock.json\" \"!.releaseconfig.json\" \"!tsconfig.json\" \"!tsconfig.build.json\" \"!test/objects.inventory.json\"",
     "format:check": "prettier --check . \"!build/**\" \"!admin/custom/**\" \"!src-admin/.__mf__temp/**\" \"!src-admin/package.json\" \"!src-admin/package-lock.json\" \"!.github/**\" \"!.vscode/**\" \"!io-package.json\" \"!README.md\" \"!CHANGELOG_OLD.md\" \"!package-lock.json\" \"!.releaseconfig.json\" \"!tsconfig.json\" \"!tsconfig.build.json\" \"!test/objects.inventory.json\"",
