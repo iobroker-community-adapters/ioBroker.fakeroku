@@ -84,7 +84,7 @@ export function planObjectCleanup(
  */
 export function planNativePrune(
   objects: ReadonlyMap<string, ioBroker.Object>,
-  deleted: ReadonlySet<string> = new Set(),
+  deleted: ReadonlySet<string>,
 ): [string, ioBroker.Object][] {
   const stale: [string, ioBroker.Object][] = [];
   for (const [id, obj] of objects) {

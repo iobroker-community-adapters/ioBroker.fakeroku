@@ -33,6 +33,7 @@ import {
   resetHarness,
   noAddressYet,
   timerFor,
+  stopWhenListing,
   stopWhenWriting,
   twoPlayers,
   kueche,
@@ -357,11 +358,7 @@ describe("Fakeroku — the host says stop in the middle of the start", () => {
 describe("Fakeroku — every stop point of the start", () => {
   it("stops after reading the object tree", async () => {
     const ctx = setup();
-    const real = ctx.i.getAdapterObjectsAsync.getMockImplementation() as () => Promise<unknown>;
-    ctx.i.getAdapterObjectsAsync.mockImplementationOnce(() => {
-      ctx.i.onUnload(() => {});
-      return real();
-    });
+    stopWhenListing(ctx);
     await ctx.i.onReady();
     expect(ctx.ecp).toHaveLength(0);
     expect(ctx.i.log.error).not.toHaveBeenCalled();
@@ -369,24 +366,27 @@ describe("Fakeroku — every stop point of the start", () => {
 
   it("stops after the devices started, before the sweep", async () => {
     const ctx = setup();
+    ctx.i.objects.set("Altgeraet", { type: "device", common: { name: "Altgeraet" }, native: {} });
     stopWhenWriting(ctx, "Wohnzimmer.keys.Home");
     await ctx.i.onReady();
     expect(ctx.ssdps).toHaveLength(0);
     expect(ctx.i.log.error).not.toHaveBeenCalled();
-    // The orphan sweep reads the object tree a second time — it must not run once stopped.
-    expect(ctx.i.getAdapterObjectsAsync).toHaveBeenCalledTimes(1);
+    // The orphan sweep must not run once stopped: the tree of a device nobody configures stays.
+    expect(ctx.i.delObjectAsync).not.toHaveBeenCalled();
+    expect(ctx.i.objects.has("Altgeraet")).toBe(true);
   });
 
   it("stops after the sweep, before discovery", async () => {
     const ctx = setup();
-    const real = ctx.i.getAdapterObjectsAsync.getMockImplementation() as () => Promise<unknown>;
-    ctx.i.getAdapterObjectsAsync
-      .mockImplementationOnce(() => real())
-      .mockImplementationOnce(() => {
-        ctx.i.onUnload(() => {});
-        return real();
-      });
+    // A key datapoint of an old version: the sweep's last step writes it back without its stale native attribute.
+    ctx.i.objects.set("Wohnzimmer.keys.Home", { type: "state", common: {}, native: { url: "keys/Home" } });
+    const real = ctx.i.setForeignObject.getMockImplementation() as (id: string, o: unknown) => Promise<void>;
+    ctx.i.setForeignObject.mockImplementation((id: string, o: unknown) => {
+      ctx.i.onUnload(() => {});
+      return real(id, o);
+    });
     await ctx.i.onReady();
+    expect(ctx.i.setForeignObject).toHaveBeenCalled();
     expect(ctx.ssdps).toHaveLength(0);
     // onUnload emptied the running list: going on would report "no device could be started".
     expect(ctx.i.log.error).not.toHaveBeenCalled();
@@ -403,11 +403,7 @@ describe("Fakeroku — every stop point of the start", () => {
 describe("Fakeroku — stop points that only one guard covers", () => {
   it("a stop during the object read writes no new identity into the configuration", async () => {
     const ctx = setup({ devices: [{ name: "Roku", port: 8060, type: "player" }] }, { fresh: true });
-    const real = ctx.i.getAdapterObjectsAsync.getMockImplementation() as () => Promise<unknown>;
-    ctx.i.getAdapterObjectsAsync.mockImplementationOnce(() => {
-      ctx.i.onUnload(() => {});
-      return real();
-    });
+    stopWhenListing(ctx);
     await ctx.i.onReady();
     expect(ctx.i.extendForeignObjectAsync).not.toHaveBeenCalled();
   });
@@ -746,6 +742,9 @@ describe("Fakeroku — the paths that only a failing database reaches", () => {
     expect(ctx.i.states.get("info.connection")).toEqual({ val: false, ack: true });
     expect(ctx.i.pending).toHaveLength(0);
     expect(ctx.i.setTimeout).not.toHaveBeenCalled();
+    // A stop is no failure of the Roku: no line about it, neither "listening again" nor "still not running".
+    expect(ctx.i.log.info).not.toHaveBeenCalledWith(expect.stringContaining("listening on port"));
+    expect(ctx.i.log.debug).not.toHaveBeenCalledWith(expect.stringContaining("still not running"));
   });
 
   it("names the missing address when the retry finds none — discovery is unavailable, not silently off", async () => {

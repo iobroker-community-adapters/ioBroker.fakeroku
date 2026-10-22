@@ -155,7 +155,7 @@ export function normalizeType(value: unknown): DeviceType {
  * so the tree is read for it only until then.
  *
  * @param raw one element of native.devices
- * @param tree what the object tree holds (empty: nothing is known)
+ * @param tree what the object tree holds (empty: nothing is known — the sealed guards read a row without a tree)
  * @returns the normalised row, or null
  */
 export function toDeviceRow(raw: unknown, tree: DeviceTree = EMPTY_TREE): DeviceRow | null {
@@ -217,7 +217,7 @@ function resolveObjectId(storedName: string, stored: unknown, tree: DeviceTree):
  * list ("the user deleted everything") and must not trigger the orphan sweep.
  *
  * @param devices the raw `native.devices` value
- * @param tree what the object tree holds (empty: nothing is known)
+ * @param tree what the object tree holds (empty: nothing is known — the sealed guards read rows without a tree)
  * @returns the usable rows, or null when there is no list
  */
 export function toDeviceRows(devices: unknown, tree: DeviceTree = EMPTY_TREE): DeviceRow[] | null {
@@ -259,8 +259,8 @@ export function nextFreePort(usedPorts: readonly number[]): number {
  * it is renamed to.
  *
  * @param devices the full current device list
- * @param candidate the name+port being added/edited
- * @param candidate.name the candidate device name
+ * @param candidate the name+port being added/edited, as `cleanDevice` hands it — the name trimmed
+ * @param candidate.name the candidate device name, trimmed
  * @param candidate.port the candidate ECP port
  * @param exceptIndex the list position to ignore (the device being edited), or -1 for a new one
  * @returns a translated clash message, or null if free
@@ -270,15 +270,14 @@ export function findClash(
   candidate: { name: string; port: number },
   exceptIndex: number,
 ): ioBroker.StringOrTranslated | null {
-  const trimmed = candidate.name.trim();
-  if (trimmed === "") {
+  if (candidate.name === "") {
     return t("deviceNameInvalid");
   }
-  const name = trimmed.toLowerCase();
+  const name = candidate.name.toLowerCase();
   // A new device's tree is built from its name: guard the two ways that can go wrong — a
   // reserved id ("info" would collide with the adapter's own channel), and a different name
   // that maps to an id another device already occupies ("My Roku" and "My*Roku" → "My_Roku").
-  const id = exceptIndex === -1 ? sanitizeId(trimmed) : null;
+  const id = exceptIndex === -1 ? sanitizeId(candidate.name) : null;
   if (id !== null && (id === "" || RESERVED_IDS.has(id))) {
     return t("deviceNameInvalid");
   }

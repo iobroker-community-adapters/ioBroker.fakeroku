@@ -263,7 +263,7 @@ describe("findClash", () => {
     // one stays on Kitchen.
     expect(findClash(devices, { name: "Living*room", port: 8061 }, 1)).toBeNull();
     expect(findClash(devices, { name: "info", port: 8061 }, 1)).toBeNull();
-    expect(findClash(devices, { name: "   ", port: 8061 }, 1)).toBe("deviceNameInvalid");
+    expect(findClash(devices, { name: "", port: 8061 }, 1)).toBe("deviceNameInvalid");
   });
 
   it("rejects a name that maps to the reserved 'info' object id", () => {

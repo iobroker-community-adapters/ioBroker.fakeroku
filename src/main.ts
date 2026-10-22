@@ -14,10 +14,11 @@ import { randomIdentity } from "./lib/device-identity";
 import { detectLocalIPv4s, detectPrimaryIPv4, localAddressFor } from "./lib/detect-ip";
 import { errText } from "./lib/err-text";
 import { migrateNativeKeys, type NativeKeyMigration } from "./lib/native-key-migration";
-import { tDesc, tName, tRaw } from "./lib/i18n";
-import { coveredBy, KnownObjects } from "./lib/known-objects";
+import { type I18nKey, tDesc, tName, tRaw } from "./lib/i18n";
+import { KnownObjects } from "./lib/known-objects";
 import { carriesAddress, chosenAddress, isOwnPeer, localNets } from "./lib/network-address";
 import { planNativePrune, planObjectCleanup } from "./lib/object-cleanup";
+import { ownRelativeId } from "./lib/pure-helpers";
 
 /** Managed timeout for a stuck SSDP start (a busy port 1900 must not hang onReady). */
 const SSDP_START_TIMEOUT_MS = 5000;
@@ -27,6 +28,17 @@ const SSDP_NOTIFY_INTERVAL_MS = 300_000;
 const RETRY_INTERVAL_MS = 60_000;
 /** The fleet's reason text while the adapter has nothing to report: it is off, or started and has not tried yet. */
 const UNKNOWN_REASON = "Unknown";
+/**
+ * The adapter's own objects with the translation keys of their name and description (none for the `info` channel) —
+ * refreshed on every start by {@link Fakeroku.refreshOwnObjects}.
+ */
+const OWN_OBJECT_TEXTS: readonly (readonly [id: string, name: I18nKey, desc: I18nKey | undefined])[] = [
+  ["info", "channelInfo", undefined],
+  ["info.connection", "connectionStatus", "connectionStatusDesc"],
+  ["info.devicesTotal", "devicesTotal", "devicesTotalDesc"],
+  ["info.devicesOnline", "devicesOnline", "devicesOnlineDesc"],
+  ["info.devicesAllOnline", "devicesAllOnline", "devicesAllOnlineDesc"],
+];
 
 /**
  * Keys the 0.1.x adapter declared and nothing reads any more: its own HTTP port and multicast
@@ -134,8 +146,6 @@ export class Fakeroku extends utils.Adapter {
   private notifyTimer: ioBroker.Interval | undefined;
   /** Every configured emulated Roku whose object tree this start created, by device id. */
   private readonly devices = new Map<string, DeviceRuntime>();
-  /** Devices whose ECP server is down — it did not start, or it died; retried on a timer until they come up. */
-  private pending: DeviceRuntime[] = [];
   /** Turns the remotes' commands into state writes. */
   private readonly commands = new CommandHandler({
     writeState: (id, val) => this.writeState(id, val),
@@ -166,7 +176,7 @@ export class Fakeroku extends utils.Adapter {
    * kept current by {@link writeIndicator}.
    */
   private readonly lastState = new Map<string, Pick<ioBroker.State, "val" | "ack" | "q">>();
-  /** The adapter's objects as read at start, keyed relative to the namespace. */
+  /** The adapter's objects before this start created a device object — taken from {@link known}, keyed relative to the namespace. */
   private ownObjects: ReadonlyMap<string, ioBroker.Object> = new Map();
   /** The own object tree, read once at start: every object write goes through it and reaches the database only on a change. */
   private readonly known = new KnownObjects(this);
@@ -214,6 +224,16 @@ export class Fakeroku extends utils.Adapter {
    */
   private get running(): RokuAdvert[] {
     return [...this.devices.values()].filter(d => d.server).map(d => d.advert);
+  }
+
+  /**
+   * The devices whose ECP server is down — it did not start, or it died; retried on a timer until they come up.
+   * onUnload lets go of every device, so nothing is pending once the host said stop.
+   *
+   * @returns the configured devices without a listening server
+   */
+  private get pending(): DeviceRuntime[] {
+    return [...this.devices.values()].filter(d => !d.server);
   }
 
   /**
@@ -346,13 +366,13 @@ export class Fakeroku extends utils.Adapter {
       await this.markOffline(this.storedStatusDevices());
       await this.refreshOwnObjects();
 
-      // The object tree as it is before this start touches it: the rows resolve their object id
-      // and — for a row from before 0.7.0 — their type against it.
-      const owned = await this.readOwnObjects();
-      this.ownObjects = owned;
       if (this.stopping) {
         return;
       }
+      // The object tree as it is before this start touches it: the rows resolve their object id
+      // and — for a row from before 0.7.0 — their type against it.
+      const owned = this.knownTree();
+      this.ownObjects = owned;
 
       // Read the device list BEFORE anything can return early: the orphan sweep below
       // has to know the configured set at every exit, or a tree the user just deleted
@@ -476,8 +496,8 @@ export class Fakeroku extends utils.Adapter {
     const failures: DeviceFailure[] = [];
     const seenIds = new Set<string>();
     for (const row of configured) {
-      // The host said stop: nothing more may start, and nothing may land in the queue onUnload
-      // just emptied.
+      // The host said stop: nothing more may start, and no device may land in the list onUnload
+      // just let go of.
       if (this.stopping) {
         return failures;
       }
@@ -514,6 +534,10 @@ export class Fakeroku extends utils.Adapter {
         failures.push({ name: row.name, reason: `its objects could not be created: ${errText(e)}`, retried: false });
         continue;
       }
+      // The host said stop while the objects were being created: onUnload has let go of every device already.
+      if (this.stopping) {
+        return failures;
+      }
       const device: DeviceRuntime = {
         id: deviceId,
         name: row.name,
@@ -523,9 +547,9 @@ export class Fakeroku extends utils.Adapter {
       };
       this.devices.set(deviceId, device);
       const failed = await this.startDeviceServer(device);
-      if (failed !== null && !this.stopping) {
+      // A stop during the bind needs no check here: onUnload let go of the device, and onReady stops right after.
+      if (failed) {
         device.reason = failed;
-        this.pending.push(device);
         failures.push({ name: row.name, reason: failed, retried: true });
       }
     }
@@ -536,12 +560,13 @@ export class Fakeroku extends utils.Adapter {
    * Start one device's ECP server and register it as running.
    *
    * @param device the device to start
-   * @returns null when the server listens, else why it does not
+   * @returns null when the server listens, undefined when the host said stop (nothing bound, nothing to tell), else
+   *   why it does not listen
    */
-  private async startDeviceServer(device: DeviceRuntime): Promise<string | null> {
-    // The host said stop while this device's objects were being created: bind nothing.
+  private async startDeviceServer(device: DeviceRuntime): Promise<string | null | undefined> {
+    // The host said stop before this retry reached the device: bind nothing.
     if (this.stopping) {
-      return "the adapter is stopping";
+      return undefined;
     }
     let server: EcpHttpServer | undefined;
     try {
@@ -560,7 +585,7 @@ export class Fakeroku extends utils.Adapter {
       // server to a device onUnload has already let go of — nothing would ever close it.
       if (this.stopping) {
         server.stop();
-        return "the adapter is stopping";
+        return undefined;
       }
       device.server = server;
       this.ssdp?.addDevice(device.advert);
@@ -573,7 +598,10 @@ export class Fakeroku extends utils.Adapter {
     }
   }
 
-  /** Arm the retry timer while a device is down or discovery is; a no-op otherwise. */
+  /**
+   * Arm the retry timer while a device is down or discovery is; a no-op otherwise — and once the host said stop, since
+   * onUnload let go of every device.
+   */
   private scheduleRetry(): void {
     const discoveryWanted = this.running.length > 0 && !this.ssdp;
     if (this.retryTimer || (this.pending.length === 0 && !discoveryWanted)) {
@@ -599,32 +627,31 @@ export class Fakeroku extends utils.Adapter {
     // status write failing while the states database hiccups — would be an unhandled rejection,
     // and js-controller ends the instance over it.
     try {
-      // No stopping check at the entry: onUnload sets the flag and empties the queue in the
+      // No stopping check at the entry: onUnload sets the flag and lets go of every device in the
       // same synchronous block, so a call that arrives afterwards finds nothing to do, and a
       // call already inside the loop is caught after the bind and again at the tail.
-      const stillPending: DeviceRuntime[] = [];
       for (const device of this.pending) {
         const failed = await this.startDeviceServer(device);
+        if (failed === undefined) {
+          return;
+        }
         if (failed === null) {
           this.log.info(`Emulated Roku "${device.name}" is listening on port ${device.advert.port} again.`);
         } else {
           this.log.debug(`Emulated Roku "${device.name}" still not running — ${failed}`);
           device.reason = failed;
-          stillPending.push(device);
         }
       }
       if (this.stopping) {
-        // The host said stop while we were binding. Assigning the list back would re-fill the
-        // queue onUnload just emptied, and scheduleRetry would then arm a new timer —
-        // which js-controller refuses during shutdown, with a warning nobody can explain.
+        // The host said stop while we were binding: starting discovery or arming a new timer now would be refused by
+        // js-controller during shutdown, with a warning nobody can explain.
         return;
       }
-      this.pending = stillPending;
       // Discovery may never have started (every device failed at boot), or it went down.
       if (this.running.length > 0 && !this.ssdp) {
         await this.startDiscovery();
       }
-      // A stop during the start above finds nothing to write: onUnload wrote false and emptied what the retry would arm.
+      // A stop during the start above finds nothing to write: onUnload wrote false and let go of every device.
       await this.updateConnection();
       if (this.retryBroken) {
         this.retryBroken = false;
@@ -638,8 +665,6 @@ export class Fakeroku extends utils.Adapter {
         this.retryBroken = true;
         this.log.warn(`Retrying the emulated Rokus failed: ${errText(e)}`);
       }
-      // No stopping check: onUnload empties the queue, and scheduleRetry arms nothing for
-      // an empty one.
       this.scheduleRetry();
     }
   }
@@ -758,28 +783,11 @@ export class Fakeroku extends utils.Adapter {
    * it back on every start — the object type included (`extend(true, old, manifest)`), which is
    * also what repairs an `info` channel a hand-edited device row named "info" once turned into a
    * device object (see the reserved-id guard in startDevices). Each is written only when it
-   * differs from the object as read at start.
+   * differs from the object as read at start ({@link KnownObjects.extend}).
    */
   private async refreshOwnObjects(): Promise<void> {
-    const info = { common: { name: tName("channelInfo") } };
-    if (!coveredBy(info, this.known.get("info"))) {
-      await this.extendObject("info", info);
-    }
-    const connection = { common: { name: tName("connectionStatus"), desc: tDesc("connectionStatusDesc") } };
-    if (!coveredBy(connection, this.known.get("info.connection"))) {
-      await this.extendObject("info.connection", connection);
-    }
-    const devicesTotal = { common: { name: tName("devicesTotal"), desc: tDesc("devicesTotalDesc") } };
-    if (!coveredBy(devicesTotal, this.known.get("info.devicesTotal"))) {
-      await this.extendObject("info.devicesTotal", devicesTotal);
-    }
-    const devicesOnline = { common: { name: tName("devicesOnline"), desc: tDesc("devicesOnlineDesc") } };
-    if (!coveredBy(devicesOnline, this.known.get("info.devicesOnline"))) {
-      await this.extendObject("info.devicesOnline", devicesOnline);
-    }
-    const devicesAllOnline = { common: { name: tName("devicesAllOnline"), desc: tDesc("devicesAllOnlineDesc") } };
-    if (!coveredBy(devicesAllOnline, this.known.get("info.devicesAllOnline"))) {
-      await this.extendObject("info.devicesAllOnline", devicesAllOnline);
+    for (const [id, name, desc] of OWN_OBJECT_TEXTS) {
+      await this.known.extend(id, { common: { name: tName(name), ...(desc ? { desc: tDesc(desc) } : {}) } });
     }
   }
 
@@ -919,11 +927,10 @@ export class Fakeroku extends utils.Adapter {
    */
   private async primeStates(): Promise<void> {
     const states = await this.getStatesAsync(`${this.namespace}.*`);
-    const prefix = `${this.namespace}.`;
     this.lastState.clear();
     for (const [id, state] of Object.entries(states)) {
       if (state) {
-        this.lastState.set(id.slice(prefix.length), { val: state.val, ack: state.ack, q: state.q });
+        this.lastState.set(ownRelativeId(this.namespace, id) ?? id, { val: state.val, ack: state.ack, q: state.q });
       }
     }
   }
@@ -974,20 +981,17 @@ export class Fakeroku extends utils.Adapter {
   }
 
   /**
-   * The adapter's objects, keyed relative to the namespace.
+   * The adapter's objects as the store knows them now — the one read at start plus every write since — keyed relative
+   * to the namespace. No second read of the tree.
    *
-   * @returns the object dump
+   * @returns the objects
    */
-  private async readOwnObjects(): Promise<Map<string, ioBroker.Object>> {
-    const objects = await this.getAdapterObjectsAsync();
-    const prefix = `${this.namespace}.`;
-    const owned = new Map<string, ioBroker.Object>();
-    for (const [id, obj] of Object.entries(objects)) {
-      if (id.startsWith(prefix)) {
-        owned.set(id.slice(prefix.length), obj);
-      }
+  private knownTree(): Map<string, ioBroker.Object> {
+    const tree = new Map<string, ioBroker.Object>();
+    for (const id of this.known.ids()) {
+      tree.set(ownRelativeId(this.namespace, id) ?? id, this.known.get(id) as ioBroker.Object);
     }
-    return owned;
+    return tree;
   }
 
   /**
@@ -1057,14 +1061,14 @@ export class Fakeroku extends utils.Adapter {
    * @param configuredDeviceIds the id-safe names of the currently configured devices
    */
   private async cleanupOrphans(configuredDeviceIds: ReadonlySet<string>): Promise<void> {
-    // A dump read NOW, after this start created and renamed its objects: the native repair
-    // below writes an object back whole, and a dump from before the start would write the
+    // The tree as it is NOW, after this start created and renamed its objects: the native repair
+    // below writes an object back whole, and the tree from before the start would write the
     // names and descriptions of the previous version back over the ones just set.
-    const owned = await this.readOwnObjects();
+    const owned = this.knownTree();
     const keysByDevice = new Map([...this.devices.values()].map(d => [d.id, d.keys]));
     const toDelete = planObjectCleanup([...owned.keys()], configuredDeviceIds, keysByDevice);
     for (const id of toDelete) {
-      await this.delObjectAsync(id, { recursive: true }).catch((e: unknown) => {
+      await this.known.remove(id, { recursive: true }).catch((e: unknown) => {
         this.log.debug(`cleanup: could not delete ${id}: ${errText(e)}`);
       });
     }
@@ -1115,7 +1119,7 @@ export class Fakeroku extends utils.Adapter {
         // The cast only collapses the union: ioBroker.Object spans every object kind
         // (instance, host, enum, ...), while a write accepts device/channel/state/folder.
         // The shape is the one just read back, so nothing is asserted away here.
-        await this.setForeignObject(`${this.namespace}.${id}`, {
+        await this.known.replace(`${this.namespace}.${id}`, {
           ...keep,
           native: {},
         } as
@@ -1182,9 +1186,6 @@ export class Fakeroku extends utils.Adapter {
     device.server = undefined;
     device.reason = `stopped answering: ${errText(err)}`;
     this.ssdp?.removeDevice(device.advert.uuid);
-    if (!this.pending.includes(device)) {
-      this.pending.push(device);
-    }
     this.scheduleRetry();
     this.updateConnection().catch((e: unknown) => {
       this.log.debug(`Connection state write failed: ${errText(e)}`);
@@ -1288,7 +1289,6 @@ export class Fakeroku extends utils.Adapter {
       }
       const marked = [...this.devices.keys()];
       this.devices.clear();
-      this.pending = [];
       // The SSDP socket is the one thing that cannot close yet — the farewell goes out
       // through it. It is closed in the callback below, whichever way that arrives.
       const farewell = this.ssdp ? this.ssdp.byebye() : Promise.resolve();

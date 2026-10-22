@@ -1,4 +1,14 @@
-import { decodeFormText, normalizeKey, sanitizeId } from "./pure-helpers";
+import { decodeFormText, normalizeKey, ownRelativeId, sanitizeId } from "./pure-helpers";
+
+describe("ownRelativeId", () => {
+  it("drops the namespace of an own id", () => {
+    expect(ownRelativeId("fakeroku.0", "fakeroku.0.Wohnzimmer.keys.Home")).toBe("Wohnzimmer.keys.Home");
+  });
+  it("answers undefined for an id of another namespace — also one that only starts with the same text", () => {
+    expect(ownRelativeId("fakeroku.0", "fakeroku.1.Wohnzimmer")).toBeUndefined();
+    expect(ownRelativeId("fakeroku.1", "fakeroku.10.Wohnzimmer")).toBeUndefined();
+  });
+});
 
 describe("sanitizeId", () => {
   it("replaces dots and spaces with underscore", () => {

@@ -2,7 +2,8 @@ import { I18n } from "@iobroker/adapter-core";
 import type translations from "../../admin/i18n/en.json";
 import { LANGUAGES } from "./constants";
 
-type I18nKey = keyof typeof translations;
+/** A key of admin/i18n/en.json — the type check refuses a key the file does not carry. */
+export type I18nKey = keyof typeof translations;
 
 /**
  * Translation object for a user-facing string, with optional `%s` interpolation.

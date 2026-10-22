@@ -80,6 +80,7 @@ export function internalOf(adapter: Fakeroku): {
   setState: ReturnType<typeof vi.fn>;
   getStatesAsync: ReturnType<typeof vi.fn>;
   getAdapterObjectsAsync: ReturnType<typeof vi.fn>;
+  getObjectListAsync: ReturnType<typeof vi.fn>;
   lastState: Map<string, { val: unknown; ack: boolean; q?: number }>;
   extendObject: ReturnType<typeof vi.fn>;
   setForeignObject: ReturnType<typeof vi.fn>;
@@ -278,6 +279,19 @@ export function stopWhenWriting(ctx: Ctx, id: string): void {
       ctx.i.onUnload(() => {});
     }
     return real(written, o);
+  });
+}
+
+/**
+ * The host says stop the moment the adapter reads its object tree — the one read of the start.
+ *
+ * @param ctx the test context
+ */
+export function stopWhenListing(ctx: Ctx): void {
+  const real = ctx.i.getObjectListAsync.getMockImplementation() as (p: unknown) => Promise<unknown>;
+  ctx.i.getObjectListAsync.mockImplementationOnce((params: unknown) => {
+    ctx.i.onUnload(() => {});
+    return real(params);
   });
 }
 

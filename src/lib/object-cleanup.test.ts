@@ -106,12 +106,12 @@ describe("planNativePrune", () => {
       ["Wohnzimmer.keys.Home", state({ url: "keys/Home" })],
       ["Wohnzimmer.keys.Back", state({})],
     ]);
-    expect(planNativePrune(objects).map(([id]) => id)).toEqual(["Wohnzimmer.keys.Home"]);
+    expect(planNativePrune(objects, new Set()).map(([id]) => id)).toEqual(["Wohnzimmer.keys.Home"]);
   });
 
   it("hands the object back untouched, so the caller can preserve common.custom", () => {
     const obj = state({ url: "keys/Home" });
-    const [[, handed]] = planNativePrune(new Map([["Wohnzimmer.keys.Home", obj]]));
+    const [[, handed]] = planNativePrune(new Map([["Wohnzimmer.keys.Home", obj]]), new Set());
     expect(handed).toBe(obj);
   });
 
@@ -125,6 +125,6 @@ describe("planNativePrune", () => {
   });
 
   it("says nothing about a clean tree", () => {
-    expect(planNativePrune(new Map([["Wohnzimmer.keys.Home", state({})]]))).toEqual([]);
+    expect(planNativePrune(new Map([["Wohnzimmer.keys.Home", state({})]]), new Set())).toEqual([]);
   });
 });

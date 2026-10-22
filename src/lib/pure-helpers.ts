@@ -18,6 +18,18 @@ export function sanitizeId(raw: string): string {
 }
 
 /**
+ * The id relative to the adapter's namespace — how the adapter names its own objects and states.
+ *
+ * @param namespace e.g. "fakeroku.0"
+ * @param id a full id
+ * @returns the id without the namespace, undefined for an id of another namespace
+ */
+export function ownRelativeId(namespace: string, id: string): string | undefined {
+  const prefix = `${namespace}.`;
+  return id.startsWith(prefix) ? id.slice(prefix.length) : undefined;
+}
+
+/**
  * Normalize a Roku key name taken from the ECP URL path: decode the character of a `Lit_<char>`
  * keyboard keypress (a malformed escape stays raw).
  *

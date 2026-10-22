@@ -17,7 +17,7 @@ import {
 } from "./lib/device-config";
 import { randomIdentity } from "./lib/device-identity";
 import { t } from "./lib/i18n";
-import { sanitizeId, UNSAFE_ID_CHAR } from "./lib/pure-helpers";
+import { ownRelativeId, sanitizeId, UNSAFE_ID_CHAR } from "./lib/pure-helpers";
 
 /**
  * One emulated Roku as stored in the adapter's native.devices — the manifest's own
@@ -175,12 +175,9 @@ export class FakerokuDeviceManagement extends DeviceManagement {
     const obj = await this.adapter.getForeignObjectAsync(this.objId);
     const devices = (obj?.native as { devices?: unknown } | undefined)?.devices;
     const objects = await this.adapter.getAdapterObjectsAsync();
-    const prefix = `${this.adapter.namespace}.`;
     const relative = new Map<string, string | undefined>();
     for (const [id, o] of Object.entries(objects)) {
-      if (id.startsWith(prefix)) {
-        relative.set(id.slice(prefix.length), o?.type);
-      }
+      relative.set(ownRelativeId(this.adapter.namespace, id) ?? id, o?.type);
     }
     return (
       toDeviceRows(
