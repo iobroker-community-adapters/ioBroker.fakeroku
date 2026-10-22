@@ -38,9 +38,11 @@ VLAN bekommt die Adresse, die sie erreicht.
 Eine bestimmte Adresse wählst du nur, wenn die emulierten Rokus **nur in einem Netz**
 existieren sollen. Dann bleibt alles in diesem Netz: Beantwortet werden nur
 Fernbedienungen daraus, in den anderen Netzen wird nichts angeboten. Gibt es die Adresse
-beim Start der Instanz auf dem Rechner nicht, wartet der Adapter bis zu zwei Minuten
-darauf (ein Netz, das erst nach ioBroker hochkommt), meldet es dann im Protokoll und
-startet nichts — er weicht nie auf ein anderes Netz aus.
+beim Start der Instanz auf dem Rechner nicht (eine neue Adresse vom Router, eine
+Sicherung auf anderer Hardware), lauscht der Adapter auf allen Adressen, damit die
+Fernbedienungen die Rokus weiter finden, schreibt eine Warnung mit der Ursache und zeigt
+die Instanz gelb (`info.connection` false), bis du eine Adresse wählst, die der Rechner
+hat.
 
 ### 3. Emulierte Rokus anlegen oder ändern
 

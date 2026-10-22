@@ -26,7 +26,7 @@ app list, app icons.
 ## Features
 
 - Emulates one or more Roku devices on the LAN — the Roku control protocol (ECP) over HTTP plus SSDP discovery on port 1900.
-- Answers the Roku queries controllers rely on: device info, apps, active app, media player, TV channels and app icons.
+- Answers the Roku queries Harmony and Sofabaton make: device description, device info, the app list and app icons.
 - Clean data model per device: a `command` datapoint plus fixed `keys.<Key>` states, all created up front.
 - Several emulated Rokus from a single instance; with "all interfaces" every network of the host is served with the host's own address in it, a chosen interface keeps everything in its network; only clients from the host's own networks are answered, capped at 25 commands per second per emulated Roku, so a misbehaving device cannot flood ioBroker. Releasing a key you are holding is never dropped by that cap.
 
@@ -52,9 +52,10 @@ For details and how to disable it, see the [Sentry plugin documentation](https:/
 - **Network interface** — leave it on "all interfaces" and the adapter runs out of the
   box: every network of the host is served, each with the host's own address in it.
   Pick a specific address only if the emulated Rokus should exist in one network only —
-  then everything stays in that network. An address the host does not carry is waited
-  for up to two minutes at start-up, then reported; the adapter never falls back to
-  another network.
+  then everything stays in that network. If the host does not carry that address at
+  start-up, the adapter listens on all addresses so the remotes still find the Rokus,
+  writes one warning and shows the instance yellow until you choose an address the host
+  has.
 - **Emulated Roku devices** — managed as cards: **+ Add** opens a dialog with a
   **name**, an **ECP port** (`8060` the real Roku port; a free one is pre-selected,
   and the dialog does not let you confirm a name or port already in use) and a **type**.

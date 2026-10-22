@@ -3,7 +3,7 @@
  * refused. Pure — the caller passes the clock — so the rule is unit-testable
  * without waiting.
  *
- * Why it exists: every accepted command becomes three state writes (plus one more
+ * Why it exists: an accepted keypress becomes two state writes (plus one more
  * when the key pulse ends). A misbehaving or hostile device in the LAN could send
  * a thousand key presses a second and turn this adapter into a write flood
  * against the ioBroker database — slowing the host, every history adapter on

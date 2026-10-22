@@ -37,8 +37,8 @@ export interface EcpServerConfig {
    * Called at most once if the server dies AFTER a successful start — a runtime
    * error it cannot recover from. Without it the adapter would keep reporting a
    * connected instance while this emulated Roku no longer answers anything, and
-   * `info.connection` means "EVERY configured Roku is listening". Mirrors the SSDP
-   * responder's callback.
+   * `info.connection` means every configured Roku listens, discovery answers and the
+   * chosen address exists. Mirrors the SSDP responder's callback.
    */
   onFatalError: (err: Error) => void;
   /**

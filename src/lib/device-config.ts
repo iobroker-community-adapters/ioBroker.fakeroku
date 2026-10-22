@@ -29,7 +29,7 @@ const LEGACY_DEFAULT_PORT = 9093;
 
 /**
  * What the adapter's object tree holds right now, as far as the rows need it: the device ids, and
- * the key states below each. Built once per start from the object dump the orphan sweep reads.
+ * the key states below each. Built once per start from the one read of the own objects.
  */
 export interface DeviceTree {
   /** The top-level device object ids. */

@@ -37,9 +37,10 @@ address in that network — a remote in a separate VLAN gets the address it can 
 Pick a specific address only if the emulated Rokus should exist in **one network
 only**. Then everything stays in that network: only remotes from it are answered, and
 nothing is offered on the others. If that address does not exist on the host when the
-instance starts, the adapter waits up to two minutes for it (a network that comes up
-after ioBroker), then says so in the log and starts nothing — it never falls back to
-another network.
+instance starts (a new address from the router, a backup restored on other hardware),
+the adapter listens on all addresses so the remotes still find the Rokus, writes one
+warning with the cause and shows the instance yellow (`info.connection` false) until you
+choose an address the host has.
 
 ### 3. Add or edit the emulated Rokus
 

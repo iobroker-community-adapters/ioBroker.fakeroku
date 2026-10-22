@@ -12,7 +12,8 @@ export interface Membership {
 /**
  * The address announced when no interface is chosen and nothing more specific is known: the host's first IPv4. Every
  * search is answered with the host's address in the searcher's own network and every NOTIFY carries the address of
- * the interface it leaves through, so this one only names the host in the log. Pure.
+ * the interface it leaves through; this one is the fallback of both — the answer to a searcher no own network
+ * matches, a NOTIFY while no per-interface sender is open — and the address the log names. Pure.
  *
  * @param interfaces the OS network-interface map
  * @returns the first IPv4 address, or "" if the host has none

@@ -195,7 +195,8 @@ export class Fakeroku extends utils.Adapter {
    *
    * dm-utils subscribes to the adapter's `message` event from its own constructor, so creating the object IS the
    * wiring — and it happens in onReady right after `I18n.init`: js-controller delivers messages before `ready`, and a
-   * card or dialog text built before the translations are loaded throws.
+   * card or dialog text built before the translations are loaded throws. A `dm:*` message that arrives while
+   * `I18n.init` still reads the translation files finds no listener yet: it gets no answer and no log line.
    */
   private deviceManagement: FakerokuDeviceManagement | undefined;
 
@@ -665,8 +666,9 @@ export class Fakeroku extends utils.Adapter {
    * a crash, or a controller that never sent its keyup — leaves the key true in
    * the database for good, and a rule watching for the next press never sees an
    * edge again. The reset belongs on STARTUP, not into onUnload: only startup also
-   * covers the crash, and up to 31 writes per device would eat the shutdown budget that
-   * today comfortably carries a single one. The reset compares against the values read in
+   * covers the crash, and up to 31 writes per device would eat the shutdown budget, which
+   * already carries the status writes (two per Roku plus three, together and only where a
+   * value changes). The reset compares against the values read in
    * the start's one bulk read and writes only a key that is not false — a healthy tree costs
    * no write and no read.
    *
@@ -1014,12 +1016,10 @@ export class Fakeroku extends utils.Adapter {
    * Teardown: drop the timers and sockets synchronously, then report done only
    * once the farewell and the last write have landed.
    *
-   * Nothing else resets this adapter's status — `info.connection`, every Roku's
-   * `info.online` and `info.error`, the device counts: the host means to reset
-   * `info.connection`, but writes its reset to the namespace root instead of the
-   * datapoint (js-controller#3472), and it knows nothing of the rest. So if the
-   * final writes are lost, the instance and every Roku show "running" while the
-   * adapter is off.
+   * Nothing else resets every Roku's `info.online` and `info.error` and the device
+   * counts: the host resets only `info.connection` (js-controller#3472, fixed in 7.2.3)
+   * and knows nothing of the rest. So if the final writes are lost, every Roku shows
+   * "running" while the adapter is off.
    *
    * A fire-and-forget write plus an immediate callback is a race; waiting closes it for the
    * slow or busy case. It is safe because without `common.supportedMessages.stopInstance` the

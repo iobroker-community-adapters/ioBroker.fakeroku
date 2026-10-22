@@ -155,7 +155,7 @@ export class CommandHandler {
 
   /**
    * The rate gate: {@link MAX_COMMANDS_PER_SECOND} per device, the excess dropped and reported once per
-   * {@link RATE_WARN_INTERVAL_MS}. Every accepted command costs three writes plus one when the pulse ends.
+   * {@link RATE_WARN_INTERVAL_MS}. An accepted keypress costs two writes plus one when the pulse ends.
    *
    * @param device the emulated Roku
    * @returns true if the command may be applied
