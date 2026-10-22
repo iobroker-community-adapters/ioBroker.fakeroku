@@ -884,7 +884,7 @@ describe("Fakeroku start-up robustness", () => {
     ctx.i.clearTimeout.mockClear();
     let done: () => void = () => {};
     const p = new Promise<void>(r => (done = r));
-    const started = ctx.i.startWithTimeout(p, 50);
+    const started = ctx.i.discovery.startWithTimeout(p, 50);
     done();
     await expect(started).resolves.toBeUndefined();
     expect(ctx.i.clearTimeout).not.toHaveBeenCalled();

@@ -147,7 +147,7 @@ describe("Fakeroku onReady — discovery is an aid, not a precondition", () => {
     expect(ctx.ecp[0].start).toHaveBeenCalled();
     expect(ctx.i.states.get("info.connection")).toEqual({ val: false, ack: true });
     expect(ctx.ssdps[0].announce).not.toHaveBeenCalled();
-    expect(ctx.i.ssdp).toBeUndefined();
+    expect(ctx.i.discovery.ssdp).toBeUndefined();
     expect(ctx.i.setTimeout).toHaveBeenCalledWith(expect.any(Function), 60_000);
 
     // Still busy a minute later: debug only.
@@ -259,7 +259,7 @@ describe("Fakeroku onReady — discovery is an aid, not a precondition", () => {
     const armed = (): number => ctx.i.setTimeout.mock.calls.filter(([, ms]) => ms === 60_000).length;
     expect(armed()).toBe(1);
 
-    ctx.i.onSsdpFatal(new Error("SSDP socket closed"));
+    ctx.i.discovery.onSsdpFatal(new Error("SSDP socket closed"));
 
     expect(armed()).toBe(1);
   });
@@ -286,11 +286,11 @@ describe("Fakeroku onReady — discovery is an aid, not a precondition", () => {
     ctx.i.clearInterval.mockClear();
     const dead = ctx.ssdps[0];
 
-    ctx.i.onSsdpFatal(new Error("SSDP socket closed"));
+    ctx.i.discovery.onSsdpFatal(new Error("SSDP socket closed"));
 
     expect(ctx.i.clearInterval).toHaveBeenCalledTimes(1);
     expect(dead.stop).toHaveBeenCalled();
-    expect(ctx.i.ssdp).toBeUndefined();
+    expect(ctx.i.discovery.ssdp).toBeUndefined();
     expect(ctx.i.log.warn).toHaveBeenCalledWith(
       expect.stringContaining("SSDP discovery unavailable: SSDP socket closed"),
     );

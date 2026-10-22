@@ -58,8 +58,6 @@ export function internalOf(adapter: Fakeroku): {
   onReady(): Promise<void>;
   onUnload(cb: () => void): void;
   applyCommand(deviceId: string, cmd: CommandEvent): boolean;
-  onSsdpFatal(err: Error): void;
-  startWithTimeout(p: Promise<void>, ms: number): Promise<void>;
   objects: Map<string, Record<string, unknown>>;
   states: Map<string, { val: unknown; ack: boolean }>;
   enums: Map<string, Set<string>>;
@@ -71,7 +69,11 @@ export function internalOf(adapter: Fakeroku): {
   terminate: ReturnType<typeof vi.fn>;
   setInterval: ReturnType<typeof vi.fn>;
   clearInterval: ReturnType<typeof vi.fn>;
-  ssdp: FakeSsdp | undefined;
+  discovery: {
+    ssdp: FakeSsdp | undefined;
+    onSsdpFatal(err: Error): void;
+    startWithTimeout(p: Promise<void>, ms: number): Promise<void>;
+  };
   running: { uuid: string; port: number }[];
   pending: { id: string; name: string }[];
   retryPendingDevices(): Promise<void>;
@@ -250,9 +252,9 @@ export function privateMembersExist(adapter: Fakeroku): unknown[] {
     adapter["onReady"],
     adapter["onUnload"],
     adapter["applyCommand"],
-    adapter["onSsdpFatal"],
-    adapter["startWithTimeout"],
-    adapter["ssdp"],
+    adapter["discovery"]["onSsdpFatal"],
+    adapter["discovery"]["startWithTimeout"],
+    adapter["discovery"]["ssdp"],
     adapter["running"],
     adapter["pending"],
     adapter["retryPendingDevices"],

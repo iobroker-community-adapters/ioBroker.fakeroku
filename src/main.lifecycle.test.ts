@@ -95,7 +95,7 @@ describe("Fakeroku collaborator wiring", () => {
     // Without this wiring the announce interval keeps firing into a dead socket
     // for as long as the instance runs.
     expect(ctx.i.clearInterval).toHaveBeenCalledTimes(1);
-    expect(ctx.i.ssdp).toBeUndefined();
+    expect(ctx.i.discovery.ssdp).toBeUndefined();
   });
 
   it("hooks each ECP server's fatal callback to the connection status", async () => {
@@ -152,7 +152,7 @@ describe("Fakeroku collaborator wiring", () => {
     const ctx = setup({}, { ssdpStartFails: true });
     await ctx.i.onReady();
     ctx.i.clearInterval.mockClear();
-    ctx.i.onSsdpFatal(new Error("SSDP socket closed"));
+    ctx.i.discovery.onSsdpFatal(new Error("SSDP socket closed"));
     // clearInterval(undefined) is a js-controller warning per call, not a no-op.
     expect(ctx.i.clearInterval).not.toHaveBeenCalled();
   });
@@ -164,7 +164,7 @@ describe("Fakeroku startWithTimeout", () => {
     // The stub's setTimeout does not fire on its own — invoke the callback the
     // way the runtime would once the deadline passes.
     const never = new Promise<void>(() => {});
-    const bounded = ctx.i.startWithTimeout(never, 500);
+    const bounded = ctx.i.discovery.startWithTimeout(never, 500);
     const armed = ctx.i.setTimeout.mock.calls.at(-1)!;
     (armed[0] as () => void)();
     await expect(bounded).rejects.toThrow(/timed out after 500/);
@@ -173,7 +173,7 @@ describe("Fakeroku startWithTimeout", () => {
   it("clears the deadline when the start succeeds", async () => {
     const ctx = setup();
     ctx.i.clearTimeout.mockClear();
-    await ctx.i.startWithTimeout(Promise.resolve(), 500);
+    await ctx.i.discovery.startWithTimeout(Promise.resolve(), 500);
     expect(ctx.i.clearTimeout).toHaveBeenCalledTimes(1);
   });
 });
@@ -445,7 +445,7 @@ describe("Fakeroku — failures that arrive while the host says stop", () => {
     ctx.i.onUnload(() => {});
     ctx.i.setTimeout.mockClear();
 
-    ctx.i.onSsdpFatal(new Error("SSDP socket closed"));
+    ctx.i.discovery.onSsdpFatal(new Error("SSDP socket closed"));
 
     expect(ctx.i.log.warn).not.toHaveBeenCalledWith(expect.stringContaining("SSDP discovery unavailable"));
     expect(ctx.i.setTimeout).not.toHaveBeenCalled();

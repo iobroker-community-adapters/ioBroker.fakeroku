@@ -49,3 +49,9 @@ export const DEVICE_ONLINE_ID = "info.online";
 
 /** A Roku's reason, relative to its device object: `Unknown`, empty while it runs, else why it does not. */
 export const DEVICE_ERROR_ID = "info.error";
+
+/** How long to wait before trying again what does not run: a device whose ECP server is down, and discovery. */
+export const RETRY_INTERVAL_MS = 60_000;
+
+/** The tail of every line about something that does not run and comes back on its own. */
+export const RETRY_NOTE = `retrying every ${RETRY_INTERVAL_MS / 1000} s`;

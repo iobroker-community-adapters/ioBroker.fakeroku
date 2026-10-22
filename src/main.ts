@@ -3,32 +3,32 @@ import { I18n } from "@iobroker/adapter-core";
 import { join } from "node:path";
 import { FakerokuDeviceManagement } from "./device-management";
 import type { RokuAdvert } from "./discovery/ssdp-messages";
+import { DiscoveryLifecycle } from "./discovery/discovery-lifecycle";
 import { RokuSsdpResponder } from "./discovery/ssdp-responder";
 import { CommandHandler } from "./command-handler";
 import type { CommandEvent } from "./ecp/ecp-command";
 import { EcpHttpServer } from "./ecp/ecp-http-server";
-import { DEVICE_ERROR_ID, DEVICE_ONLINE_ID, instanceObjectId, RESERVED_IDS } from "./lib/constants";
+import {
+  DEVICE_ERROR_ID,
+  DEVICE_ONLINE_ID,
+  instanceObjectId,
+  RESERVED_IDS,
+  RETRY_INTERVAL_MS,
+  RETRY_NOTE,
+} from "./lib/constants";
 import { deviceTreeOf, storedRowOf, toDeviceRows, type DeviceRow } from "./lib/device-config";
 import { randomIdentity } from "./lib/device-identity";
-import { detectLocalIPv4s, detectPrimaryIPv4, localAddressFor } from "./lib/detect-ip";
+import { detectLocalIPv4s } from "./lib/detect-ip";
 import { errText } from "./lib/err-text";
 import { migrateNativeKeys, type NativeKeyMigration } from "./lib/native-key-migration";
 import { type I18nKey, tDesc, tName, tRaw } from "./lib/i18n";
 import { KnownObjects } from "./lib/known-objects";
-import { carriesAddress, chosenAddress, isOwnPeer, localNets } from "./lib/network-address";
+import { carriesAddress, chosenAddress, isOwnPeer } from "./lib/network-address";
 import { planNativePrune, planObjectCleanup } from "./lib/object-cleanup";
 import { ownRelativeId } from "./lib/pure-helpers";
 import { type DeviceType, keysForType } from "./lib/roku-keys";
 import { StatusBoard, UNKNOWN_REASON } from "./status-board";
 
-/** Managed timeout for a stuck SSDP start (a busy port 1900 must not hang onReady). */
-const SSDP_START_TIMEOUT_MS = 5000;
-/** Proactive ssdp:alive interval so controllers find the device without searching. */
-const SSDP_NOTIFY_INTERVAL_MS = 300_000;
-/** How long to wait before trying again what does not run: a device whose ECP server is down, and discovery. */
-const RETRY_INTERVAL_MS = 60_000;
-/** The tail of every line about something that does not run and comes back on its own. */
-const RETRY_NOTE = `retrying every ${RETRY_INTERVAL_MS / 1000} s`;
 /**
  * The adapter's own objects with the translation keys of their name and description (none for the `info` channel) —
  * refreshed on every start by {@link Fakeroku.refreshOwnObjects}.
@@ -143,8 +143,20 @@ interface DeviceRuntime {
  * a keypress lands in `<device>.command` and pulses `<device>.keys.<Key>`.
  */
 export class Fakeroku extends utils.Adapter {
-  private ssdp: RokuSsdpResponder | undefined;
-  private notifyTimer: ioBroker.Interval | undefined;
+  /** The SSDP side: the responder, its announcements, its outage and return, the farewell. */
+  private readonly discovery = new DiscoveryLifecycle(this, {
+    bindIp: () => this.bindIp,
+    running: () => this.running,
+    isClientAllowed: address => this.isOwnClient(address),
+    stopping: () => this.stopping,
+    makeSsdpResponder: options => this.makeSsdpResponder(options),
+    onDown: () => {
+      this.scheduleRetry();
+      this.updateConnection().catch((e: unknown) => {
+        this.log.debug(`Connection state write failed: ${errText(e)}`);
+      });
+    },
+  });
   /** Every configured emulated Roku whose object tree this start created, by device id. */
   private readonly devices = new Map<string, DeviceRuntime>();
   /** Turns the remotes' commands into state writes. */
@@ -156,10 +168,6 @@ export class Fakeroku extends utils.Adapter {
   });
   /** The retry timer for {@link pending} and for discovery, armed only while something does not run. */
   private retryTimer: ioBroker.Timeout | undefined;
-  /** Discovery is answering and announcing — one of the conditions of a healthy instance. */
-  private discoveryUp = false;
-  /** Discovery is down and the warning about it is written: repeats go to debug, its return to info. */
-  private discoveryDown = false;
   /** A retry pass threw and the warning about it is written: repeats go to debug, the next good pass to info. */
   private retryBroken = false;
 
@@ -240,7 +248,7 @@ export class Fakeroku extends utils.Adapter {
    * @returns true when everything runs
    */
   private get healthy(): boolean {
-    return this.allRunning && this.discoveryUp && !this.bindMissing;
+    return this.allRunning && this.discovery.up && !this.bindMissing;
   }
 
   /**
@@ -378,12 +386,12 @@ export class Fakeroku extends utils.Adapter {
       }
       this.reportFailures(failures);
       if (this.running.length > 0) {
-        await this.startDiscovery();
+        await this.discovery.startDiscovery();
         if (this.stopping) {
           return;
         }
         const of = this.running.length < this.expectedDevices ? ` of ${this.expectedDevices}` : "";
-        const where = this.discoveryUp ? `advertising on ${this.advertisedAddresses()}` : "discovery unavailable";
+        const where = this.discovery.up ? `advertising on ${this.advertisedAddresses()}` : "discovery unavailable";
         this.log.info(`Emulating ${this.running.length}${of} Roku device(s), ${where}`);
       }
       await this.updateConnection();
@@ -542,7 +550,7 @@ export class Fakeroku extends utils.Adapter {
         return undefined;
       }
       device.server = server;
-      this.ssdp?.addDevice(device.advert);
+      this.discovery.addDevice(device.advert);
       return null;
     } catch (e) {
       // One device's failure (a busy ECP port) must not take the others down.
@@ -557,7 +565,7 @@ export class Fakeroku extends utils.Adapter {
    * onUnload let go of every device.
    */
   private scheduleRetry(): void {
-    const discoveryWanted = this.running.length > 0 && !this.ssdp;
+    const discoveryWanted = this.running.length > 0 && !this.discovery.started;
     if (this.retryTimer || (this.pending.length === 0 && !discoveryWanted)) {
       return;
     }
@@ -602,8 +610,8 @@ export class Fakeroku extends utils.Adapter {
         return;
       }
       // Discovery may never have started (every device failed at boot), or it went down.
-      if (this.running.length > 0 && !this.ssdp) {
-        await this.startDiscovery();
+      if (this.running.length > 0 && !this.discovery.started) {
+        await this.discovery.startDiscovery();
       }
       // A stop during the start above finds nothing to write: onUnload wrote false and let go of every device.
       await this.updateConnection();
@@ -621,106 +629,6 @@ export class Fakeroku extends utils.Adapter {
       }
       this.scheduleRetry();
     }
-  }
-
-  /**
-   * Start the SSDP responder for the devices that are listening.
-   *
-   * Discovery is what lets a remote FIND an emulated Roku; a remote already paired keeps working without it. A busy port
-   * 1900, a stuck bind or a host without an IPv4 therefore leaves the Rokus running and the instance yellow, and the
-   * minute retry starts it again. In the auto case join every interface and answer each network with the host's own
-   * address in it, so a multi-homed host is discoverable — and reachable — on all its LANs; a chosen interface pins
-   * membership, NOTIFY egress and every answer to itself.
-   */
-  private async startDiscovery(): Promise<void> {
-    // Both callers start it only while nothing runs and the host has not said stop.
-    const bindIp = this.bindIp;
-    const advertiseIp = bindIp ?? detectPrimaryIPv4();
-    if (!advertiseIp) {
-      this.discoveryFailed("the host has no IPv4 address");
-      return;
-    }
-    const membershipInterfaces = bindIp
-      ? [{ iface: localNets().find(net => net.address === bindIp)?.iface ?? bindIp, address: bindIp }]
-      : detectLocalIPv4s();
-    const ssdp = this.makeSsdpResponder({
-      devices: [...this.running],
-      bindIp,
-      advertiseIp,
-      membershipInterfaces,
-      logger: this.log,
-      isClientAllowed: this.isOwnClient,
-      // "All interfaces": every search is answered with the host's address in the searcher's own
-      // network. A chosen interface answers with its address only (the responder uses bindIp).
-      advertiseFor: bindIp ? undefined : remote => localAddressFor(remote),
-      onFatalError: err => this.onSsdpFatal(err),
-    });
-    this.ssdp = ssdp;
-    try {
-      await this.startWithTimeout(ssdp.start(), SSDP_START_TIMEOUT_MS);
-    } catch (e) {
-      // A start that only timed out can still bind later. Close it, or the socket
-      // outlives the reference dropped here and keeps answering with nobody to stop it.
-      ssdp.stop();
-      if (this.ssdp === ssdp) {
-        this.ssdp = undefined;
-      }
-      this.discoveryFailed(errText(e));
-      return;
-    }
-    // The bind resolved after the host asked us to stop: announcing now would put a
-    // device back into the network we just said goodbye to, and this.setInterval would
-    // refuse with "setInterval called, but adapter is shutting down".
-    if (this.stopping) {
-      ssdp.stop();
-      return;
-    }
-    this.discoveryUp = true;
-    if (this.discoveryDown) {
-      this.discoveryDown = false;
-      this.log.info("SSDP discovery is running again — remotes can find the emulated Rokus.");
-    }
-    ssdp.announce();
-    const timer = this.setInterval(() => this.announceTick(), SSDP_NOTIFY_INTERVAL_MS);
-    if (timer) {
-      this.notifyTimer = timer;
-    }
-  }
-
-  /**
-   * Discovery is down: one warning with the cause for the outage, its repeats on debug.
-   *
-   * @param cause why it is down
-   */
-  private discoveryFailed(cause: string): void {
-    this.discoveryUp = false;
-    if (this.discoveryDown) {
-      this.log.debug(`SSDP discovery still unavailable: ${cause}`);
-      return;
-    }
-    this.discoveryDown = true;
-    this.log.warn(
-      `SSDP discovery unavailable: ${cause} — paired remotes keep working, a new pairing does not; ${RETRY_NOTE}`,
-    );
-  }
-
-  /**
-   * One NOTIFY pass: follow the host first, then announce.
-   *
-   * Only in the automatic case — a chosen interface is the user's decision and does not move under
-   * us. Every pass hands the responder the interfaces the host has NOW: one that came up since the
-   * start (a second network card, a VLAN) is joined and announced on, one that went away is
-   * dropped, and a changed fallback address (a DHCP lease change) is logged once. Every five
-   * minutes is early enough: a controller caches the announced address for its max-age of an hour.
-   */
-  private announceTick(): void {
-    if (!this.bindIp) {
-      const current = detectPrimaryIPv4();
-      if (current && this.ssdp?.refreshAdvertise(current, detectLocalIPv4s())) {
-        this.log.info(`Host address changed — the emulated Rokus are now advertised on ${current}.`);
-      }
-    }
-    this.ssdp?.announce();
   }
 
   /**
@@ -1095,65 +1003,10 @@ export class Fakeroku extends utils.Adapter {
     device.server?.stop();
     device.server = undefined;
     device.reason = `stopped answering: ${errText(err)}`;
-    this.ssdp?.removeDevice(device.advert.uuid);
+    this.discovery.removeDevice(device.advert.uuid);
     this.scheduleRetry();
     this.updateConnection().catch((e: unknown) => {
       this.log.debug(`Connection state write failed: ${errText(e)}`);
-    });
-  }
-
-  /**
-   * The SSDP responder died at runtime (its socket closed after a good start). Stop announcing into the dead socket,
-   * close what is left of it, and let the minute retry start discovery again; the ECP servers keep working, the
-   * instance is yellow meanwhile.
-   *
-   * @param err why it died
-   */
-  private onSsdpFatal(err: Error): void {
-    if (this.notifyTimer) {
-      this.clearInterval(this.notifyTimer);
-      this.notifyTimer = undefined;
-    }
-    this.ssdp?.stop();
-    this.ssdp = undefined;
-    if (this.stopping) {
-      return;
-    }
-    this.discoveryFailed(errText(err));
-    this.scheduleRetry();
-    this.updateConnection().catch((e: unknown) => {
-      this.log.debug(`Connection state write failed: ${errText(e)}`);
-    });
-  }
-
-  /**
-   * Bound await: reject if the SSDP start doesn't settle in time, so a stuck
-   * port-1900 bind degrades to "discovery off" instead of hanging the adapter.
-   *
-   * @param promise the SSDP start promise
-   * @param ms the timeout in milliseconds
-   * @returns a promise that settles with the start result or a timeout error
-   */
-  private startWithTimeout(promise: Promise<void>, ms: number): Promise<void> {
-    return new Promise<void>((resolve, reject) => {
-      const timer = this.setTimeout(() => reject(new Error(`SSDP start timed out after ${ms} ms`)), ms);
-      const clear = (): void => {
-        if (timer) {
-          this.clearTimeout(timer);
-        }
-      };
-      promise.then(
-        () => {
-          clear();
-          resolve();
-        },
-        (e: unknown) => {
-          clear();
-          // Lint (prefer-promise-reject-errors) wants an Error here; errText downstream
-          // would cope with anything, so this is the rule's shape, not a second safeguard.
-          reject(e instanceof Error ? e : new Error(errText(e)));
-        },
-      );
     });
   }
 
@@ -1183,10 +1036,7 @@ export class Fakeroku extends utils.Adapter {
       // First of all, before any teardown: whatever is still in flight must not start or
       // write anything from here on.
       this.stopping = true;
-      if (this.notifyTimer) {
-        this.clearInterval(this.notifyTimer);
-        this.notifyTimer = undefined;
-      }
+      this.discovery.stopAnnouncing();
       if (this.retryTimer) {
         this.clearTimeout(this.retryTimer);
         this.retryTimer = undefined;
@@ -1201,7 +1051,7 @@ export class Fakeroku extends utils.Adapter {
       this.devices.clear();
       // The SSDP socket is the one thing that cannot close yet — the farewell goes out
       // through it. It is closed in the callback below, whichever way that arrives.
-      const farewell = this.ssdp ? this.ssdp.byebye() : Promise.resolve();
+      const farewell = this.discovery.byebye();
       const status = this.status
         .markOffline(marked)
         // A rejected write must not become an unhandled rejection — that is a
@@ -1212,8 +1062,7 @@ export class Fakeroku extends utils.Adapter {
           this.log.debug(`Final status write failed: ${errText(e)}`);
         });
       void Promise.all([farewell, status]).finally(() => {
-        this.ssdp?.stop();
-        this.ssdp = undefined;
+        this.discovery.stop();
         callback();
       });
     } catch {
