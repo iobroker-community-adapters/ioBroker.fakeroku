@@ -43,3 +43,9 @@ export const OWN_INFO_IDS: ReadonlySet<string> = new Set([
 
 /** The eleven languages every ioBroker manifest and admin translation carries. */
 export const LANGUAGES = ["en", "de", "ru", "pt", "nl", "fr", "it", "es", "pl", "uk", "zh-cn"] as const;
+
+/** A Roku's online indicator, relative to its device object: true while its ECP server listens. */
+export const DEVICE_ONLINE_ID = "info.online";
+
+/** A Roku's reason, relative to its device object: `Unknown`, empty while it runs, else why it does not. */
+export const DEVICE_ERROR_ID = "info.error";

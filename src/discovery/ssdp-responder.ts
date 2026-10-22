@@ -382,24 +382,44 @@ export class RokuSsdpResponder {
     return [{ socket: receiver, address: this.advertiseIp }];
   }
 
+  /**
+   * Send one datagram per device into the multicast group through every announcer. A failure is logged at debug and
+   * never thrown: an announcement runs on a timer, and a farewell must not hang teardown.
+   *
+   * @param outs the sockets with the address their announcements carry
+   * @param build the datagram for one device and address
+   * @param what the datagram's name in the log line
+   * @param sent called once per datagram when its send reported back or threw
+   */
+  private sendToGroup(
+    outs: readonly { socket: dgram.Socket; address: string }[],
+    build: (device: RokuAdvert, address: string) => string,
+    what: string,
+    sent: () => void,
+  ): void {
+    for (const { socket, address } of outs) {
+      for (const device of this.devices) {
+        try {
+          socket.send(Buffer.from(build(device, address)), SSDP_PORT, MULTICAST_ADDR, err => {
+            if (err) {
+              this.config.logger.debug(`SSDP ${what} send failed: ${errText(err)}`);
+            }
+            sent();
+          });
+        } catch (e) {
+          this.config.logger.debug(`SSDP ${what} send failed: ${errText(e)}`);
+          sent();
+        }
+      }
+    }
+  }
+
   /** Send one proactive ssdp:alive burst for every device. The adapter calls this on a managed interval. */
   public announce(): void {
     if (!this.socket) {
       return;
     }
-    for (const { socket, address } of this.announcers(this.socket)) {
-      for (const device of this.devices) {
-        try {
-          socket.send(Buffer.from(buildAliveNotify(device, address)), SSDP_PORT, MULTICAST_ADDR, err => {
-            if (err) {
-              this.config.logger.debug(`SSDP NOTIFY send failed: ${errText(err)}`);
-            }
-          });
-        } catch (e) {
-          this.config.logger.debug(`SSDP NOTIFY send failed: ${errText(e)}`);
-        }
-      }
-    }
+    this.sendToGroup(this.announcers(this.socket), buildAliveNotify, "NOTIFY", () => {});
   }
 
   /**
@@ -419,26 +439,16 @@ export class RokuSsdpResponder {
     }
     return new Promise<void>(resolve => {
       let open = outs.length * this.devices.length;
-      const done = (): void => {
-        if (--open === 0) {
-          resolve();
-        }
-      };
-      for (const { socket } of outs) {
-        for (const device of this.devices) {
-          try {
-            socket.send(Buffer.from(buildByebyeNotify(device)), SSDP_PORT, MULTICAST_ADDR, err => {
-              if (err) {
-                this.config.logger.debug(`SSDP byebye send failed: ${errText(err)}`);
-              }
-              done();
-            });
-          } catch (e) {
-            this.config.logger.debug(`SSDP byebye send failed: ${errText(e)}`);
-            done();
+      this.sendToGroup(
+        outs,
+        device => buildByebyeNotify(device),
+        "byebye",
+        () => {
+          if (--open === 0) {
+            resolve();
           }
-        }
-      }
+        },
+      );
     });
   }
 

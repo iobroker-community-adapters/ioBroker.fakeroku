@@ -1,5 +1,5 @@
 import { ROKU_DEVICE_TYPE, type RokuAdvert, usnOf } from "../discovery/ssdp-messages";
-import type { DeviceType } from "./state-model";
+import type { DeviceType } from "../lib/roku-keys";
 
 /**
  * A fake but CURRENT Roku OS version, kept at the newest Roku OS major (checked 2026-09-24: Roku

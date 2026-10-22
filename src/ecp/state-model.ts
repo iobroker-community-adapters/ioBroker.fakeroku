@@ -1,4 +1,9 @@
 import type { CommandEvent } from "./ecp-command";
+import { BASE_KEYS, TV_KEYS } from "../lib/roku-keys";
+
+// keysForType is read from here by the sealed F-11 guard; the key tables themselves live in lib (device-config needs
+// them to tell a TV from its tree, and lib does not reach up into ecp).
+export { keysForType } from "../lib/roku-keys";
 
 /**
  * Longest `command` value written. The text comes straight from the request URL,
@@ -7,59 +12,6 @@ import type { CommandEvent } from "./ecp-command";
  * (a key name, `launch:<id>`, a search keyword) stay far below this.
  */
 export const MAX_COMMAND_LENGTH = 500;
-
-/** The emulated Roku device type — decides which keys the device exposes. */
-export type DeviceType = "player" | "tv";
-
-/**
- * The base Roku remote keys every device type understands (ECP universal keys
- * plus FindRemote). A "player" (streaming box/stick) exposes exactly these.
- */
-export const BASE_KEYS = [
-  "Home",
-  "Rev",
-  "Fwd",
-  "Play",
-  "Select",
-  "Left",
-  "Right",
-  "Up",
-  "Down",
-  "Back",
-  "InstantReplay",
-  "Info",
-  "Backspace",
-  "Enter",
-  "Search",
-  "FindRemote",
-] as const;
-
-/**
- * The extra keys only a Roku TV understands: volume, power, channel and input. A "tv" device
- * exposes {@link BASE_KEYS} plus these.
- *
- * The input list is Roku's own (ECP documentation: InputTuner, InputHDMI1–4, InputAV1). The power
- * keys go beyond the documented PowerOff because the controllers send them: `PowerOn` (Home
- * Assistant/rokuecp, openHAB, node-roku-client), `Power` (Homey, node-roku-client, rokuecp) and
- * `Sleep` (rokuecp). A key a controller sends but no state carries only ever reaches `command`.
- */
-export const TV_KEYS = [
-  "VolumeUp",
-  "VolumeDown",
-  "VolumeMute",
-  "PowerOff",
-  "PowerOn",
-  "Power",
-  "Sleep",
-  "ChannelUp",
-  "ChannelDown",
-  "InputTuner",
-  "InputHDMI1",
-  "InputHDMI2",
-  "InputHDMI3",
-  "InputHDMI4",
-  "InputAV1",
-] as const;
 
 /** Every key any device type can carry — used to recognise a keypress as a standard key. */
 const ALL_KEYS: ReadonlySet<string> = new Set<string>([...BASE_KEYS, ...TV_KEYS]);
@@ -80,17 +32,6 @@ const KEY_BY_LOWER: ReadonlyMap<string, string> = new Map([...ALL_KEYS].map(key 
  */
 export function canonicalKey(key: string): string {
   return KEY_BY_LOWER.get(key.toLowerCase()) ?? key;
-}
-
-/**
- * The key set a device of the given type exposes: BASE_KEYS for a player, plus
- * TV_KEYS for a TV.
- *
- * @param type the device type
- * @returns the ordered list of key names to create for the device
- */
-export function keysForType(type: DeviceType): readonly string[] {
-  return type === "tv" ? [...BASE_KEYS, ...TV_KEYS] : BASE_KEYS;
 }
 
 /** What a command translates to in ioBroker state terms. The adapter performs the writes. */

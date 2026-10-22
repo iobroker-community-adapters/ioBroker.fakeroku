@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { BASE_KEYS, canonicalKey, commandToStateWrite, keysForType, MAX_COMMAND_LENGTH, TV_KEYS } from "./state-model";
+import { BASE_KEYS, TV_KEYS } from "../lib/roku-keys";
+import { canonicalKey, commandToStateWrite, keysForType, MAX_COMMAND_LENGTH } from "./state-model";
 
 const root = join(__dirname, "..", "..");
 

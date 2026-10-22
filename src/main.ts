@@ -7,9 +7,8 @@ import { RokuSsdpResponder } from "./discovery/ssdp-responder";
 import { CommandHandler } from "./command-handler";
 import type { CommandEvent } from "./ecp/ecp-command";
 import { EcpHttpServer } from "./ecp/ecp-http-server";
-import { type DeviceType, keysForType } from "./ecp/state-model";
-import { instanceObjectId, RESERVED_IDS } from "./lib/constants";
-import { deviceTreeOf, toDeviceRows, type DeviceRow } from "./lib/device-config";
+import { DEVICE_ERROR_ID, DEVICE_ONLINE_ID, instanceObjectId, RESERVED_IDS } from "./lib/constants";
+import { deviceTreeOf, storedRowOf, toDeviceRows, type DeviceRow } from "./lib/device-config";
 import { randomIdentity } from "./lib/device-identity";
 import { detectLocalIPv4s, detectPrimaryIPv4, localAddressFor } from "./lib/detect-ip";
 import { errText } from "./lib/err-text";
@@ -19,6 +18,7 @@ import { KnownObjects } from "./lib/known-objects";
 import { carriesAddress, chosenAddress, isOwnPeer, localNets } from "./lib/network-address";
 import { planNativePrune, planObjectCleanup } from "./lib/object-cleanup";
 import { ownRelativeId } from "./lib/pure-helpers";
+import { type DeviceType, keysForType } from "./lib/roku-keys";
 
 /** Managed timeout for a stuck SSDP start (a busy port 1900 must not hang onReady). */
 const SSDP_START_TIMEOUT_MS = 5000;
@@ -28,6 +28,8 @@ const SSDP_NOTIFY_INTERVAL_MS = 300_000;
 const RETRY_INTERVAL_MS = 60_000;
 /** The fleet's reason text while the adapter has nothing to report: it is off, or started and has not tried yet. */
 const UNKNOWN_REASON = "Unknown";
+/** The tail of every line about something that does not run and comes back on its own. */
+const RETRY_NOTE = `retrying every ${RETRY_INTERVAL_MS / 1000} s`;
 /**
  * The adapter's own objects with the translation keys of their name and description (none for the `info` channel) —
  * refreshed on every start by {@link Fakeroku.refreshOwnObjects}.
@@ -244,9 +246,16 @@ export class Fakeroku extends utils.Adapter {
    * @returns true when everything runs
    */
   private get healthy(): boolean {
-    return (
-      this.expectedDevices > 0 && this.running.length === this.expectedDevices && this.discoveryUp && !this.bindMissing
-    );
+    return this.allRunning && this.discoveryUp && !this.bindMissing;
+  }
+
+  /**
+   * Every configured Roku listens — the device half of {@link healthy}, and `info.devicesAllOnline`.
+   *
+   * @returns true when at least one Roku is configured and all of them listen
+   */
+  private get allRunning(): boolean {
+    return this.expectedDevices > 0 && this.running.length === this.expectedDevices;
   }
 
   /**
@@ -256,15 +265,13 @@ export class Fakeroku extends utils.Adapter {
    * @returns once the writes landed (or nothing had to be written)
    */
   private async updateConnection(): Promise<void> {
-    const total = this.expectedDevices;
-    const online = this.running.length;
     await Promise.all([
       ...[...this.devices.values()].map(device =>
         this.markDevice(device.id, device.server ? "" : (device.reason ?? UNKNOWN_REASON)),
       ),
-      this.writeIndicator("info.devicesTotal", total),
-      this.writeIndicator("info.devicesOnline", online),
-      this.writeIndicator("info.devicesAllOnline", total > 0 && online === total),
+      this.writeIndicator("info.devicesTotal", this.expectedDevices),
+      this.writeIndicator("info.devicesOnline", this.running.length),
+      this.writeIndicator("info.devicesAllOnline", this.allRunning),
       this.writeIndicator("info.connection", this.healthy),
     ]);
   }
@@ -278,8 +285,8 @@ export class Fakeroku extends utils.Adapter {
    */
   private async markDevice(deviceId: string, reason: string): Promise<void> {
     await Promise.all([
-      this.writeIndicator(`${deviceId}.info.online`, reason === ""),
-      this.writeIndicator(`${deviceId}.info.error`, reason),
+      this.writeIndicator(`${deviceId}.${DEVICE_ONLINE_ID}`, reason === ""),
+      this.writeIndicator(`${deviceId}.${DEVICE_ERROR_ID}`, reason),
     ]);
   }
 
@@ -309,9 +316,11 @@ export class Fakeroku extends utils.Adapter {
   private storedStatusDevices(): string[] {
     const ids = new Set<string>();
     for (const id of this.lastState.keys()) {
-      const parts = id.split(".");
-      if (parts.length === 3 && parts[1] === "info" && (parts[2] === "online" || parts[2] === "error")) {
-        ids.add(parts[0]);
+      // A device id carries no dot (sanitizeId), so the status id is everything after the first one.
+      const dot = id.indexOf(".");
+      const status = id.slice(dot + 1);
+      if (dot > 0 && (status === DEVICE_ONLINE_ID || status === DEVICE_ERROR_ID)) {
+        ids.add(id.slice(0, dot));
       }
     }
     return [...ids];
@@ -446,7 +455,7 @@ export class Fakeroku extends utils.Adapter {
    * @param failures the Rokus that do not run, with their reasons
    */
   private reportFailures(failures: readonly DeviceFailure[]): void {
-    const retry = (f: DeviceFailure): string => (f.retried ? `; retrying every ${RETRY_INTERVAL_MS / 1000} s` : "");
+    const retry = (f: DeviceFailure): string => (f.retried ? `; ${RETRY_NOTE}` : "");
     if (failures.length > 0 && this.running.length === 0) {
       const list = failures.map(f => `"${f.name}": ${f.reason}${retry(f)}`).join(" · ");
       this.log.error(`No emulated Roku is running — ${list}`);
@@ -746,7 +755,7 @@ export class Fakeroku extends utils.Adapter {
     }
     this.discoveryDown = true;
     this.log.warn(
-      `SSDP discovery unavailable: ${cause} — paired remotes keep working, a new pairing does not; retrying every ${RETRY_INTERVAL_MS / 1000} s`,
+      `SSDP discovery unavailable: ${cause} — paired remotes keep working, a new pairing does not; ${RETRY_NOTE}`,
     );
   }
 
@@ -822,7 +831,7 @@ export class Fakeroku extends utils.Adapter {
       // The symbol in the object browser comes from statusStates; a relative id is read below the device itself.
       this.known.extend(deviceId, {
         type: "device",
-        common: { name: tRaw(friendlyName), statusStates: { onlineId: "info.online" } },
+        common: { name: tRaw(friendlyName), statusStates: { onlineId: DEVICE_ONLINE_ID } },
         native: {},
       }),
       this.known.extend(`${deviceId}.info`, {
@@ -830,7 +839,7 @@ export class Fakeroku extends utils.Adapter {
         common: { name: tName("channelDeviceInfo"), desc: tDesc("channelDeviceInfoDesc") },
         native: {},
       }),
-      this.known.extend(`${deviceId}.info.online`, {
+      this.known.extend(`${deviceId}.${DEVICE_ONLINE_ID}`, {
         type: "state",
         common: {
           name: tName("stateOnline"),
@@ -843,7 +852,7 @@ export class Fakeroku extends utils.Adapter {
         },
         native: {},
       }),
-      this.known.extend(`${deviceId}.info.error`, {
+      this.known.extend(`${deviceId}.${DEVICE_ERROR_ID}`, {
         type: "state",
         common: {
           name: tName("stateError"),
@@ -1021,13 +1030,7 @@ export class Fakeroku extends utils.Adapter {
     if (fresh.length === 0 && untyped.length === 0) {
       return false;
     }
-    const devices = rows.map(row => ({
-      name: row.storedName,
-      port: row.port,
-      type: row.type,
-      uuid: fresh.includes(row) ? randomIdentity() : row.identity,
-      objectId: row.objectId,
-    }));
+    const devices = rows.map(row => storedRowOf(row, fresh.includes(row) ? randomIdentity() : row.identity));
     try {
       await this.extendForeignObjectAsync(instanceObjectId(this.namespace), { native: { devices } });
     } catch (e) {
@@ -1176,9 +1179,7 @@ export class Fakeroku extends utils.Adapter {
     if (this.stopping) {
       return;
     }
-    this.log.error(
-      `Emulated Roku "${device.name}" stopped answering: ${errText(err)} — retrying every ${RETRY_INTERVAL_MS / 1000} s`,
-    );
+    this.log.error(`Emulated Roku "${device.name}" stopped answering: ${errText(err)} — ${RETRY_NOTE}`);
     // Close it before letting go of it: nothing else ever reaches it again, and in compact mode
     // the port would stay taken for the lifetime of the whole host process. stop() is
     // idempotent and safe on a dead server.

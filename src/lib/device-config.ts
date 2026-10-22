@@ -1,8 +1,7 @@
-import { type DeviceType, TV_KEYS } from "../ecp/state-model";
 import { DEFAULT_ECP_PORT, RESERVED_IDS } from "./constants";
 import { resolveDeviceUuid } from "./device-identity";
-import { t } from "./i18n";
 import { sanitizeId } from "./pure-helpers";
+import { type DeviceType, TV_KEYS } from "./roku-keys";
 
 /**
  * Reading `native.devices` — the ONE place that turns a stored config row into the values
@@ -251,6 +250,24 @@ export function nextFreePort(usedPorts: readonly number[]): number {
 }
 
 /**
+ * The row as `native.devices` stores it: the name exactly as stored, the normalised port and type, the identity and the
+ * object id — the shape the runtime writes once at start and the device manager writes on every save.
+ *
+ * @param row the normalised row
+ * @param identity the identity to store — the row's own unless the start hands a new one
+ * @returns the stored row
+ */
+export function storedRowOf(
+  row: DeviceRow,
+  identity: string = row.identity,
+): ioBroker.AdapterConfig["devices"][number] {
+  return { name: row.storedName, port: row.port, type: row.type, uuid: identity, objectId: row.objectId };
+}
+
+/** Why a device cannot be saved as entered — a key of admin/i18n/en.json. */
+export type ClashReason = "deviceNameInvalid" | "deviceNameInUse" | "devicePortInUse";
+
+/**
  * A name/port clash against the other devices, as a ready-to-show message — the backend
  * safety net behind the dialog's OK rule, for anyone who writes the configuration another way
  * (expert mode, CLI); this never lets a duplicate through.
@@ -263,15 +280,15 @@ export function nextFreePort(usedPorts: readonly number[]): number {
  * @param candidate.name the candidate device name, trimmed
  * @param candidate.port the candidate ECP port
  * @param exceptIndex the list position to ignore (the device being edited), or -1 for a new one
- * @returns a translated clash message, or null if free
+ * @returns the i18n key of the clash — the caller shows the text — or null if free
  */
 export function findClash(
   devices: readonly DeviceRow[],
   candidate: { name: string; port: number },
   exceptIndex: number,
-): ioBroker.StringOrTranslated | null {
+): ClashReason | null {
   if (candidate.name === "") {
-    return t("deviceNameInvalid");
+    return "deviceNameInvalid";
   }
   const name = candidate.name.toLowerCase();
   // A new device's tree is built from its name: guard the two ways that can go wrong — a
@@ -279,22 +296,22 @@ export function findClash(
   // that maps to an id another device already occupies ("My Roku" and "My*Roku" → "My_Roku").
   const id = exceptIndex === -1 ? sanitizeId(candidate.name) : null;
   if (id !== null && (id === "" || RESERVED_IDS.has(id))) {
-    return t("deviceNameInvalid");
+    return "deviceNameInvalid";
   }
   for (let i = 0; i < devices.length; i++) {
     if (i === exceptIndex) {
       continue;
     }
     if (devices[i].name.toLowerCase() === name) {
-      return t("deviceNameInUse");
+      return "deviceNameInUse";
     }
     // The other device's REAL object id — built from its stored name, taken over from the old
     // adapter, or stored — not an id derived from the name the list displays.
     if (id !== null && devices[i].objectId === id) {
-      return t("deviceNameInvalid");
+      return "deviceNameInvalid";
     }
     if (devices[i].port === candidate.port) {
-      return t("devicePortInUse");
+      return "devicePortInUse";
     }
   }
   return null;

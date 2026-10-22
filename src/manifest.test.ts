@@ -1,6 +1,6 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { BASE_KEYS, TV_KEYS } from "./ecp/state-model";
+import { BASE_KEYS, TV_KEYS } from "./lib/roku-keys";
 import { LANGUAGES } from "./lib/constants";
 
 const root = join(__dirname, "..");

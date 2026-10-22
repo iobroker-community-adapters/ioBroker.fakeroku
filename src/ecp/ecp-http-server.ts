@@ -13,7 +13,7 @@ import {
   buildScpdXml,
   DEFAULT_APPS,
 } from "./device-info";
-import type { DeviceType } from "./state-model";
+import type { DeviceType } from "../lib/roku-keys";
 
 /** Configuration for one emulated Roku's ECP HTTP server. */
 export interface EcpServerConfig {
@@ -165,13 +165,14 @@ export class EcpHttpServer {
     const url = req.url ?? "/";
 
     if (method === "GET") {
-      const reply = this.routeGet(url);
+      const path = url.split("?")[0];
+      const reply = this.routeGet(path);
       if (reply === null) {
         res.statusCode = 404;
         res.end();
         return;
       }
-      if (url.split("?")[0] === "/query/device-info") {
+      if (path === "/query/device-info") {
         // The pairing probe — the first thing most remotes ask. Visible for diagnosis.
         this.config.logger.debug(`device-info queried from ${peer} (remote pairing/probe)`);
       }
@@ -217,8 +218,7 @@ export class EcpHttpServer {
     res.end();
   }
 
-  private routeGet(url: string): GetReply | null {
-    const path = url.split("?")[0];
+  private routeGet(path: string): GetReply | null {
     const xml = (body: string): GetReply => ({ body, type: XML });
     switch (path) {
       case "/":

@@ -5,13 +5,14 @@ import {
   type DeviceLoadContext,
   type JsonFormSchema,
 } from "@iobroker/dm-utils";
-import { instanceObjectId, RESERVED_IDS } from "./lib/constants";
+import { DEVICE_ERROR_ID, DEVICE_ONLINE_ID, instanceObjectId, RESERVED_IDS } from "./lib/constants";
 import {
   deviceTreeOf,
   findClash,
   nextFreePort,
   normalizePort,
   normalizeType,
+  storedRowOf,
   toDeviceRows,
   type DeviceRow,
 } from "./lib/device-config";
@@ -220,7 +221,7 @@ export class FakerokuDeviceManagement extends DeviceManagement {
    * @returns the row as it is persisted
    */
   private static toStored(row: DeviceRow): RokuDeviceConfig {
-    return { name: row.storedName, port: row.port, type: row.type, uuid: row.identity, objectId: row.objectId };
+    return storedRowOf(row);
   }
 
   /**
@@ -257,15 +258,15 @@ export class FakerokuDeviceManagement extends DeviceManagement {
    * @returns the card descriptor
    */
   private toDeviceInfo(device: DeviceRow): DeviceInfo<string> {
-    const info = `${this.adapter.namespace}.${device.objectId}.info`;
+    const own = `${this.adapter.namespace}.${device.objectId}`;
     return {
       id: device.identity,
       name: device.name,
       identifier: String(device.port),
       model: t(device.type === "tv" ? "deviceTypeTv" : "deviceTypePlayer"),
       status: {
-        connection: { stateId: `${info}.online`, mapping: { true: "connected", false: "disconnected" } },
-        warning: { stateId: `${info}.error` },
+        connection: { stateId: `${own}.${DEVICE_ONLINE_ID}`, mapping: { true: "connected", false: "disconnected" } },
+        warning: { stateId: `${own}.${DEVICE_ERROR_ID}` },
       },
       actions: [
         {
@@ -319,7 +320,7 @@ export class FakerokuDeviceManagement extends DeviceManagement {
       const clean = cleanDevice(data);
       const clash = findClash(devices, clean, -1);
       if (clash) {
-        await context.showMessage(clash);
+        await context.showMessage(t(clash));
         return { refresh: true };
       }
       const stored = devices.map(d => FakerokuDeviceManagement.toStored(d));
@@ -365,7 +366,7 @@ export class FakerokuDeviceManagement extends DeviceManagement {
       const clean = cleanDevice(data);
       const clash = findClash(devices, clean, index);
       if (clash) {
-        await context.showMessage(clash);
+        await context.showMessage(t(clash));
         return { refresh: "devices" };
       }
       const stored = devices.map(d => FakerokuDeviceManagement.toStored(d));
