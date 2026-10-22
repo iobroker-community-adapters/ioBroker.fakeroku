@@ -1,0 +1,6 @@
+{
+  "source": "github:logantgt/EcpEmuServer",
+  "verified": "v0.4",
+  "_verified": "EcpEmuServer is another Roku ECP emulator for the Logitech Harmony, the remote fakeroku serves (F-00). v0.4 (2026-10-22 against the tag): SSDP answers `ST: roku:ecp` with a Location on port 8060 and sends `NT: roku:ecp` notifies; HTTP answers `GET /` with the device description, `GET /query/apps` with an app list and `POST /keypress/<key>`. fakeroku answers all of it and more (device-info, SCPD, icon, keydown/keyup, launch) — nothing in v0.4 that fakeroku does not answer. Raising this value means reading Program.cs (the HTTP routes) and SSDPManager.cs (the discovery messages) of the new release against src/ecp/ and src/discovery/ again.",
+  "watch": ["src/EcpEmuServer/Program.cs", "src/EcpEmuServer/SSDPManager.cs"]
+}

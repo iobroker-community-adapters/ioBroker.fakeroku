@@ -18,6 +18,39 @@
     }
   },
   "forumThread": "https://forum.iobroker.net/topic/85188/test-adapter-fakeroku-1.1.0",
+  "_deviceIds": "Each emulated Roku is a device object whose id comes from the name the user gives it; renaming changes only the displayed name (K3).",
+  "deviceIds": {
+    "userNamed": "device name set in the device dialog of the device manager"
+  },
+  "noDeviceSources": "fakeroku is a Roku emulator for remotes such as Logitech Harmony: it controls no devices, it answers as a Roku so the remote's keys can trigger ioBroker scripts, so there are no devices to research or add",
+  "_suites": "fakeroku has no counterpart (sealed register, krobi 2026-10-02 22:05): it logs in nowhere and no device of its own can drop off. Its devices come from its settings, so the fixture renames one there (test/inventory.js feedFixtures).",
+  "suites": {
+    "connectionTest": {
+      "none": "the settings page has no connection test: fakeroku connects to nothing, the remotes connect to it"
+    },
+    "groupSwitches": {
+      "none": "no setting adds or removes a group of datapoints: every Roku has its fixed keys"
+    },
+    "rename": true,
+    "rejectLogin": {
+      "none": "fakeroku logs in nowhere: it is an emulator without a counterpart"
+    },
+    "dropDevice": {
+      "none": "no counterpart: an emulated Roku runs as long as the adapter runs and never drops off a remote list"
+    }
+  },
+  "serverTest": {
+    "_why": "On the real host every emulated Roku listens and discovery runs: the instance is green, every Roku online, the counts are numbers.",
+    "observeSeconds": 60,
+    "connectSeconds": 60,
+    "startSpacingSeconds": 0,
+    "reads": [
+      { "id": "info.connection", "expect": "true" },
+      { "id": "*.info.online", "expect": "true" },
+      { "id": "info.devicesTotal", "expect": "number" }
+    ],
+    "noCommands": "fakeroku switches nothing: its datapoints report what a remote pressed, no command goes to a device"
+  },
   "_listenPorts": "Every port the adapter opens. `key` is a native key only for primary/secondary; for shared and perDevice it is a label. fakeroku has no primary port: each emulated Roku carries its own ECP port in native.devices[], and SSDP 1900 is shared on purpose (declaring it as native.port would warn every UPnP user on the host).",
   "listenPorts": [
     {

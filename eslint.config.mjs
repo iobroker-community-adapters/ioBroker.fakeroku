@@ -17,8 +17,18 @@ export default [
     },
   },
   {
+    // No finding is switched off in the code: an inline `eslint-disable` (or any other inline config) has no effect and
+    // lint names it, and `@ts-expect-error` is banned like `@ts-ignore` — a finding is fixed, or its exception goes
+    // through the workshop with krobi's go (round 109).
+    linterOptions: {
+      noInlineConfig: true,
+    },
     rules: {
       "@typescript-eslint/no-floating-promises": "error",
+      "@typescript-eslint/ban-ts-comment": [
+        "error",
+        { "ts-expect-error": true, "ts-ignore": true, "ts-nocheck": true, "ts-check": false },
+      ],
     },
   },
   {

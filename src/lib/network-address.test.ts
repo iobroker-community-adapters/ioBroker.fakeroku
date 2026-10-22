@@ -35,7 +35,7 @@ const IFACES: InterfaceMap = {
   ],
   iot: [
     {
-      address: "10.47.88.2",
+      address: "192.0.2.2",
       netmask: "255.255.255.0",
       family: "IPv4",
       mac: "bb:bb:bb:bb:bb:bb",
@@ -73,7 +73,7 @@ describe("localNets", () => {
     expect(localNets(IFACES)).toEqual([
       { iface: "eth0", family: "IPv4", address: "192.168.1.5", prefixLength: 24 },
       { iface: "eth0", family: "IPv6", address: "2001:db8::5", prefixLength: 64 },
-      { iface: "iot", family: "IPv4", address: "10.47.88.2", prefixLength: 32 },
+      { iface: "iot", family: "IPv4", address: "192.0.2.2", prefixLength: 32 },
       { iface: "iot", family: "IPv6", address: "fe80::1", prefixLength: 128 },
     ]);
   });
@@ -113,7 +113,7 @@ describe("ownNets", () => {
 
   it("is the networks of the chosen address's interface", () => {
     expect(ownNets("192.168.1.5", nets).map(n => n.address)).toEqual(["192.168.1.5", "2001:db8::5"]);
-    expect(ownNets("fe80::1%iot", nets).map(n => n.address)).toEqual(["10.47.88.2", "fe80::1"]);
+    expect(ownNets("fe80::1%iot", nets).map(n => n.address)).toEqual(["192.0.2.2", "fe80::1"]);
   });
 
   it("is nothing for an address no interface carries", () => {
@@ -135,14 +135,14 @@ describe("isOwnPeer", () => {
   });
 
   it("answers no peer outside the chosen network — another own network, loopback, nothing", () => {
-    expect(isOwnPeer("10.47.88.2", "192.168.1.5", nets)).toBe(false);
+    expect(isOwnPeer("192.0.2.2", "192.168.1.5", nets)).toBe(false);
     expect(isOwnPeer("127.0.0.1", "192.168.1.5", nets)).toBe(false);
     expect(isOwnPeer(undefined, "192.168.1.5", nets)).toBe(false);
     expect(isOwnPeer("", undefined, nets)).toBe(false);
   });
 
   it("answers a peer of any own network with every address, and nothing outside", () => {
-    expect(isOwnPeer("10.47.88.2", undefined, nets)).toBe(true);
+    expect(isOwnPeer("192.0.2.2", undefined, nets)).toBe(true);
     expect(isOwnPeer("fe80::1%iot", undefined, nets)).toBe(true);
     expect(isOwnPeer("10.47.4.9", undefined, nets)).toBe(false);
   });

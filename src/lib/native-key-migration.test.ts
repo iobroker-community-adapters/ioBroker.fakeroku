@@ -155,13 +155,13 @@ describe("buildNativeKeyPatch", () => {
   it("prefers the meaningful source when several old keys compete for one new key", () => {
     // The upgrade injected the default into `networkInterface`; the concrete address the
     // user entered years ago still sits under `BIND` — it must not lose to the default.
-    expect(buildNativeKeyPatch({ networkInterface: "0.0.0.0", BIND: "10.47.88.2" }, IFACE_AND_BIND)).toEqual({
-      bind: "10.47.88.2",
+    expect(buildNativeKeyPatch({ networkInterface: "0.0.0.0", BIND: "192.0.2.2" }, IFACE_AND_BIND)).toEqual({
+      bind: "192.0.2.2",
       networkInterface: null,
       BIND: null,
     });
-    expect(buildNativeKeyPatch({ networkInterface: "", BIND: "10.47.88.2" }, IFACE_AND_BIND)).toEqual({
-      bind: "10.47.88.2",
+    expect(buildNativeKeyPatch({ networkInterface: "", BIND: "192.0.2.2" }, IFACE_AND_BIND)).toEqual({
+      bind: "192.0.2.2",
       networkInterface: null,
       BIND: null,
     });

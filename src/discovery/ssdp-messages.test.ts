@@ -54,7 +54,7 @@ describe("rokuSearchTarget", () => {
 });
 
 describe("buildSearchResponse", () => {
-  const r = buildSearchResponse({ uuid: "abc123", port: 8060 }, "10.47.88.2");
+  const r = buildSearchResponse({ uuid: "abc123", port: 8060 }, "192.0.2.2");
   it("uses Roku's USN format", () => {
     expect(r).toContain("USN: uuid:roku:ecp:abc123");
   });
@@ -62,16 +62,16 @@ describe("buildSearchResponse", () => {
     expect(r).not.toContain("::");
   });
   it("advertises the selected interface IP and port", () => {
-    expect(r).toContain("LOCATION: http://10.47.88.2:8060/");
+    expect(r).toContain("LOCATION: http://192.0.2.2:8060/");
   });
   it("answers with ST roku:ecp", () => {
     expect(r).toContain("ST: roku:ecp");
   });
   it("answers a wildcard search as the Roku service", () => {
-    expect(buildSearchResponse({ uuid: "abc123", port: 8060 }, "10.47.88.2", "ssdp:all")).toContain("ST: roku:ecp");
+    expect(buildSearchResponse({ uuid: "abc123", port: 8060 }, "192.0.2.2", "ssdp:all")).toContain("ST: roku:ecp");
   });
   it("mirrors a upnp:rootdevice search, because a control point drops an answer with a foreign ST", () => {
-    const root = buildSearchResponse({ uuid: "abc123", port: 8060 }, "10.47.88.2", "upnp:rootdevice");
+    const root = buildSearchResponse({ uuid: "abc123", port: 8060 }, "192.0.2.2", "upnp:rootdevice");
     expect(root).toContain("ST: upnp:rootdevice");
     // The USN keeps Roku's plain form even there — the `::<device>` suffix a strict UPnP
     // answer would carry is exactly what made node-ssdp unusable for this adapter.
@@ -81,7 +81,7 @@ describe("buildSearchResponse", () => {
 });
 
 describe("buildAliveNotify", () => {
-  const n = buildAliveNotify({ uuid: "abc123", port: 8060 }, "10.47.88.2");
+  const n = buildAliveNotify({ uuid: "abc123", port: 8060 }, "192.0.2.2");
   it("announces ssdp:alive with the Roku USN", () => {
     expect(n).toContain("NTS: ssdp:alive");
     expect(n).toContain("USN: uuid:roku:ecp:abc123");

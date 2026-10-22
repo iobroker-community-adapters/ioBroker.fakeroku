@@ -24,7 +24,7 @@ function v6(address: string, prefix = 64): never {
 
 describe("pickPrimaryIPv4", () => {
   it("returns the first non-internal IPv4 (skips loopback)", () => {
-    expect(pickPrimaryIPv4({ lo: [v4("127.0.0.1", 8, true)], eth0: [v4("10.47.88.2")] })).toBe("10.47.88.2");
+    expect(pickPrimaryIPv4({ lo: [v4("127.0.0.1", 8, true)], eth0: [v4("192.0.2.2")] })).toBe("192.0.2.2");
   });
 
   it("skips internal addresses and IPv6", () => {
@@ -47,14 +47,14 @@ describe("pickPrimaryIPv4", () => {
 
 describe("localAddressFor — the host's address in a remote's network", () => {
   const nets = localNets({
-    eth0: [v4("10.47.88.2")],
+    eth0: [v4("192.0.2.2")],
     "eth0.50": [v4("192.168.50.2")],
     docker0: [v4("172.17.0.1", 16)],
   });
 
   it("finds the host's address in the network a remote sits in", () => {
     expect(localAddressFor("192.168.50.77", nets)).toBe("192.168.50.2");
-    expect(localAddressFor("::ffff:10.47.88.99", nets)).toBe("10.47.88.2");
+    expect(localAddressFor("::ffff:192.0.2.99", nets)).toBe("192.0.2.2");
     expect(localAddressFor("172.17.0.9", nets)).toBe("172.17.0.1");
     expect(localAddressFor("8.8.8.8", nets)).toBeUndefined();
   });
@@ -66,12 +66,12 @@ describe("pickMembershipIPv4s", () => {
     // again and throw EADDRINUSE.
     expect(
       pickMembershipIPv4s({
-        eth0: [v4("10.47.88.2"), v4("10.47.88.3")],
+        eth0: [v4("192.0.2.2"), v4("192.0.2.3")],
         eth1: [v4("192.168.1.5")],
         lo: [v4("127.0.0.1", 8, true)],
       }),
     ).toEqual([
-      { iface: "eth0", address: "10.47.88.2" },
+      { iface: "eth0", address: "192.0.2.2" },
       { iface: "eth1", address: "192.168.1.5" },
     ]);
   });
@@ -80,11 +80,11 @@ describe("pickMembershipIPv4s", () => {
     expect(
       pickMembershipIPv4s({
         docker0: [v4("172.17.0.1", 16)],
-        eth0: [v4("10.47.88.2")],
+        eth0: [v4("192.0.2.2")],
       }),
     ).toEqual([
       { iface: "docker0", address: "172.17.0.1" },
-      { iface: "eth0", address: "10.47.88.2" },
+      { iface: "eth0", address: "192.0.2.2" },
     ]);
   });
 });
