@@ -4,8 +4,6 @@ import { BASE_KEYS, TV_KEYS } from "./lib/roku-keys";
 import { LANGUAGES } from "./lib/constants";
 
 const root = join(__dirname, "..");
-const LANGS = LANGUAGES;
-
 /**
  * Manifest wiring the integration boot test cannot see.
  */
@@ -39,7 +37,7 @@ describe("io-package.json manifest", () => {
   // Compact mode: the host may load several instances into ONE node process, which saves
   // 40-80 MB and a startup per instance on small hardware. Declaring it costs nothing at
   // runtime — the user still switches it on — but the adapter has to earn the claim, and
-  // the tests in main.test.ts ("two instances in one process") are where it is earned.
+  // the tests in main.lifecycle.test.ts ("two instances in one process") are where it is earned.
   // The whole fleet declares it; fakeroku carried `false` from the adapter it took over.
   it("declares compact mode, the way every adapter of the fleet does", () => {
     expect(io.common?.compact).toBe(true);
@@ -88,7 +86,7 @@ describe("io-package.json manifest", () => {
     for (const obj of io.instanceObjects ?? []) {
       const name = obj.common?.name;
       expect(typeof name, `${obj._id} common.name is not a plain string`).not.toBe("string");
-      expect(Object.keys(name as Record<string, string>).sort(), `${obj._id} languages`).toEqual([...LANGS].sort());
+      expect(Object.keys(name as Record<string, string>).sort(), `${obj._id} languages`).toEqual([...LANGUAGES].sort());
     }
   });
 
@@ -101,7 +99,7 @@ describe("io-package.json manifest", () => {
         continue;
       }
       expect(typeof desc, `${obj._id} common.desc is not a plain string`).not.toBe("string");
-      expect(Object.keys(desc as Record<string, string>).sort(), `${obj._id} languages`).toEqual([...LANGS].sort());
+      expect(Object.keys(desc as Record<string, string>).sort(), `${obj._id} languages`).toEqual([...LANGUAGES].sort());
     }
   });
 });
@@ -125,7 +123,7 @@ describe("naming catalogue", () => {
 
   it("every language file carries exactly the keys en.json has", () => {
     const expected = Object.keys(en).sort();
-    for (const lang of LANGS) {
+    for (const lang of LANGUAGES) {
       const data = JSON.parse(readFileSync(join(i18nDir, `${lang}.json`), "utf8")) as Record<string, string>;
       const actual = Object.keys(data).sort();
       expect(
@@ -140,7 +138,7 @@ describe("naming catalogue", () => {
   });
 
   it("no language file leaves a key empty", () => {
-    for (const lang of LANGS) {
+    for (const lang of LANGUAGES) {
       const data = JSON.parse(readFileSync(join(i18nDir, `${lang}.json`), "utf8")) as Record<string, string>;
       const blank = Object.entries(data)
         .filter(([, v]) => typeof v !== "string" || v.trim() === "")

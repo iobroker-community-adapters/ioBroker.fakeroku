@@ -1,4 +1,3 @@
-import { describe, expect, it } from "vitest";
 import { LogThrottle } from "./log-throttle";
 
 describe("LogThrottle", () => {
@@ -14,9 +13,5 @@ describe("LogThrottle", () => {
     expect(t.due("a", 0)).toBe(true);
     expect(t.due("b", 0)).toBe(true);
     expect(t.due("a", 1)).toBe(false);
-  });
-
-  it("lets the first line through even at clock zero", () => {
-    expect(new LogThrottle(60_000).due("x", 0)).toBe(true);
   });
 });

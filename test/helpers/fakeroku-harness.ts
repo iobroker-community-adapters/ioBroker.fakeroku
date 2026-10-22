@@ -59,7 +59,7 @@ export function internalOf(adapter: Fakeroku): {
   onUnload(cb: () => void): void;
   applyCommand(deviceId: string, cmd: CommandEvent): boolean;
   objects: Map<string, Record<string, unknown>>;
-  states: Map<string, { val: unknown; ack: boolean }>;
+  states: Map<string, { val: unknown; ack: boolean; q?: number }>;
   enums: Map<string, Set<string>>;
   written: string[];
   config: Record<string, unknown>;
@@ -80,10 +80,8 @@ export function internalOf(adapter: Fakeroku): {
   devices: Map<string, { keys: ReadonlySet<string>; server?: unknown }>;
   commands: { pulseTimers: Set<unknown>; holdTimers: Map<string, unknown> };
   setState: ReturnType<typeof vi.fn>;
-  getStatesAsync: ReturnType<typeof vi.fn>;
   getAdapterObjectsAsync: ReturnType<typeof vi.fn>;
   getObjectListAsync: ReturnType<typeof vi.fn>;
-  status: unknown;
   extendObject: ReturnType<typeof vi.fn>;
   setForeignObject: ReturnType<typeof vi.fn>;
   instanceNative: Record<string, unknown>;
@@ -176,8 +174,8 @@ export function setup(
   config: Record<string, unknown> = {},
   opts: { failEcpPort?: number; ssdpStartFails?: boolean; fresh?: boolean } = {},
 ): Ctx {
-  // The default config chooses 192.168.1.5 — an interface has to carry it, or the adapter
-  // (rightly) waits for it and then refuses to serve an address the host does not have.
+  // The default config chooses 192.168.1.5 — an interface has to carry it, or the adapter listens on all addresses
+  // instead, warns once and reports info.connection false.
   osMock.interfaces ??= {
     eth0: [{ family: "IPv4", address: "192.168.1.5", internal: false, cidr: "192.168.1.5/24" }],
   };

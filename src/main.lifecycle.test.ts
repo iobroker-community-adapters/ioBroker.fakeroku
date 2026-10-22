@@ -90,11 +90,12 @@ describe("Fakeroku collaborator wiring", () => {
     const ctx = setup();
     await ctx.i.onReady();
     ctx.i.clearInterval.mockClear();
+    const announce = ctx.i.setInterval.mock.results.at(-1)!.value as unknown;
     const onFatal = ctx.ssdps[0].options.onFatalError as (err: Error) => void;
     onFatal(new Error("SSDP socket closed"));
     // Without this wiring the announce interval keeps firing into a dead socket
     // for as long as the instance runs.
-    expect(ctx.i.clearInterval).toHaveBeenCalledTimes(1);
+    expect(ctx.i.clearInterval).toHaveBeenCalledExactlyOnceWith(announce);
     expect(ctx.i.discovery.ssdp).toBeUndefined();
   });
 
@@ -174,7 +175,8 @@ describe("Fakeroku startWithTimeout", () => {
     const ctx = setup();
     ctx.i.clearTimeout.mockClear();
     await ctx.i.discovery.startWithTimeout(Promise.resolve(), 500);
-    expect(ctx.i.clearTimeout).toHaveBeenCalledTimes(1);
+    const deadline = ctx.i.setTimeout.mock.results.at(-1)!.value as unknown;
+    expect(ctx.i.clearTimeout).toHaveBeenCalledExactlyOnceWith(deadline);
   });
 });
 
@@ -477,6 +479,7 @@ describe("Fakeroku onUnload", () => {
     const pulse = ctx.i.setTimeout.mock.results.at(-1)!.value as unknown;
     ctx.i.applyCommand("Wohnzimmer", { type: "keydown", key: "Select" }); // arms a watchdog
     const watchdog = ctx.i.setTimeout.mock.results.at(-1)!.value as unknown;
+    const announce = ctx.i.setInterval.mock.results.at(-1)!.value as unknown;
     ctx.i.clearTimeout.mockClear();
     ctx.i.clearInterval.mockClear();
 
@@ -486,7 +489,7 @@ describe("Fakeroku onUnload", () => {
     expect(callback).toHaveBeenCalledTimes(1);
     expect(ctx.ssdps[0].stop).toHaveBeenCalledTimes(1);
     expect(ctx.ecp[0].stop).toHaveBeenCalledTimes(1);
-    expect(ctx.i.clearInterval).toHaveBeenCalledTimes(1); // the NOTIFY repeat
+    expect(ctx.i.clearInterval).toHaveBeenCalledExactlyOnceWith(announce); // the NOTIFY repeat
     expect(ctx.i.clearTimeout).toHaveBeenCalledWith(pulse);
     expect(ctx.i.clearTimeout).toHaveBeenCalledWith(watchdog);
     expect(ctx.i.states.get("info.connection")).toEqual({ val: false, ack: true });
@@ -517,14 +520,15 @@ describe("Fakeroku onUnload", () => {
     // Fire-and-forget plus an immediate callback loses the writes: the process is
     // gone before they reach the database, and the instance and the Roku keep
     // showing "running" while the adapter is off. info.devicesTotal is not among
-    // them — how many Rokus there are does not change at a stop.
-    expect(order).toEqual([
-      "write:Wohnzimmer.info.online",
+    // them — how many Rokus there are does not change at a stop. The writes may land in any order; the callback
+    // comes after the last of them.
+    expect(order.at(-1)).toBe("callback");
+    expect(order.slice(0, -1).sort()).toEqual([
       "write:Wohnzimmer.info.error",
-      "write:info.devicesOnline",
-      "write:info.devicesAllOnline",
+      "write:Wohnzimmer.info.online",
       "write:info.connection",
-      "callback",
+      "write:info.devicesAllOnline",
+      "write:info.devicesOnline",
     ]);
     expect(ctx.i.states.get("info.connection")).toEqual({ val: false, ack: true });
     expect(ctx.i.states.get("Wohnzimmer.info.online")).toEqual({ val: false, ack: true });
@@ -804,11 +808,14 @@ describe("Fakeroku — the paths that only a failing database reaches", () => {
     const { late, release } = lateSsdp(ctx);
     const ready = ctx.i.onReady();
     await vi.waitFor(() => expect(late().start).toHaveBeenCalled());
-    ctx.i.onUnload(() => {});
+    await new Promise<void>(resolve => ctx.i.onUnload(resolve));
     ctx.i.setTimeout.mockClear();
+    ctx.i.setState.mockClear();
     release();
     await ready;
     expect(ctx.i.log.info).not.toHaveBeenCalledWith(expect.stringContaining("Emulating"));
+    expect(ctx.i.setState).not.toHaveBeenCalled();
+    expect(ctx.i.states.get("info.connection")).toEqual({ val: false, ack: true });
     expect(ctx.i.setTimeout).not.toHaveBeenCalled();
   });
 

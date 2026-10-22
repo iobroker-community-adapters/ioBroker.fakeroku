@@ -284,11 +284,12 @@ describe("Fakeroku onReady — discovery is an aid, not a precondition", () => {
     const ctx = setup();
     await ctx.i.onReady();
     ctx.i.clearInterval.mockClear();
+    const announce = ctx.i.setInterval.mock.results.at(-1)!.value as unknown;
     const dead = ctx.ssdps[0];
 
     ctx.i.discovery.onSsdpFatal(new Error("SSDP socket closed"));
 
-    expect(ctx.i.clearInterval).toHaveBeenCalledTimes(1);
+    expect(ctx.i.clearInterval).toHaveBeenCalledExactlyOnceWith(announce);
     expect(dead.stop).toHaveBeenCalled();
     expect(ctx.i.discovery.ssdp).toBeUndefined();
     expect(ctx.i.log.warn).toHaveBeenCalledWith(

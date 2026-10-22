@@ -9,8 +9,6 @@ import { join } from "node:path";
 import { LANGUAGES } from "./constants";
 import { t, tDesc, tName, tRaw } from "./i18n";
 
-const LANGS = LANGUAGES;
-
 describe("t() — device-manager texts from the real translation files", () => {
   beforeAll(async () => {
     // The same root main.ts hands to I18n.init: adapter-core looks for `<root>/i18n`,
@@ -23,7 +21,7 @@ describe("t() — device-manager texts from the real translation files", () => {
     const text = t("dmDeleteConfirm", "Wohnzimmer") as Record<string, string>;
     // A translation that lost its %s shows the user a confirmation without the
     // device name — exactly the dialog where the name matters most.
-    for (const lang of LANGS) {
+    for (const lang of LANGUAGES) {
       expect(text[lang], lang).toContain("Wohnzimmer");
       expect(text[lang], lang).not.toContain("%s");
     }
@@ -31,7 +29,7 @@ describe("t() — device-manager texts from the real translation files", () => {
 
   it("returns a plain key in all eleven languages, not the key itself", () => {
     const text = t("dmAdd") as Record<string, string>;
-    expect(Object.keys(text).sort()).toEqual([...LANGS].sort());
+    expect(Object.keys(text).sort()).toEqual([...LANGUAGES].sort());
     expect(text.en).toBe("Add Roku device");
     expect(text.de).toBe("Roku-Gerät hinzufügen");
   });
@@ -49,8 +47,8 @@ describe("tName / tDesc — object names and explanations from the real files", 
 
   it.each(NAME_KEYS)("resolves the object name %s in all eleven languages", key => {
     const text = tName(key as Parameters<typeof tName>[0]) as Record<string, string>;
-    expect(Object.keys(text).sort()).toEqual([...LANGS].sort());
-    for (const lang of LANGS) {
+    expect(Object.keys(text).sort()).toEqual([...LANGUAGES].sort());
+    for (const lang of LANGUAGES) {
       expect(text[lang], lang).toBeTruthy();
       expect(text[lang], `${lang} is not the untranslated key`).not.toBe(key);
     }
@@ -58,8 +56,8 @@ describe("tName / tDesc — object names and explanations from the real files", 
 
   it.each(DESC_KEYS)("resolves the explanation %s in all eleven languages", key => {
     const text = tDesc(key as Parameters<typeof tDesc>[0]) as Record<string, string>;
-    expect(Object.keys(text).sort()).toEqual([...LANGS].sort());
-    for (const lang of LANGS) {
+    expect(Object.keys(text).sort()).toEqual([...LANGUAGES].sort());
+    for (const lang of LANGUAGES) {
       expect(text[lang], lang).toBeTruthy();
       expect(text[lang], `${lang} is not the untranslated key`).not.toBe(key);
     }
@@ -69,7 +67,7 @@ describe("tName / tDesc — object names and explanations from the real files", 
     // common.desc is an explanation a user can read, never the name again.
     const name = tName("stateLastCommand") as Record<string, string>;
     const desc = tDesc("stateLastCommandDesc") as Record<string, string>;
-    for (const lang of LANGS) {
+    for (const lang of LANGUAGES) {
       expect(desc[lang], lang).not.toBe(name[lang]);
       expect(desc[lang].length, lang).toBeGreaterThan(name[lang].length);
     }
@@ -79,8 +77,8 @@ describe("tName / tDesc — object names and explanations from the real files", 
 describe("tRaw — protocol text as a translation object", () => {
   it("offers the same text under every admin language", () => {
     const name = tRaw("VolumeUp") as Record<string, string>;
-    expect(Object.keys(name).sort()).toEqual([...LANGS].sort());
-    for (const lang of LANGS) {
+    expect(Object.keys(name).sort()).toEqual([...LANGUAGES].sort());
+    for (const lang of LANGUAGES) {
       expect(name[lang], lang).toBe("VolumeUp");
     }
   });

@@ -112,7 +112,7 @@ function mockContext(opts: { form?: unknown; confirm?: boolean } = {}): {
 type MockCtx = ReturnType<typeof mockContext>;
 type RokuDeviceConfig = { name: string; port: number; type: "player" | "tv"; uuid?: string; objectId?: string };
 
-/** Typed access to the private manager methods under test (mirrors main.test.ts). */
+/** Typed access to the private manager methods under test (mirrors internalOf in test/helpers/fakeroku-harness.ts). */
 interface DmInternals {
   readDevices(): Promise<{ storedName: string; name: string; port: number; type: string; identity: string }[]>;
   loadDevices(ctx: { addDevice: (info: unknown) => void }): Promise<void>;
@@ -141,13 +141,22 @@ interface Card {
 const internalOf = (dm: FakerokuDeviceManagement): DmInternals => dm as unknown as DmInternals;
 
 describe("FakerokuDeviceManagement", () => {
-  let adapter: ReturnType<typeof mockAdapter>;
-  let dm: FakerokuDeviceManagement;
-
-  function make(devices: unknown = [], objects: Record<string, { type: string }> = {}): DmInternals {
-    adapter = mockAdapter(devices, objects);
-    dm = new FakerokuDeviceManagement(adapter as unknown as ConstructorParameters<typeof FakerokuDeviceManagement>[0]);
-    return internalOf(dm);
+  /**
+   * A manager over its own in-memory config object.
+   *
+   * @param devices the stored device list
+   * @param objects the adapter's objects, by id relative to the namespace
+   * @returns the manager's internals and the adapter double it writes to
+   */
+  function make(
+    devices: unknown = [],
+    objects: Record<string, { type: string }> = {},
+  ): { i: DmInternals; adapter: ReturnType<typeof mockAdapter> } {
+    const adapter = mockAdapter(devices, objects);
+    const dm = new FakerokuDeviceManagement(
+      adapter as unknown as ConstructorParameters<typeof FakerokuDeviceManagement>[0],
+    );
+    return { i: internalOf(dm), adapter };
   }
 
   /**
@@ -156,7 +165,15 @@ describe("FakerokuDeviceManagement", () => {
    * @param devices Device list the manager loads the cards from
    */
   async function cards(devices: unknown): Promise<Card[]> {
-    const i = make(devices);
+    return loadCards(make(devices).i);
+  }
+
+  /**
+   * Collect the cards a manager pushes into the view.
+   *
+   * @param i the manager's internals
+   */
+  async function loadCards(i: DmInternals): Promise<Card[]> {
     const out: Card[] = [];
     await i.loadDevices({ addDevice: (c: unknown) => out.push(c as Card) });
     return out;
@@ -169,7 +186,7 @@ describe("FakerokuDeviceManagement", () => {
   const kitchenStored = { ...kitchen, objectId: "Kitchen" };
 
   it("reads the list from the instance's OWN config object", async () => {
-    const i = make([living]);
+    const { i, adapter } = make([living]);
     const rows = await i.readDevices();
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({ name: "Living room", port: 8060, type: "player", identity: "keep-me" });
@@ -179,8 +196,8 @@ describe("FakerokuDeviceManagement", () => {
   it("survives a native.devices that is not an array", async () => {
     // A hand-edited config (or an old instance) can leave anything here. Returning
     // it raw would make .map/.filter throw and take the whole manager view down.
-    await expect(make("nonsense").readDevices()).resolves.toEqual([]);
-    await expect(make(undefined).readDevices()).resolves.toEqual([]);
+    await expect(make("nonsense").i.readDevices()).resolves.toEqual([]);
+    await expect(make(undefined).i.readDevices()).resolves.toEqual([]);
   });
 
   it("normalises hand-edited rows so the dialogs keep working", async () => {
@@ -188,7 +205,7 @@ describe("FakerokuDeviceManagement", () => {
     // garbage port, a null row. The clash check's .trim() used to throw on the
     // numeric name, and with it every add/edit dialog failed. A row with no usable
     // name is dropped now — the manager could not have saved it either.
-    const i = make([{ name: 42, port: "abc" }, null, { name: "Ok", port: 8061, type: "tv", uuid: "u1" }]);
+    const { i, adapter } = make([{ name: 42, port: "abc" }, null, { name: "Ok", port: 8061, type: "tv", uuid: "u1" }]);
     const rows = await i.readDevices();
     expect(rows.map(r => r.name)).toEqual(["Ok"]);
     const ctx = mockContext({ form: { name: "New", port: 8070, type: "player" } });
@@ -240,14 +257,16 @@ describe("FakerokuDeviceManagement", () => {
   });
 
   it("routes each card's delete action to THAT card's device", async () => {
-    const out = await cards([living, kitchen]);
+    const { i, adapter } = make([living, kitchen]);
+    const out = await loadCards(i);
     const del = out[1].actions.find(a => a.id === "delete")!;
     await del.handler(out[1].id, mockContext({ confirm: true }));
     expect(adapter._stored()).toEqual([livingStored]);
   });
 
   it("routes a card's edit action to THAT card's device", async () => {
-    const out = await cards([living, kitchen]);
+    const { i, adapter } = make([living, kitchen]);
+    const out = await loadCards(i);
     const edit = out[1].actions.find(a => a.id === "edit")!;
     await edit.handler(out[1].id, mockContext({ form: { name: "Kueche", port: 8061, type: "tv" } }));
     // Renamed, same identity, SAME object id — the tree, its rooms and history stay put.
@@ -262,14 +281,14 @@ describe("FakerokuDeviceManagement", () => {
     // living. With a positional card id, "delete kitchen" would have deleted whatever
     // now sits at index 1 — or nothing at all.
     const out = await cards([living, kitchen]);
-    const i = make([kitchen]);
+    const { i, adapter } = make([kitchen]);
     await i.deleteDevice(out[1].id, mockContext({ confirm: true }));
     expect(adapter._stored()).toEqual([]);
   });
 
   it("routes the instance-level add action to addDevice", async () => {
-    make([living]);
-    const add = internalOf(dm).getInstanceInfo().actions[0];
+    const { i, adapter } = make([living]);
+    const add = i.getInstanceInfo().actions[0];
     await add.handler(mockContext({ form: { name: "Bedroom", port: 8070, type: "player" } }));
     expect(adapter._stored()).toHaveLength(2);
   });
@@ -281,7 +300,7 @@ describe("FakerokuDeviceManagement", () => {
   });
 
   it("declares the v3 API and a single add action", () => {
-    const info = make([]).getInstanceInfo();
+    const info = make([]).i.getInstanceInfo();
     // The manager silently shows nothing for a wrong apiVersion.
     expect(info.apiVersion).toBe("v3");
     expect(info.identifierLabel).toBe("portLabel");
@@ -294,7 +313,7 @@ describe("FakerokuDeviceManagement", () => {
     // deleted device would come back. It clears the old array first for exactly four key
     // names, `native.devices` among them. This test pins the key: renaming it (or writing
     // the list anywhere else) silently breaks every deletion.
-    const i = make([living, kitchen]);
+    const { i, adapter } = make([living, kitchen]);
     await i.deleteDevice("kitchen-uuid", mockContext({ confirm: true }));
     const [, patch] = adapter.extendForeignObjectAsync.mock.calls[0];
     expect(Object.keys(patch)).toEqual(["native"]);
@@ -305,7 +324,7 @@ describe("FakerokuDeviceManagement", () => {
 
   describe("add", () => {
     it("pre-selects a free port and appends the device with its own identity and a fixed object id", async () => {
-      const i = make([living]);
+      const { i, adapter } = make([living]);
       const ctx = mockContext({ form: { name: "  Bedroom  ", port: 8070, type: "tv" } });
       await expect(i.addDevice(ctx)).resolves.toEqual({ refresh: true });
       expect(ctx.showForm.mock.calls[0][1]).toMatchObject({ data: { type: "player", port: 8061 } });
@@ -320,7 +339,7 @@ describe("FakerokuDeviceManagement", () => {
     it("hands the dialog the rule that switches OK off", async () => {
       // dm-gui-components disables OK only through applyDisabledRule (or an unchanged form) —
       // a field validator colours the field and nothing more.
-      const i = make([living]);
+      const { i } = make([living]);
       const ctx = mockContext({ form: undefined });
       await i.addDevice(ctx);
       const options = ctx.showForm.mock.calls[0][1] as { applyDisabledRule: string };
@@ -330,7 +349,7 @@ describe("FakerokuDeviceManagement", () => {
     });
 
     it("passes the names and ports already in use into the form validator", async () => {
-      const i = make([living, kitchen]);
+      const { i } = make([living, kitchen]);
       const ctx = mockContext({ form: undefined });
       await i.addDevice(ctx);
       const schema = ctx.showForm.mock.calls[0][0] as FormSchema;
@@ -345,7 +364,7 @@ describe("FakerokuDeviceManagement", () => {
     });
 
     it("writes nothing when the dialog is cancelled", async () => {
-      const i = make([living]);
+      const { i, adapter } = make([living]);
       const ctx = mockContext({ form: undefined });
       await i.addDevice(ctx);
       expect(adapter.extendForeignObjectAsync).not.toHaveBeenCalled();
@@ -353,7 +372,7 @@ describe("FakerokuDeviceManagement", () => {
     });
 
     it("treats a blank name as a cancel — no device, and no error popup", async () => {
-      const i = make([living]);
+      const { i, adapter } = make([living]);
       const ctx = mockContext({ form: { name: "   ", port: 8070, type: "player" } });
       await i.addDevice(ctx);
       expect(adapter.extendForeignObjectAsync).not.toHaveBeenCalled();
@@ -363,7 +382,7 @@ describe("FakerokuDeviceManagement", () => {
     });
 
     it("ignores a non-string name from the form", async () => {
-      const i = make([living]);
+      const { i, adapter } = make([living]);
       const ctx = mockContext({ form: { name: 42, port: 8070, type: "player" } });
       await i.addDevice(ctx);
       expect(adapter.extendForeignObjectAsync).not.toHaveBeenCalled();
@@ -371,7 +390,7 @@ describe("FakerokuDeviceManagement", () => {
     });
 
     it("refuses a clash and tells the user instead of writing it", async () => {
-      const i = make([living]);
+      const { i, adapter } = make([living]);
       const ctx = mockContext({ form: { name: "New", port: 8060, type: "player" } });
       await i.addDevice(ctx);
       // The form validator can be bypassed (older admin, message API) — the backend
@@ -383,7 +402,7 @@ describe("FakerokuDeviceManagement", () => {
 
   describe("edit", () => {
     it("keeps the stored uuid across a rename so the pairing survives", async () => {
-      const i = make([living]);
+      const { i, adapter } = make([living]);
       const ctx = mockContext({ form: { name: "Lounge", port: 8060, type: "player" } });
       await expect(i.editDevice("keep-me", ctx)).resolves.toEqual({ refresh: "devices" });
       // A new uuid means a new USN — the Harmony/Sofabaton drops the pairing and
@@ -397,7 +416,7 @@ describe("FakerokuDeviceManagement", () => {
       // The manifest's default device carries no uuid, so main.ts identifies it by
       // deriveUuid(storedName). Deriving from the NEW name here would move the SSDP
       // identity on a plain rename and silently unpair the remote.
-      const i = make([{ name: "Roku", port: 8060, type: "player" }]);
+      const { i, adapter } = make([{ name: "Roku", port: 8060, type: "player" }]);
       await i.editDevice(deriveUuid("Roku"), mockContext({ form: { name: "Wohnzimmer", port: 8060, type: "player" } }));
       expect(adapter._stored()[0]).toEqual({
         name: "Wohnzimmer",
@@ -413,7 +432,7 @@ describe("FakerokuDeviceManagement", () => {
       // Binds the two sites that must agree: both go through the same normaliser, so
       // an edit can never persist a different answer than the one being advertised.
       const stored = { name: "Roku", port: 8060, type: "player" as const };
-      const i = make([stored]);
+      const { i, adapter } = make([stored]);
       await i.editDevice(
         resolveDeviceUuid(stored),
         mockContext({ form: { name: "Schlafzimmer", port: 8060, type: "player" } }),
@@ -427,7 +446,7 @@ describe("FakerokuDeviceManagement", () => {
       // deriveUuid("Roku") while the runtime was advertising deriveUuid(" Roku ").
       // Opening the card and pressing save — changing nothing — unpaired the remote.
       const stored = { name: " Roku ", port: 8060, type: "player" as const };
-      const i = make([stored]);
+      const { i, adapter } = make([stored]);
       const runtimeIdentity = resolveDeviceUuid(stored);
       await i.editDevice(runtimeIdentity, mockContext({ form: { name: "Roku", port: 8060, type: "player" } }));
       expect(adapter._stored()[0].uuid).toBe(runtimeIdentity);
@@ -439,7 +458,7 @@ describe("FakerokuDeviceManagement", () => {
       // wandering, and every script pointing into it breaking, because a different card
       // was saved. Only the edited row takes the trimmed name.
       const untouched = { name: " Bedroom ", port: 8061, type: "player" as const };
-      const i = make([living, untouched]);
+      const { i, adapter } = make([living, untouched]);
       await i.editDevice("keep-me", mockContext({ form: { name: "Lounge", port: 8060, type: "player" } }));
       expect(adapter._stored()[1]).toEqual({
         name: " Bedroom ",
@@ -454,13 +473,13 @@ describe("FakerokuDeviceManagement", () => {
       // A hand-edited id with characters that cannot go into an SSDP header was
       // rejected by the runtime on every start (a warning per start) but survived
       // every edit. The edit now replaces it with the derived one.
-      const i = make([{ name: "Roku", port: 8060, type: "player", uuid: "not a/valid id" }]);
+      const { i, adapter } = make([{ name: "Roku", port: 8060, type: "player", uuid: "not a/valid id" }]);
       await i.editDevice(deriveUuid("Roku"), mockContext({ form: { name: "Roku", port: 8060, type: "player" } }));
       expect(adapter._stored()[0].uuid).toBe(deriveUuid("Roku"));
     });
 
     it("pre-fills the form with the current device", async () => {
-      const i = make([living, kitchen]);
+      const { i } = make([living, kitchen]);
       const ctx = mockContext({ form: undefined });
       await i.editDevice("kitchen-uuid", ctx);
       expect(ctx.showForm.mock.calls[0][1]).toMatchObject({ data: { name: "Kitchen", port: 8061, type: "tv" } });
@@ -469,7 +488,7 @@ describe("FakerokuDeviceManagement", () => {
     it("keeps the tree of a device the OLD adapter created, even when its name has an umlaut", async () => {
       // The pre-0.6.0 adapter built "Küche" as the object id; the rebuild would build "K_che" —
       // and the orphan sweep used to delete the old tree with its values, rooms and history.
-      const i = make([{ name: "Küche", port: 9093, uuid: "legacy-uuid" }], { Küche: { type: "device" } });
+      const { i, adapter } = make([{ name: "Küche", port: 9093, uuid: "legacy-uuid" }], { Küche: { type: "device" } });
       await i.editDevice("legacy-uuid", mockContext({ form: { name: "Küche", port: 9093, type: "player" } }));
       expect(adapter._stored()[0].objectId).toBe("Küche");
     });
@@ -477,7 +496,7 @@ describe("FakerokuDeviceManagement", () => {
     it("keeps a TV's keys for a row from before 0.7.0 that stored no type", async () => {
       // The old adapter created every key the remote pressed, TV keys included; read as a player
       // the row would have its VolumeUp & co. swept away.
-      const i = make([{ name: "TV", port: 9093, uuid: "legacy-tv" }], {
+      const { i } = make([{ name: "TV", port: 9093, uuid: "legacy-tv" }], {
         TV: { type: "device" },
         "TV.keys.VolumeUp": { type: "state" },
       });
@@ -487,17 +506,16 @@ describe("FakerokuDeviceManagement", () => {
     });
 
     it("the edit form has no object-id rule — a renamed device keeps its tree", async () => {
-      const i = make([living, kitchen]);
+      const { i } = make([living, kitchen]);
       const ctx = mockContext({ form: undefined });
       await i.editDevice("kitchen-uuid", ctx);
       const schema = ctx.showForm.mock.calls[0][0] as FormSchema;
-      expect(schema.items.name.validator).not.toContain("Living_room");
       // A name whose id another device occupies is fine for a rename: the id does not move.
       expect(evaluate(schema.items.name.validator!, { name: "Living*room" })).toBe(true);
     });
 
     it("leaves the edited device out of the dialog's in-use lists", async () => {
-      const i = make([living, kitchen]);
+      const { i } = make([living, kitchen]);
       const ctx = mockContext({ form: undefined });
       await i.editDevice("kitchen-uuid", ctx);
       const schema = ctx.showForm.mock.calls[0][0] as FormSchema;
@@ -516,7 +534,7 @@ describe("FakerokuDeviceManagement", () => {
       // it as a duplicate id and info.connection stays false with nothing pointing back
       // at the dialog that accepted it.
       const spaced = { name: " Roku ", port: 8062, type: "player" as const, uuid: "spaced-uuid" };
-      const i = make([living, spaced]);
+      const { i } = make([living, spaced]);
       const ctx = mockContext({ form: undefined });
       await i.addDevice(ctx);
       const schema = ctx.showForm.mock.calls[0][0] as FormSchema;
@@ -526,7 +544,7 @@ describe("FakerokuDeviceManagement", () => {
     });
 
     it("does not clash a device with its own name and port", async () => {
-      const i = make([living, kitchen]);
+      const { i, adapter } = make([living, kitchen]);
       const ctx = mockContext({ form: { name: "Kitchen", port: 8061, type: "tv" } });
       await i.editDevice("kitchen-uuid", ctx);
       expect(ctx.showMessage).not.toHaveBeenCalled();
@@ -534,7 +552,7 @@ describe("FakerokuDeviceManagement", () => {
     });
 
     it("still refuses to move a device onto ANOTHER device's port", async () => {
-      const i = make([living, kitchen]);
+      const { i, adapter } = make([living, kitchen]);
       const ctx = mockContext({ form: { name: "Kitchen", port: 8060, type: "tv" } });
       await i.editDevice("kitchen-uuid", ctx);
       expect(ctx.showMessage).toHaveBeenCalledWith("devicePortInUse");
@@ -542,7 +560,7 @@ describe("FakerokuDeviceManagement", () => {
     });
 
     it("does nothing for a card that no longer exists", async () => {
-      const i = make([living]);
+      const { i, adapter } = make([living]);
       const ctx = mockContext({ form: { name: "Ghost", port: 9000, type: "player" } });
       await expect(i.editDevice("gone", ctx)).resolves.toEqual({ refresh: "devices" });
       // A stale manager view must not open a form that would then append a device.
@@ -553,7 +571,7 @@ describe("FakerokuDeviceManagement", () => {
 
   describe("delete", () => {
     it("removes exactly the selected device after confirmation", async () => {
-      const i = make([living, kitchen]);
+      const { i, adapter } = make([living, kitchen]);
       const ctx = mockContext({ confirm: true });
       await expect(i.deleteDevice("keep-me", ctx)).resolves.toEqual({ refresh: "devices" });
       expect(ctx.showConfirmation).toHaveBeenCalledWith({ key: "dmDeleteConfirm", args: ["Living room"] });
@@ -561,14 +579,14 @@ describe("FakerokuDeviceManagement", () => {
     });
 
     it("keeps the device when the user declines", async () => {
-      const i = make([living, kitchen]);
+      const { i, adapter } = make([living, kitchen]);
       await i.deleteDevice("keep-me", mockContext({ confirm: false }));
       expect(adapter.extendForeignObjectAsync).not.toHaveBeenCalled();
       expect(adapter._stored()).toEqual([living, kitchen]);
     });
 
     it("does not even ask for a card that no longer exists", async () => {
-      const i = make([living]);
+      const { i, adapter } = make([living]);
       const ctx = mockContext({ confirm: true });
       await expect(i.deleteDevice("gone", ctx)).resolves.toEqual({ refresh: "devices" });
       // Without the guard, splice(-1,1) removes the LAST device — the user confirms
@@ -578,7 +596,7 @@ describe("FakerokuDeviceManagement", () => {
     });
 
     it("writes the empty list when the last device goes, so the tree gets swept", async () => {
-      const i = make([living]);
+      const { i, adapter } = make([living]);
       await i.deleteDevice("keep-me", mockContext({ confirm: true }));
       expect(adapter._stored()).toEqual([]);
     });
@@ -659,12 +677,13 @@ describe("buildDeviceForm", () => {
   });
 
   it("keeps the validator valid code when a name carries quotes or backslashes", () => {
-    const form = buildDeviceForm(['Say "hi"', "back\\slash"], [], []).schema as unknown as FormSchema;
-    const literal = form.items.name.validator!.match(/\[[^\]]*"say \\"hi\\""[^\]]*\]/)?.[0];
-    expect(literal).toBeDefined();
     // The admin evaluates this string as JavaScript. An unescaped quote ends the array
     // early and every duplicate-name check in the dialog silently stops working.
-    expect(JSON.parse(literal!)).toEqual(['say "hi"', "back\\slash"]);
+    const form = buildDeviceForm(['Say "hi"', "back\\slash"], [], []).schema as unknown as FormSchema;
+    const check = (name: string): boolean => evaluate(form.items.name.validator!, { name });
+    expect(check('say "hi"')).toBe(false);
+    expect(check("back\\slash")).toBe(false);
+    expect(check("Bedroom")).toBe(true);
   });
 
   describe("the name validator, evaluated the way the admin evaluates it", () => {

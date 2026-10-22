@@ -74,7 +74,6 @@ describe("planObjectCleanup", () => {
 
   it("keeps info.connection even while sweeping its siblings", () => {
     const plan = planObjectCleanup(["info.connection", "info.keys.Home"], new Set(["ioBroker"]), BASE);
-    expect(plan).not.toContain("info.connection");
     expect(plan).toEqual(["info.keys"]);
   });
 

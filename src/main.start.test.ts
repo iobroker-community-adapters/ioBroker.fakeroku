@@ -878,7 +878,6 @@ describe("Fakeroku start-up robustness", () => {
     // in the timer lists becomes a js-controller warning per entry on unload.
     ctx.i.clearTimeout.mockClear();
     ctx.i.onUnload(() => {});
-    expect(ctx.i.clearTimeout).not.toHaveBeenCalledWith(undefined);
     expect(ctx.i.clearTimeout).not.toHaveBeenCalled();
 
     ctx.i.clearTimeout.mockClear();

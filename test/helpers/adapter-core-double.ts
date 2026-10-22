@@ -55,7 +55,7 @@ class Adapter {
   public adapterDir = "/tmp/fakeroku";
   public config: Record<string, unknown> = {};
   public objects = new Map<string, Record<string, unknown>>();
-  public states = new Map<string, { val: unknown; ack: boolean }>();
+  public states = new Map<string, { val: unknown; ack: boolean; q?: number }>();
   // Enum membership, the way js-controller stores it: enum id -> the FULL state ids in it.
   // The double needs it because delObject strips an id from every enum it belongs to, which
   // is how a user's room/function assignment disappears without anything saying so.
@@ -97,10 +97,12 @@ class Adapter {
   public on = vi.fn();
   /** Ending the process — the adapter never does it itself: the device manager runs inside the process. */
   public terminate = vi.fn();
+  // The quality is kept when the write carries one — a state seeded or written with `q` reads back with it, which is
+  // what the indicators' changed-check compares; a write without one stores none (js-controller stores 0).
   public setState = vi.fn((id: string, state: unknown) => {
-    const s = state as { val?: unknown; ack?: boolean };
+    const s = state as { val?: unknown; ack?: boolean; q?: number };
     const key = id.replace(`${this.namespace}.`, "");
-    this.states.set(key, { val: s?.val, ack: s?.ack === true });
+    this.states.set(key, { val: s?.val, ack: s?.ack === true, ...(s?.q !== undefined ? { q: s.q } : {}) });
     this.written.push(key);
     return Promise.resolve();
   });
@@ -143,14 +145,10 @@ class Adapter {
     this.seedDefault(key, stored);
     return Promise.resolve();
   });
-  public getObjectAsync = vi.fn((id: string) => {
-    const stored = this.objects.get(id.replace(`${this.namespace}.`, ""));
-    return Promise.resolve(stored ? structuredClone(stored) : null);
-  });
   public getAdapterObjectsAsync = vi.fn(() => {
     const out: Record<string, unknown> = {};
     for (const [k, v] of this.objects) {
-      // Clone, like getObjectAsync next door: js-controller hands out a copy. Handing out
+      // Clone: js-controller hands out a copy. Handing out
       // the LIVE reference would make an in-place mutation that never reaches the database
       // look like a success in every test that reads the dump back.
       out[`${this.namespace}.${k}`] = structuredClone(v);
@@ -201,10 +199,10 @@ class Adapter {
     }
     return Promise.resolve();
   });
-  public setInterval = vi.fn(() => ({ kind: "interval" }));
-  public clearInterval = vi.fn();
   // Every handle is its own object, so a test can tell WHICH timer was cleared.
   private timerSeq = 0;
+  public setInterval = vi.fn((_cb: () => void, _ms: number) => ({ kind: "interval", seq: ++this.timerSeq }));
+  public clearInterval = vi.fn();
   public setTimeout = vi.fn((_cb: () => void, _ms: number) => ({ kind: "timeout", seq: ++this.timerSeq }));
   public clearTimeout = vi.fn();
   /** @param _opts the adapter options (unused by the double) */

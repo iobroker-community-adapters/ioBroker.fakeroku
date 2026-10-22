@@ -1,12 +1,6 @@
 import { deriveUuid, resolveDeviceUuid } from "./device-identity";
 
 describe("deriveUuid", () => {
-  it("is stable for the same name (no A1-style drift across restarts)", () => {
-    expect(deriveUuid("ioBroker")).toBe(deriveUuid("ioBroker"));
-  });
-  it("differs for different names", () => {
-    expect(deriveUuid("Living Room")).not.toBe(deriveUuid("Bedroom"));
-  });
   it("stays byte-identical across releases (a changed identity re-pairs the remote)", () => {
     // The identity IS the pairing: a Harmony that learned this Roku remembers
     // exactly this serial/USN. Changing how it is derived silently unpairs every

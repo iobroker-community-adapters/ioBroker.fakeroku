@@ -35,6 +35,14 @@ function host(): {
 const player: CommandTarget = { id: "Wohnzimmer", name: "Wohnzimmer", keys: new Set(["Home", "Select"]) };
 
 describe("CommandHandler", () => {
+  // The rate gate reads the clock: frozen, a slow test machine cannot refill the bucket between two presses.
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ["Date"], now: 1_000_000 });
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it("records a keypress and pulses the key true, then false after the pulse", () => {
     const h = host();
     expect(h.handler.apply(player, { type: "keypress", key: "Home" })).toBe(true);

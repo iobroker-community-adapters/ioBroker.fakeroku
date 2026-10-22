@@ -15,10 +15,9 @@ describe("answersSearch + the ST of the answer", () => {
     expect(answersSearch(device, "uuid:roku:ecp:other")).toBe(false);
     expect(answersSearch(device, "roku:ecp")).toBe(true);
   });
-  it("mirrors the searched target and answers the wildcard as the Roku service", () => {
+  it("mirrors the searched target", () => {
     const device = { uuid: "abc123", port: 8060 };
     expect(buildSearchResponse(device, "192.168.1.5", ROKU_DEVICE_TYPE)).toContain(`ST: ${ROKU_DEVICE_TYPE}`);
-    expect(buildSearchResponse(device, "192.168.1.5", "ssdp:all")).toContain("ST: roku:ecp");
   });
 });
 

@@ -341,10 +341,6 @@ describe("EcpHttpServer", () => {
       serverConfig({
         device: { uuid: "dying", port },
         friendlyName: "Wohnzimmer",
-        deviceType: "player",
-        bindIp: "127.0.0.1",
-        logger: recordingLogger,
-        onCommand: () => true,
         onFatalError: e => fatals.push(e),
       }),
     );
@@ -365,10 +361,7 @@ describe("EcpHttpServer", () => {
       serverConfig({
         device: { uuid: "zzz", port: 1 },
         friendlyName: "never started",
-        deviceType: "player",
         bindIp: undefined,
-        logger: recordingLogger,
-        onCommand: () => true,
       }),
     );
     // onUnload calls stop() unconditionally, including for a device whose start
@@ -385,10 +378,6 @@ describe("EcpHttpServer", () => {
       serverConfig({
         device: { uuid: "busy", port: busyPort },
         friendlyName: "busy",
-        deviceType: "player",
-        bindIp: "127.0.0.1",
-        logger: recordingLogger,
-        onCommand: () => true,
       }),
     );
     try {
@@ -409,10 +398,6 @@ describe("EcpHttpServer", () => {
       serverConfig({
         device: { uuid: "held", port: heldPort },
         friendlyName: "held",
-        deviceType: "player",
-        bindIp: "127.0.0.1",
-        logger: recordingLogger,
-        onCommand: () => true,
       }),
     );
     await held.start();
@@ -522,9 +507,6 @@ describe("EcpHttpServer — a Roku TV", () => {
         device: { uuid: "tv1", port },
         friendlyName: "TV",
         deviceType: "tv",
-        bindIp: "127.0.0.1",
-        logger: recordingLogger,
-        onCommand: () => true,
       }),
     );
     await server.start();
@@ -547,10 +529,6 @@ describe("EcpHttpServer — the trust boundary is the caller's", () => {
       serverConfig({
         device: { uuid: "x", port: 0 },
         friendlyName: "X",
-        deviceType: "player",
-        bindIp: "127.0.0.1",
-        logger: recordingLogger,
-        onCommand: () => true,
         isClientAllowed: a => {
           seen.push(a);
           return false;
@@ -569,10 +547,6 @@ describe("EcpHttpServer — the trust boundary is the caller's", () => {
       serverConfig({
         device: { uuid: "y", port },
         friendlyName: "Y",
-        deviceType: "player",
-        bindIp: "127.0.0.1",
-        logger: recordingLogger,
-        onCommand: () => true,
       }),
     );
     await server.start();
