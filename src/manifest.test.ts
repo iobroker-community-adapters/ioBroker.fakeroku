@@ -2,6 +2,7 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { BASE_KEYS, TV_KEYS } from "./lib/roku-keys";
 import { LANGUAGES } from "./lib/constants";
+import { ICON_URI_PREFIX } from "./lib/device-icons";
 
 const root = join(__dirname, "..");
 /**
@@ -188,5 +189,18 @@ describe("object inventory", () => {
       expect(ids).not.toContain(`fakeroku.0.${device}.commandType`);
     }
     expect(ids).toContain("fakeroku.0.info.connection");
+  });
+
+  it("gives every device the pictogram of its type, as the file itself", () => {
+    const icons = Object.entries(inventory)
+      .filter(([, obj]) => (obj as { type?: string }).type === "device")
+      .map(([id, obj]) => [id, (obj as { common: { icon?: string } }).common.icon] as const);
+    expect(icons.map(([id]) => id).sort()).toEqual(["fakeroku.0.Player", "fakeroku.0.TV"]);
+    for (const [id, icon] of icons) {
+      const file = id.endsWith(".TV") ? "tv.svg" : "player.svg";
+      expect(icon?.startsWith(ICON_URI_PREFIX), id).toBe(true);
+      const markup = Buffer.from(icon!.slice(ICON_URI_PREFIX.length), "base64").toString("utf8");
+      expect(markup, id).toBe(readFileSync(join(root, "admin", "icons", file), "utf8").replace(/\r\n/g, "\n"));
+    }
   });
 });

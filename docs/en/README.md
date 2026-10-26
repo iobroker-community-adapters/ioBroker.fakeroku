@@ -82,7 +82,8 @@ At instance level:
 | `info.devicesOnline`    | number, read-only  | How many of them listen right now.                                                                                                                                                                                                                                                      |
 | `info.devicesAllOnline` | boolean, read-only | `true` while every configured Roku listens; `false` while none is configured.                                                                                                                                                                                                           |
 
-For each emulated Roku, below `fakeroku.0.<name>`:
+Each emulated Roku is a device in the object tree, drawn as a box for a player and as a screen for a TV.
+Below `fakeroku.0.<name>`:
 
 | Datapoint     | Type               | Meaning                                                                                                                                                                                                             |
 | ------------- | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

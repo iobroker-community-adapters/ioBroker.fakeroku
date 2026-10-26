@@ -117,6 +117,17 @@ More cases: [documentation](./docs/en/README.md#troubleshooting).
 	### **WORK IN PROGRESS**
 -->
 
+### **WORK IN PROGRESS**
+
+- (krobipd) New: every emulated Roku shows in the object tree whether it is a player or a TV.
+- (krobipd) Fixed: a discovery problem that keeps occurring is logged once, not again every few minutes.
+- (krobipd) Improved: the adapter reads its object tree once at start instead of several times.
+- (krobipd) Improved: the documentation describes what happens when the chosen network address is missing on the host.
+- (krobipd) Improved: the README has a troubleshooting section.
+- (krobipd) Improved: the update notice links to the description of the object tree.
+- (krobipd) Changed: the interface setting is labelled "Network interface".
+- (krobipd) Changed: js-controller 7.2.5 and admin 8.2.0 or newer are required.
+
 ### 1.10.0 (2026-10-03)
 
 - (krobipd) New: every emulated Roku shows whether it runs and, if not, why — a green or grey symbol in the object tree, online or offline on its card with the reason.
@@ -142,7 +153,7 @@ More cases: [documentation](./docs/en/README.md#troubleshooting).
 - (krobipd) Improved: a start writes only datapoints that changed and reads the key states in one request — no needless updates for history adapters.
 - (krobipd) Improved: the README links the detailed user documentation in English and German.
 
-### 1.8.1 (2026-09-27)
+### 1.8.1 (2026-09-27) — stable
 
 - (krobipd) Improved: the note the Admin shows before an update from 0.x is short now: the apps folder is removed, app launches arrive as launch:<id> in command.
 

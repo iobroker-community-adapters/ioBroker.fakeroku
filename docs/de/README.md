@@ -88,7 +88,8 @@ Auf Instanz-Ebene:
 | `info.devicesOnline`    | number, nur lesbar  | Wie viele davon gerade lauschen.                                                                                                                                                                                                                                                                                                |
 | `info.devicesAllOnline` | boolean, nur lesbar | `true`, solange jeder eingerichtete Roku lauscht; `false`, solange keiner eingerichtet ist.                                                                                                                                                                                                                                     |
 
-Je emuliertem Roku, unterhalb von `fakeroku.0.<Name>`:
+Jeder emulierte Roku ist ein Gerät im Objektbaum, gezeichnet als Box für einen Player und als Bildschirm für einen TV.
+Unterhalb von `fakeroku.0.<Name>`:
 
 | Datenpunkt     | Typ                 | Bedeutung                                                                                                                                                                                                                        |
 | -------------- | ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

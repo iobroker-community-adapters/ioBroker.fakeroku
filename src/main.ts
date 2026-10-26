@@ -19,6 +19,7 @@ import {
 import { deviceTreeOf, storedRowOf, toDeviceRows, type DeviceRow } from "./lib/device-config";
 import { randomIdentity } from "./lib/device-identity";
 import { detectLocalIPv4s } from "./lib/detect-ip";
+import { deviceIcon } from "./lib/device-icons";
 import { errText } from "./lib/err-text";
 import { migrateNativeKeys, type NativeKeyMigration } from "./lib/native-key-migration";
 import { type I18nKey, tDesc, tName, tRaw } from "./lib/i18n";
@@ -492,7 +493,7 @@ export class Fakeroku extends utils.Adapter {
       }
       const keys = keysForType(row.type);
       try {
-        await this.createDeviceStates(deviceId, row.name, keys);
+        await this.createDeviceStates(deviceId, row.name, row.type, keys);
       } catch (e) {
         failures.push({ name: row.name, reason: `its objects could not be created: ${errText(e)}`, retried: false });
         continue;
@@ -677,16 +678,23 @@ export class Fakeroku extends utils.Adapter {
    *
    * @param deviceId the id-safe device path segment
    * @param friendlyName the configured device name
+   * @param type the device type, which picks the pictogram of the device in the object browser
    * @param keys the key names to create for this device (from its type)
    */
-  private async createDeviceStates(deviceId: string, friendlyName: string, keys: readonly string[]): Promise<void> {
+  private async createDeviceStates(
+    deviceId: string,
+    friendlyName: string,
+    type: DeviceType,
+    keys: readonly string[],
+  ): Promise<void> {
     await Promise.all([
       // The device name is the user's own text — nothing to translate, but it must
       // still BE a translation object like every other common.name (tRaw).
-      // The symbol in the object browser comes from statusStates; a relative id is read below the device itself.
+      // The online symbol in the object browser comes from statusStates; a relative id is read below the device
+      // itself. The pictogram says player or TV; an unreadable file leaves the field as it is (undefined).
       this.known.extend(deviceId, {
         type: "device",
-        common: { name: tRaw(friendlyName), statusStates: { onlineId: DEVICE_ONLINE_ID } },
+        common: { name: tRaw(friendlyName), icon: deviceIcon(type), statusStates: { onlineId: DEVICE_ONLINE_ID } },
         native: {},
       }),
       this.known.extend(`${deviceId}.info`, {

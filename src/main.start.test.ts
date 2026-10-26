@@ -18,6 +18,7 @@ vi.mock("node:os", async importOriginal => {
 import { I18n } from "@iobroker/adapter-core";
 import { join } from "node:path";
 import { deriveUuid } from "./lib/device-identity";
+import { deviceIcon } from "./lib/device-icons";
 import { setup, resetHarness, noAddressYet, twoPlayers, fakeEcp } from "../test/helpers/fakeroku-harness";
 
 afterEach(resetHarness);
@@ -897,5 +898,72 @@ describe("Fakeroku start-up robustness", () => {
     await new Promise<void>(resolve => ctx.i.onUnload(() => (cb(), resolve())));
     expect(ctx.i.clearInterval).not.toHaveBeenCalled();
     expect(cb).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("Fakeroku onReady — the device pictogram", () => {
+  /**
+   * The writes a start made to one object.
+   *
+   * @param ctx the harness of that start
+   * @param id the object id
+   * @returns how often the start extended it
+   */
+  function writesTo(ctx: ReturnType<typeof setup>, id: string): number {
+    return ctx.i.extendObject.mock.calls.filter(([written]) => written === id).length;
+  }
+
+  it("gives a player the player and a TV the TV pictogram", async () => {
+    const ctx = setup({
+      devices: [
+        { name: "Wohnzimmer", port: 8060, type: "player" },
+        { name: "Kino", port: 8061, type: "tv" },
+      ],
+    });
+    await ctx.i.onReady();
+    expect((ctx.i.objects.get("Wohnzimmer")?.common as { icon?: string }).icon).toBe(deviceIcon("player"));
+    expect((ctx.i.objects.get("Kino")?.common as { icon?: string }).icon).toBe(deviceIcon("tv"));
+    expect(deviceIcon("player")).not.toBe(deviceIcon("tv"));
+  });
+
+  it("gives an existing device without one its pictogram exactly once", async () => {
+    const first = setup();
+    await first.i.onReady();
+    const tree = new Map(first.i.objects);
+    const device = structuredClone(tree.get("Wohnzimmer")!);
+    delete (device.common as { icon?: string }).icon;
+    tree.set("Wohnzimmer", device);
+    await new Promise<void>(resolve => first.i.onUnload(resolve));
+    resetHarness();
+
+    const upgrade = setup();
+    for (const [id, obj] of tree) {
+      upgrade.i.objects.set(id, structuredClone(obj));
+    }
+    await upgrade.i.onReady();
+    expect(writesTo(upgrade, "Wohnzimmer")).toBe(1);
+    expect((upgrade.i.objects.get("Wohnzimmer")?.common as { icon?: string }).icon).toBe(deviceIcon("player"));
+    const healed = new Map(upgrade.i.objects);
+    await new Promise<void>(resolve => upgrade.i.onUnload(resolve));
+    resetHarness();
+
+    const restart = setup();
+    for (const [id, obj] of healed) {
+      restart.i.objects.set(id, structuredClone(obj));
+    }
+    await restart.i.onReady();
+    expect(writesTo(restart, "Wohnzimmer")).toBe(0);
+  });
+
+  it("replaces a path in the icon field by the inline pictogram once", async () => {
+    const ctx = setup();
+    ctx.i.objects.set("Wohnzimmer", {
+      type: "device",
+      common: { name: "Wohnzimmer", icon: "/icons/player.svg" },
+      native: {},
+    });
+    await ctx.i.onReady();
+    expect(writesTo(ctx, "Wohnzimmer")).toBe(1);
+    expect((ctx.i.objects.get("Wohnzimmer")?.common as { icon?: string }).icon).toBe(deviceIcon("player"));
   });
 });
