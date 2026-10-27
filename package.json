@@ -86,6 +86,7 @@
   },
   "readmeFilename": "README.md",
   "overrides": {
-    "esbuild": ">=0.25.0"
+    "esbuild": ">=0.25.0",
+    "node-forge": ">=1.4.1"
   }
 }
