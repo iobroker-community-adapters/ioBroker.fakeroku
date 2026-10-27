@@ -120,8 +120,6 @@ More cases: [documentation](./docs/en/README.md#troubleshooting).
 ### **WORK IN PROGRESS**
 
 - (krobipd) New: every emulated Roku shows in the object tree whether it is a player or a TV.
-- (krobipd) Fixed: a discovery problem that keeps occurring is logged once, not again every few minutes.
-- (krobipd) Improved: the adapter reads its object tree once at start instead of several times.
 - (krobipd) Improved: the documentation describes what happens when the chosen network address is missing on the host.
 - (krobipd) Improved: the README has a troubleshooting section.
 - (krobipd) Improved: the update notice links to the description of the object tree.
