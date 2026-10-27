@@ -1,8 +1,12 @@
 import { vi } from "vitest";
 import type { CommandEvent } from "../../src/ecp/ecp-command";
 import { sanitizeId } from "../../src/lib/pure-helpers";
-import { Fakeroku } from "../../src/main";
+import * as mainModule from "../../src/main";
 import { osMock } from "./os-double";
+
+// main.ts does not export the class (an `export` next to `module.exports` makes esbuild treat it as an ES module);
+// the class rides along on the compact-mode factory.
+const { Fakeroku } = mainModule as unknown as { Fakeroku: new () => ioBroker.Adapter };
 
 /*
  * Shared harness of the orchestration tests (`src/main.*.test.ts`). `@iobroker/adapter-core` is replaced by
@@ -54,7 +58,7 @@ export function settle(): Promise<void> {
  * @param adapter Adapter instance under test
  * @returns the same instance, typed with what the tests reach into
  */
-export function internalOf(adapter: Fakeroku): {
+export function internalOf(adapter: ioBroker.Adapter): {
   onReady(): Promise<void>;
   onUnload(cb: () => void): void;
   applyCommand(deviceId: string, cmd: CommandEvent): boolean;
@@ -99,7 +103,7 @@ export function internalOf(adapter: Fakeroku): {
 /** What setup() hands a test: the adapter, typed access to its internals, and the fakes it built. */
 export interface Ctx {
   /** The adapter under test. */
-  adapter: Fakeroku;
+  adapter: ioBroker.Adapter;
   /** Typed access to its private members and the double's store. */
   i: ReturnType<typeof internalOf>;
   /** Every ECP server the adapter built, in order. */
@@ -238,31 +242,37 @@ export function setup(
 }
 
 /**
- * The private members the tests reach through {@link internalOf}, read once with element access: TypeScript checks
- * element access against the real members, so renaming one breaks the type check instead of turning a test into one
- * that reads `undefined` and stays green.
+ * The private members the tests reach through {@link internalOf} that the instance does not carry. main.ts exports
+ * no class type, so a renamed member no longer breaks the type check — a test asserts this list is empty instead,
+ * so a rename turns red rather than leaving a test that reads `undefined` and stays green.
  *
- * @param adapter the adapter
- * @returns the members (unused — the point is the type check)
+ * @param adapter a freshly built adapter
+ * @returns the names of the missing members (empty when all exist)
  */
-export function privateMembersExist(adapter: Fakeroku): unknown[] {
-  return [
-    adapter["onReady"],
-    adapter["onUnload"],
-    adapter["applyCommand"],
-    adapter["discovery"]["onSsdpFatal"],
-    adapter["discovery"]["startWithTimeout"],
-    adapter["discovery"]["ssdp"],
-    adapter["running"],
-    adapter["pending"],
-    adapter["retryPendingDevices"],
-    adapter["devices"],
-    adapter["commands"],
-    adapter["status"],
-    adapter["deviceManagement"],
-    adapter["makeEcpServer"],
-    adapter["makeSsdpResponder"],
-  ];
+export function missingPrivateMembers(adapter: ioBroker.Adapter): string[] {
+  const own = adapter as unknown as Record<string, unknown>;
+  const missing = [
+    "onReady",
+    "onUnload",
+    "applyCommand",
+    "discovery",
+    "running",
+    "pending",
+    "retryPendingDevices",
+    "devices",
+    "commands",
+    "status",
+    "deviceManagement",
+    "makeEcpServer",
+    "makeSsdpResponder",
+  ].filter(name => !(name in own));
+  const discovery = own.discovery;
+  if (typeof discovery === "object" && discovery !== null) {
+    missing.push(
+      ...["onSsdpFatal", "startWithTimeout", "ssdp"].filter(name => !(name in discovery)).map(n => `discovery.${n}`),
+    );
+  }
+  return missing;
 }
 
 /**

@@ -19,7 +19,6 @@ vi.mock("node:os", async importOriginal => {
 import { I18n } from "@iobroker/adapter-core";
 import { FakerokuDeviceManagement } from "./device-management";
 import * as mainModule from "./main";
-import { Fakeroku } from "./main";
 import { EcpHttpServer } from "./ecp/ecp-http-server";
 import { RokuSsdpResponder } from "./discovery/ssdp-responder";
 import { deriveUuid } from "./lib/device-identity";
@@ -27,6 +26,7 @@ import {
   setup,
   settle,
   internalOf,
+  missingPrivateMembers,
   type Ctx,
   type FakeEcp,
   type FakeSsdp,
@@ -42,6 +42,8 @@ import {
   deferredStart,
 } from "../test/helpers/fakeroku-harness";
 import { osMock } from "../test/helpers/os-double";
+
+const { Fakeroku } = mainModule as unknown as { Fakeroku: new () => ioBroker.Adapter };
 
 afterEach(resetHarness);
 
@@ -71,6 +73,11 @@ describe("Fakeroku collaborator wiring", () => {
     const makeSsdp = i.makeSsdpResponder as (o: unknown) => unknown;
     expect(make({ device: { uuid: "a", port: 8060 } })).toBeInstanceOf(EcpHttpServer);
     expect(makeSsdp({ devices: [], membershipInterfaces: [] })).toBeInstanceOf(RokuSsdpResponder);
+  });
+
+  it("carries every private member the tests reach into", () => {
+    // The tests reach the class through a cast, so a renamed member would not break the type check.
+    expect(missingPrivateMembers(new Fakeroku())).toEqual([]);
   });
 
   it("routes each ECP server's commands to ITS OWN device", async () => {

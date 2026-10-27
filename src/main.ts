@@ -143,7 +143,7 @@ interface DeviceRuntime {
  * (Logitech Harmony or a Sofabaton X1/X2) trigger events in ioBroker:
  * a keypress lands in `<device>.command` and pulses `<device>.keys.<Key>`.
  */
-export class Fakeroku extends utils.Adapter {
+class Fakeroku extends utils.Adapter {
   /** The SSDP side: the responder, its announcements, its outage and return, the farewell. */
   private readonly discovery = new DiscoveryLifecycle(this, {
     bindIp: () => this.bindIp,
@@ -1080,8 +1080,11 @@ export class Fakeroku extends utils.Adapter {
 }
 
 if (require.main !== module) {
-  // Export the constructor in compact mode
-  module.exports = (options: Partial<utils.AdapterOptions> | undefined) => new Fakeroku(options);
+  // Export the constructor in compact mode; the class rides along on the factory for the tests (an `export` next
+  // to `module.exports` makes esbuild treat the file as an ES module)
+  module.exports = Object.assign((options: Partial<utils.AdapterOptions> | undefined) => new Fakeroku(options), {
+    Fakeroku,
+  });
 } else {
   // Start the instance directly
   (() => new Fakeroku())();

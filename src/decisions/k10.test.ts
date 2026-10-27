@@ -103,7 +103,8 @@ vi.mock("node:os", async importOriginal => {
   });
   return { ...actual, default: { ...actual, networkInterfaces }, networkInterfaces };
 });
-import { Fakeroku } from "../main";
+import * as mainModule from "../main";
+const { Fakeroku } = mainModule as unknown as { Fakeroku: new () => ioBroker.Adapter };
 
 /** What a guard reaches in the adapter under test: its private start, its stand-in maps and spies. */
 interface Run {
