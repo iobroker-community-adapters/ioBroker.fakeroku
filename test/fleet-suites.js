@@ -25,7 +25,8 @@
 //   "a rejected login shows no connection" D11 (krobi 2026-10-16 07:38: no connection, then offline) after a rejected
 //                                       login info.connection is true only while data still arrives
 //   "a counterpart that answers wrong or refuses" D6 a 500 and an empty 200 · C26b drifted JSON: the adapter runs on,
-//                                       deletes no object and empties no value, each met by a restart (network hook,
+//                                       deletes no object and empties no value the clean start had (round 148),
+//                                       each met by a restart (network hook,
 //                                       section 7 `fault`: the first answer to each request wrong, the repeat right),
 //                                       red as well when the wrong answers reached no request past the first one of a
 //                                       clean start · D21 after a 429 with retry-after 60 no call to that host before
@@ -145,6 +146,18 @@ function upBefore(markers, before) {
   return markers
     .filter(([id, off]) => before[id]?.val !== undefined && before[id]?.val !== null && before[id]?.val !== off)
     .map(([id]) => id);
+}
+// D6/C26b (round 148, dl-manager CI 40423395879): an emptied value counts only when the clean start already had it — the
+// baseline before each mode carries what the previous wrong answers set (a reason text), and an adapter that recovers after
+// that mode, as its backoff wants, rightly empties it again (the fleet rule: empty while all is well).
+function emptiedOf(clean, before, after) {
+  return Object.keys(before).filter(
+    id =>
+      id in clean &&
+      !EMPTY.has(clean[id]?.val) &&
+      !EMPTY.has(before[id]?.val) &&
+      (!(id in after) || EMPTY.has(after[id]?.val)),
+  );
 }
 // D6 (round 141, yamaha 2026-10-22: every receiver carries info.connection and one reachable flag per transport, 32
 // markers on 8 devices, and one dropped receiver turned 2 to 4 of them false): the suite counts DEVICES, not markers. A
@@ -812,6 +825,7 @@ module.exports = function fleetSuites(suite, ctx) {
         }
       });
       const clean = new Set(readRequests(since).map(r => r.key));
+      const cleanStates = await dumpStates(harness);
       try {
         for (const mode of ["500", "empty", "drift"]) {
           const objects = await dumpObjects(harness);
@@ -859,9 +873,7 @@ module.exports = function fleetSuites(suite, ctx) {
                 ...deletions.filter(([id, when]) => when >= at && id in objects).map(([id]) => id),
               ]),
             ],
-            emptied: Object.keys(states).filter(
-              id => !EMPTY.has(states[id]?.val) && (!(id in after) || EMPTY.has(after[id]?.val)),
-            ),
+            emptied: emptiedOf(cleanStates, states, after),
           };
           if (!verdicts[mode].running) {
             return;
@@ -1154,6 +1166,7 @@ module.exports.workshopMutexProblem = workshopMutexProblem;
 module.exports.spacingOf = spacingOf;
 module.exports.newlyDown = newlyDown;
 module.exports.upBefore = upBefore;
+module.exports.emptiedOf = emptiedOf;
 module.exports.devicesOf = devicesOf;
 module.exports.stampsOf = stampsOf;
 module.exports.droppedPress = droppedPress;

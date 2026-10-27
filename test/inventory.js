@@ -1356,29 +1356,44 @@ function listenPortPlan() {
 
 /**
  * Round 104: hold each port the way another program would — a TCP server, an exclusive UDP socket — on the address the
- * adapter binds.
+ * adapter binds. Round 148 (fakeroku, measured on macOS): a holder on 0.0.0.0 leaves `::` free, and an adapter that binds
+ * "all addresses" without a host listens dual-stack there — so "all" is held dual-stack on `::`; a connection to the holder
+ * is dropped at once, so closing it never waits on a client.
  *
  * @param {{ protocol: string, port: number }[]} ports the ports
  * @param {string} address the address
  */
 async function takePorts(ports, address) {
   const held = [];
+  const all = address === "0.0.0.0";
   for (const { protocol, port } of ports) {
     const holder =
       protocol === "udp"
-        ? require("node:dgram").createSocket({ type: "udp4", reuseAddr: false })
-        : require("node:net").createServer();
+        ? require("node:dgram").createSocket({ type: all ? "udp6" : "udp4", reuseAddr: false })
+        : require("node:net").createServer(socket => socket.destroy());
     await new Promise((resolve, reject) => {
       holder.once("error", reject);
       if (protocol === "udp") {
-        holder.bind({ port, address, exclusive: true }, resolve);
+        holder.bind({ port, address: all ? "::" : address, exclusive: true }, resolve);
       } else {
-        holder.listen(port, address, resolve);
+        holder.listen(port, all ? "::" : address, resolve);
       }
     });
     held.push(holder);
   }
   return held;
+}
+
+/**
+ * Round 148 (fakeroku; measured with mocha 2026-10-27): release the held ports within a second at most — a suite's after()
+ * that fails or hangs makes mocha skip the harness's own teardown registered behind it, and the adapter process outlives
+ * the run with its ports and the database lock.
+ *
+ * @param {Array<{ close: (cb: () => void) => void }>} held the holders of takePorts
+ */
+function releasePorts(held) {
+  const closed = Promise.all(held.map(h => new Promise(resolve => h.close(() => resolve()))));
+  return Promise.race([closed, new Promise(resolve => setTimeout(resolve, 1000).unref())]);
 }
 
 /** Round 104 (DB-01): every file the adapter process wrote (`<pid>.files`, test/network-hook.js), with its time. */
@@ -1679,7 +1694,7 @@ tests.integration(ADAPTER_DIR, {
             errors: harness.getLogs().filter(l => l.level === "error" && l.from === `${ADAPTER}.0`),
           };
         });
-        after(() => Promise.all(held.map(h => new Promise(resolve => h.close(() => resolve())))));
+        after(() => releasePorts(held));
 
         it("stops with an error when it can talk to nothing, and runs on when it can", function () {
           const ports = verdict.plan.taken.map(p => `${p.protocol} ${p.port}`).join(", ");
