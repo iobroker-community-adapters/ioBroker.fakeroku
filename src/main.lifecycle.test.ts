@@ -80,6 +80,34 @@ describe("Fakeroku collaborator wiring", () => {
     expect(missingPrivateMembers(new Fakeroku())).toEqual([]);
   });
 
+  it("answers an unknown message with an error and leaves the device manager's messages to dm-utils", async () => {
+    // Without the answer the sender waits for its timeout; a second answer to a dm:* message would race dm-utils'.
+    const ctx = setup();
+    const adapter = ctx.adapter;
+    const on = adapter.on as unknown as ReturnType<typeof vi.fn>;
+    expect(on.mock.calls.some(([event]) => event === "message")).toBe(false);
+    await ctx.i.onReady();
+    // dm-utils registers its own message listener when the device manager is built; the adapter's comes after it
+    const listeners = on.mock.calls.filter(([event]) => event === "message");
+    expect(listeners).toHaveLength(2);
+    const handler = listeners[1][1] as (obj: unknown) => void;
+    const sendTo = vi.fn();
+    (adapter as unknown as { sendTo: typeof sendTo }).sendTo = sendTo;
+    const callback = { message: {}, id: 1, ack: false, time: 0 };
+
+    handler({ command: "dm:instanceInfo", from: "system.adapter.admin.0", message: {}, callback });
+    handler({ command: "whatever", from: "system.adapter.admin.0", message: {} });
+    expect(sendTo).not.toHaveBeenCalled();
+
+    handler({ command: "whatever", from: "system.adapter.admin.0", message: {}, callback });
+    expect(sendTo).toHaveBeenCalledWith(
+      "system.adapter.admin.0",
+      "whatever",
+      { error: "unknown command whatever" },
+      callback,
+    );
+  });
+
   it("routes each ECP server's commands to ITS OWN device", async () => {
     const ctx = setup(twoPlayers());
     await ctx.i.onReady();

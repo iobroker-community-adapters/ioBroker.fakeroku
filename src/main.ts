@@ -224,6 +224,26 @@ class Fakeroku extends utils.Adapter {
   }
 
   /**
+   * Answers a message nobody here handles with an error, so its sender gets a reply instead of waiting for its timeout.
+   * The device manager's own `dm:*` messages are left to dm-utils, which answers them.
+   *
+   * @param obj the message
+   */
+  private onMessage(obj: ioBroker.Message): void {
+    try {
+      if (typeof obj?.command !== "string" || obj.command.startsWith("dm:")) {
+        return;
+      }
+      this.log.debug(`unknown message ${obj.command}`);
+      if (obj.callback) {
+        this.sendTo(obj.from, obj.command, { error: `unknown command ${obj.command}` }, obj.callback);
+      }
+    } catch (e) {
+      this.log.debug(`message ${String(obj?.command)} not answered: ${errText(e)}`);
+    }
+  }
+
+  /**
    * The adverts of the devices that are actually listening — the basis for info.connection and discovery.
    *
    * @returns the listening devices' adverts
@@ -318,6 +338,7 @@ class Fakeroku extends utils.Adapter {
     try {
       await I18n.init(join(this.adapterDir, "admin"), this);
       this.deviceManagement = new FakerokuDeviceManagement(this);
+      this.on("message", this.onMessage.bind(this));
 
       // Repair what an update leaves behind in the instance object, before anything binds a port.
       // The write restarts this instance, so nothing may start before it.
