@@ -250,16 +250,28 @@ const EXPECTED_OBJECTS = 64;
  *
  * With INVENTORY_RENAME=1 (fleet suite D22) the user renames the first Roku in the device manager first: its
  * native.devices row gets a new name and keeps its identity and object id (K2, K3), and the host restarts the instance.
+ * The row is written in the device manager's shape (`editDevice` in src/device-management.ts): it stores the object id
+ * of the tree the device already has, which a row from before 1.8.0 does not carry yet.
  *
  * @param {import("@iobroker/testing").IntegrationTestHarness} harness
  */
 async function feedFixtures(harness) {
   if (process.env.INVENTORY_RENAME === "1") {
     const stored = (await harness.objects.getObjectAsync(`system.adapter.${ADAPTER}.0`)).native.devices;
+    const devices = (await harness.objects.getObjectList({ startkey: NS, endkey: `${NS}香` })).rows.filter(
+      r => r.value?.type === "device",
+    );
+    const treeOf = row => {
+      const own = devices.find(r => r.value.common?.name?.en === row.name);
+      assert.ok(own, `no device object carries the name "${row.name}" — the rename has no tree to keep`);
+      return own.id.slice(NS.length);
+    };
     await resetInstanceNative(
       harness,
       await fixtureNative({
-        devices: stored.map((row, i) => (i === 0 ? { ...row, name: `${row.name} renamed` } : row)),
+        devices: stored.map((row, i) =>
+          i === 0 ? { ...row, name: `${row.name} renamed`, objectId: row.objectId ?? treeOf(row) } : row,
+        ),
       }),
     );
     await restartAsTheHost(harness, null, "for the renamed Roku");
@@ -356,7 +368,7 @@ const FIXTURE_NATIVE = {
  * fixture; a DNS answer), each `path.join(__dirname, "<file>")`. adapterEnv puts them into EVERY start; no suite names
  * a hook of its own. Empty where the adapter reaches its fixtures through its settings alone.
  */
-const FIXTURE_HOOKS = [];
+const FIXTURE_HOOKS = [path.join(__dirname, "inventory-lan-hook.cjs")];
 /**
  * Round 123 (homeconnect 2026-10-15: the fetch hook widened the request budget in every start, so the limit suites judged
  * a limiter that was switched off): adapter-specific — the `--require` hooks that change only the adapter's own pace (a
