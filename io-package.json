@@ -80,19 +80,6 @@
         "pl": "Instancja uruchamia się raz ponownie po tej aktualizacji i usuwa ustawienie pozostawione przez starszą wersję; poza tym nic się nie zmienia.",
         "uk": "Після цього оновлення екземпляр один раз перезапускається та прибирає налаштування, залишене старішою версією; більше нічого не змінюється.",
         "zh-cn": "本次更新后实例会重启一次，清除旧版本遗留的一项设置；其他一切保持不变。"
-      },
-      "1.7.0": {
-        "en": "Button datapoints keep their value and their room and function assignment, and the instance restarts once right after this update.",
-        "de": "Tastendatenpunkte behalten ihren Wert und ihre Raum- und Funktionszuordnung, und die Instanz startet direkt nach diesem Update einmal neu.",
-        "ru": "Точки данных кнопок сохраняют значение и привязку к комнате и функции, а экземпляр один раз перезапускается сразу после этого обновления.",
-        "pt": "Os pontos de dados das teclas mantêm o seu valor e a atribuição de divisão e função, e a instância reinicia uma vez logo após esta atualização.",
-        "nl": "Knopdatapunten behouden hun waarde en hun kamer- en functietoewijzing, en de instantie start direct na deze update eenmalig opnieuw.",
-        "fr": "Les points de données des touches gardent valeur et affectation de pièce et de fonction, et l'instance redémarre une fois juste après cette mise à jour.",
-        "it": "I punti dati dei tasti mantengono valore e assegnazione di stanza e funzione, e l'istanza si riavvia una volta subito dopo questo aggiornamento.",
-        "es": "Los puntos de datos de las teclas conservan su valor y su asignación de habitación y función, y la instancia se reinicia una vez justo tras esta actualización.",
-        "pl": "Punkty danych przycisków zachowują swoją wartość oraz przypisanie do pomieszczenia i funkcji, a instancja uruchamia się raz ponownie zaraz po tej aktualizacji.",
-        "uk": "Точки даних кнопок зберігають значення та прив'язку до кімнати й функції, а екземпляр один раз перезапускається одразу після цього оновлення.",
-        "zh-cn": "按键数据点保留其数值以及房间和功能分配，实例会在本次更新后自动重启一次。"
       }
     },
     "titleLang": {
