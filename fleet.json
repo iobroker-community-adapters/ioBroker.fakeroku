@@ -51,6 +51,9 @@
     ],
     "noCommands": "fakeroku switches nothing: its datapoints report what a remote pressed, no command goes to a device"
   },
+  "fixtureLimits": {
+    "none": "no device reports limits: fakeroku is the device itself, its only numbers are the two read-only Roku counts"
+  },
   "_listenPorts": "Every port the adapter opens. `key` is a native key only for primary/secondary; for shared and perDevice it is a label. fakeroku has no primary port: each emulated Roku carries its own ECP port in native.devices[], and SSDP 1900 is shared on purpose (declaring it as native.port would warn every UPnP user on the host).",
   "listenPorts": [
     {
