@@ -14,18 +14,23 @@ const LOOPBACK = /^(?:127\.|::1$|::ffff:127\.)/;
 const ownAddresses = () =>
   new Set(
     Object.values(os.networkInterfaces())
-      .flat()
-      .filter(Boolean)
+      .flatMap(list => list ?? [])
       .map(a => a.address.split("%")[0]),
   );
 
 const emit = dgram.Socket.prototype.emit;
+/**
+ * @param {string | symbol} event the event
+ * @param {...unknown} args its arguments — for `message` the datagram and its sender
+ * @returns {boolean} whether a listener got it
+ */
 dgram.Socket.prototype.emit = function (event, ...args) {
   if (event === "message") {
-    const from = typeof args[1]?.address === "string" ? args[1].address.split("%")[0] : undefined;
+    const rinfo = /** @type {{ address?: unknown } | undefined} */ (args[1]);
+    const from = typeof rinfo?.address === "string" ? rinfo.address.split("%")[0] : undefined;
     if (from !== undefined && !LOOPBACK.test(from) && !ownAddresses().has(from)) {
       return false;
     }
   }
-  return emit.call(this, event, ...args);
+  return Reflect.apply(emit, this, [event, ...args]);
 };

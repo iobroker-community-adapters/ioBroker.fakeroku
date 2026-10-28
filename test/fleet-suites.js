@@ -228,7 +228,7 @@ function workshopMutexProblem(startDir) {
     if (fs.existsSync(lockFile)) {
       const probe = spawnSync("lockf", ["-k", "-s", "-t", "0", lockFile, "/usr/bin/true"], { encoding: "utf8" });
       if (probe.status === 0) {
-        return `the workshop mutex (${locks}) is not held — start the run through with-werkstatt-lock.py`;
+        return `the workshop mutex (${locks}) is not held — start the run through werkbank-run.py hand`;
       }
       if (probe.status !== LOCKF_HELD) {
         return `the workshop mutex (${locks}) cannot be probed (lockf: ${probe.error?.message ?? `exit ${probe.status}`})`;
@@ -237,7 +237,7 @@ function workshopMutexProblem(startDir) {
       try {
         holder = JSON.parse(fs.readFileSync(path.join(locks, "werkstatt-pruefung.holder.json"), "utf8")).pid;
       } catch {
-        return `the workshop mutex (${locks}) is held, but names no holder — start the run through with-werkstatt-lock.py`;
+        return `the workshop mutex (${locks}) is held, but names no holder — start the run through werkbank-run.py hand`;
       }
       let pid = process.pid;
       for (let hop = 0; hop < 64 && pid > 1; hop++) {
@@ -539,7 +539,7 @@ module.exports = function fleetSuites(suite, ctx) {
         }
         const rel = id.slice(NS.length);
         const role = String(o.common?.role ?? "");
-        const leaf = rel.split(".").at(-1);
+        const leaf = rel.split(".").at(-1) ?? "";
         let want;
         if (role in STOPPED && rel !== "info.connection") {
           want = STOPPED[role];

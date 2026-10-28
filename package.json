@@ -66,7 +66,7 @@
     "prebuild": "rimraf build",
     "build": "build-adapter ts",
     "watch": "build-adapter ts --watch",
-    "check": "tsc --noEmit",
+    "check": "tsc --noEmit && tsc --noEmit -p test/tsconfig.json",
     "test:ts": "vitest run",
     "test:unit": "vitest run",
     "test:package": "mocha test/package --exit",

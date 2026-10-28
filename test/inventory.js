@@ -147,8 +147,8 @@ const ADDRESS_KEY = (() => {
   return fs.existsSync(file) ? find(JSON.parse(fs.readFileSync(file, "utf8"))) : undefined;
 })();
 const CHOSEN_ADDRESS = Object.values(require("node:os").networkInterfaces())
-  .flat()
-  .find(i => (i.family === "IPv4" || i.family === 4) && !i.internal)?.address;
+  .flatMap(list => list ?? [])
+  .find(i => i.family === "IPv4" && !i.internal)?.address;
 const MISSING_ADDRESS = "192.0.2.1";
 // Round 97 (krobi 2026-10-06 19:07–19:14, page "Diagnosebericht — Flottenstandard"): an adapter with a diagnostics
 // report carries the fleet master src/lib/diagnostics/report-jobs.ts; the card asks every REPORT_POLL_MS whether a
@@ -156,6 +156,17 @@ const MISSING_ADDRESS = "192.0.2.1";
 const DIAGNOSTICS_REPORT = fs.existsSync(path.join(ADAPTER_DIR, "src", "lib", "diagnostics", "report-jobs.ts"));
 const REPORT_POLL_MS = 2000;
 const REPORT_DEADLINE_MS = 180000;
+
+/**
+ * @typedef {object} WriteWatch what watchObjectWrites returns
+ * @property {Map<string, number>} writes the adapter's object writes per id in this start
+ * @property {Map<string, number>} peak the most writes of one id in one start
+ * @property {string[]} unchanged the ids the adapter rewrote without a change
+ * @property {string[]} deleted the ids deleted
+ * @property {Array<[string, number]>} times every object write of the adapter with its time
+ * @property {string[]} unchangedStates the states the adapter rewrote without a change
+ * @property {() => void} newStart begins the per-start counts again (playControllerRestarts)
+ */
 
 /**
  * Every object write of the adapter in this suite, and which of them changed nothing (round 61). An unchanged
@@ -167,7 +178,21 @@ const REPORT_DEADLINE_MS = 180000;
  * @param {import("@iobroker/testing").IntegrationTestHarness} harness
  */
 async function watchObjectWrites(harness) {
-  const watch = { writes: new Map(), peak: new Map(), unchanged: [], deleted: [], times: [], unchangedStates: [] };
+  /** @type {WriteWatch} */
+  const watch = {
+    writes: new Map(),
+    peak: new Map(),
+    unchanged: [],
+    deleted: [],
+    times: [],
+    unchangedStates: [],
+    // Round 64: a restart the harness plays (playControllerRestarts) is a new start — the per-start counts begin again,
+    // the known object content stays (it is the database's).
+    newStart: () => {
+      watch.writes.clear();
+      states.clear();
+    },
+  };
   const known = new Map();
   const roles = new Map();
   const states = new Map();
@@ -218,12 +243,6 @@ async function watchObjectWrites(harness) {
     }
     states.set(id, now);
   });
-  // Round 64: a restart the harness plays (playControllerRestarts) is a new start — the per-start counts begin again,
-  // the known object content stays (it is the database's).
-  watch.newStart = () => {
-    watch.writes.clear();
-    states.clear();
-  };
   const list = await harness.objects.getObjectListAsync({ startkey: NS, endkey: `${NS}香` });
   for (const row of list.rows) {
     if (row.value) {
@@ -410,6 +429,7 @@ const MOVES = {};
  * the counterpart is gone — every state that shows the outage belongs here (each device's reachability, a rollup such as
  * `devicesOnline`, a cloud flag); every other value stays as it was.
  */
+/** @type {Record<string, unknown>} */
 const OUTAGE_SHOWN = {};
 
 /**
@@ -527,6 +547,15 @@ async function resetInstanceNative(harness, native) {
 }
 
 /**
+ * The harness fields `@iobroker/testing` keeps private: the test installation folder and the exit marker. Every use
+ * fails loudly when a version drops one (clearInstanceData, restartAsTheHost).
+ *
+ * @param {import("@iobroker/testing").IntegrationTestHarness} harness
+ * @returns {{ testDir: string, _adapterExit: unknown }} the same harness
+ */
+const internals = harness => /** @type {any} */ (harness);
+
+/**
  * Round 71 (reported by dl-manager): @iobroker/testing clears only the database and the log directory before a suite;
  * the instance's data folder (`utils.getAbsoluteInstanceDataDir`, `iobroker-data/<adapter>.0` under the test directory)
  * survives every suite and every run. A file the fresh-install suite wrote was still there when the upgrade suite
@@ -538,10 +567,10 @@ async function resetInstanceNative(harness, native) {
  * @param {import("@iobroker/testing").IntegrationTestHarness} harness
  */
 function clearInstanceData(harness) {
-  if (typeof harness.testDir !== "string") {
+  if (typeof internals(harness).testDir !== "string") {
     throw new Error("the harness no longer carries testDir — clearInstanceData cannot find the instance data folder");
   }
-  fs.rmSync(path.join(harness.testDir, "iobroker-data", `${ADAPTER}.0`), { recursive: true, force: true });
+  fs.rmSync(path.join(internals(harness).testDir, "iobroker-data", `${ADAPTER}.0`), { recursive: true, force: true });
   fs.writeFileSync(path.join(RESOURCE_DIR, `${Date.now()}.install`), "");
 }
 
@@ -561,7 +590,7 @@ function clearInstanceData(harness) {
  * @param {...string} hooks the test hooks the suite starts the adapter with (as for adapterEnv)
  */
 function playControllerRestarts(harness, watch, ...hooks) {
-  const restarts = { count: 0, again: [], done: Promise.resolve() };
+  const restarts = { count: 0, again: /** @type {number[]} */ ([]), done: Promise.resolve() };
   harness.on("objectChange", (id, obj) => {
     if (
       id !== `system.adapter.${ADAPTER}.0` ||
@@ -608,7 +637,7 @@ async function withinDeadline(promise, ms, what) {
  * on the adapter's own write; the suite "a restart right after the start" plays it on purpose.
  *
  * @param {import("@iobroker/testing").IntegrationTestHarness} harness
- * @param {{ newStart(): void } | undefined} watch what watchObjectWrites returned
+ * @param {{ newStart(): void } | null | undefined} watch what watchObjectWrites returned, null in a slot without one
  * @param {string} why when the restart comes, in the stop's failure message
  * @param {...string} hooks the test hooks of the start (as for adapterEnv)
  */
@@ -625,7 +654,7 @@ async function restartAsTheHost(harness, watch, why, ...hooks) {
   await new Promise(resolve => setTimeout(resolve, RESTART_DELAY_MS));
   // @iobroker/testing refuses a second start of one harness ("already been used"); the host starts the same
   // instance again — reset the exit marker, and fail loudly should the harness no longer keep it there.
-  harness._adapterExit = undefined;
+  internals(harness)._adapterExit = undefined;
   assert.ok(!harness.didAdapterStop(), "@iobroker/testing changed its exit marker — the restart play needs a new form");
   await withinDeadline(
     harness.startAdapterAndWait(false, adapterEnv(...hooks)),
@@ -765,6 +794,7 @@ async function waitForStates(harness, wanted, what) {
  */
 async function playOutage(harness, watch) {
   assert.ok(Object.keys(OUTAGE_SHOWN).length > 0, "OUTAGE_SHOWN names no state — nothing would show the outage");
+  /** @type {Record<string, unknown>} */
   const before = {};
   for (const [id, val] of Object.entries(OUTAGE_SHOWN)) {
     before[id] = (await harness.states.getStateAsync(`${NS}${id}`))?.val;
@@ -1119,7 +1149,13 @@ function commandValue(common, now) {
 async function playCommands(harness) {
   const list = await harness.objects.getObjectListAsync({ startkey: NS, endkey: `${NS}香` });
   const writable = list.rows.map(r => r.value).filter(o => o?.type === "state" && o.common?.write !== false);
-  const run = { writes: [], acks: [], since: Date.now() };
+  const run = {
+    /** @type {Array<{ id: string, val: unknown, t: number, sole: boolean }>} */
+    writes: [],
+    /** @type {Array<[string, number]>} */
+    acks: [],
+    since: Date.now(),
+  };
   const acknowledged = (id, state) => {
     if (id.startsWith(NS) && state?.ack === true && state.from === `system.adapter.${ADAPTER}.0`) {
       run.acks.push([id, state.ts]);
@@ -1178,7 +1214,7 @@ function networkFiles() {
  * Round 97: one `diagnostics` message to the adapter and its answer, as the admin card sends it.
  *
  * @param {import("@iobroker/testing").IntegrationTestHarness} harness
- * @param {{ action: string }} message the message
+ * @param {{ action: string, [key: string]: unknown }} message the message
  */
 function askDiagnostics(harness, message) {
   const answer = new Promise(resolve => harness.sendTo(`${ADAPTER}.0`, "diagnostics", message, resolve));
@@ -1200,11 +1236,11 @@ function instanceFiles(harness) {
         walk(file);
       } else {
         const stat = fs.statSync(file);
-        files[path.relative(harness.testDir, file)] = `${stat.size} ${stat.mtimeMs}`;
+        files[path.relative(internals(harness).testDir, file)] = `${stat.size} ${stat.mtimeMs}`;
       }
     }
   };
-  const data = path.join(harness.testDir, "iobroker-data");
+  const data = path.join(internals(harness).testDir, "iobroker-data");
   walk(path.join(data, `${ADAPTER}.0`));
   walk(path.join(data, "files", `${ADAPTER}.0`));
   return files;
@@ -1386,9 +1422,12 @@ async function takePorts(ports, address) {
     await new Promise((resolve, reject) => {
       holder.once("error", reject);
       if (protocol === "udp") {
-        holder.bind({ port, address: all ? "::" : address, exclusive: true }, resolve);
+        /** @type {import("node:dgram").Socket} */ (holder).bind(
+          { port, address: all ? "::" : address, exclusive: true },
+          () => resolve(undefined),
+        );
       } else {
-        holder.listen(port, all ? "::" : address, resolve);
+        /** @type {import("node:net").Server} */ (holder).listen(port, all ? "::" : address, () => resolve(undefined));
       }
     });
     held.push(holder);
@@ -1404,7 +1443,9 @@ async function takePorts(ports, address) {
  * @param {Array<{ close: (cb: () => void) => void }>} held the holders of takePorts
  */
 function releasePorts(held) {
-  const closed = Promise.all(held.map(h => new Promise(resolve => h.close(() => resolve()))));
+  const closed = Promise.all(
+    held.map(h => /** @type {Promise<void>} */ (new Promise(resolve => h.close(() => resolve())))),
+  );
   return Promise.race([closed, new Promise(resolve => setTimeout(resolve, 1000).unref())]);
 }
 
@@ -1797,7 +1838,7 @@ tests.integration(ADAPTER_DIR, {
           await restarts.done;
           await waitForAdapterWork(harness);
           use = networkUse(seen);
-          strangers = await askFromAnotherNetwork(use, CHOSEN_ADDRESS);
+          strangers = await askFromAnotherNetwork(use, /** @type {string} */ (CHOSEN_ADDRESS));
         });
 
         it("uses only the chosen address", function () {
@@ -1805,7 +1846,7 @@ tests.integration(ADAPTER_DIR, {
             use.length > 0,
             "the network hook recorded nothing — a start without NETWORK_HOOK as its last hook",
           );
-          const wrong = offTheAddress(use, CHOSEN_ADDRESS);
+          const wrong = offTheAddress(use, /** @type {string} */ (CHOSEN_ADDRESS));
           assert.deepStrictEqual(wrong, [], `network use off ${CHOSEN_ADDRESS}:\n${wrong.join("\n")}`);
         });
 
