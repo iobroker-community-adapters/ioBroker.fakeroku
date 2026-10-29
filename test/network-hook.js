@@ -195,7 +195,11 @@ const hangOpen = new Map();
 const hangStart = (host, port) => {
   const key = `${host} ${port}`;
   hangOpen.set(key, (hangOpen.get(key) ?? 0) + 1);
-  fs.appendFileSync(calls, `${JSON.stringify({ t: Date.now(), kind: "hang-start", host, port })}\n`);
+  // round 157 (inventory-template audit V21): a hung attempt a command opened carries it — the command suite holds its
+  // window until the adapter gave each one up
+  const cause = command.getStore();
+  const rec = { t: Date.now(), kind: "hang-start", host, port };
+  fs.appendFileSync(calls, `${JSON.stringify(cause === undefined ? rec : { ...rec, cause })}\n`);
 };
 const hangEnd = (host, port) => {
   fs.appendFileSync(calls, `${JSON.stringify({ t: Date.now(), kind: "hang-end", host, port })}\n`);
@@ -378,6 +382,12 @@ net.Socket.prototype.connect = cutConnect;
 const socketEmit = /** @type {Native} */ (net.Socket.prototype.emit);
 /** @this {net.Socket} */
 function cutSocketEmit(event, ...args) {
+  // Round 157 (fleet-suite audit): the switch holds at once, also on a connection opened before — the interval below drops
+  // it within 100 ms, and an answer in that gap reached the adapter while every counterpart was cut
+  if (event === "data" && open.has(this) && down()) {
+    this.destroy(reset());
+    return false;
+  }
   if (event === "data" && open.has(this)) {
     silenceIfHung(this);
   }
@@ -400,6 +410,10 @@ const socketWrite = /** @type {Native} */ (net.Socket.prototype.write);
 // commands there, and until now only the connections were counted, so no command limit was ever judged.
 /** @this {net.Socket} */
 function causeWrite(...args) {
+  if (open.has(this) && down()) {
+    this.destroy(reset());
+    return false;
+  }
   silenceIfHung(this);
   const target = targets.get(this);
   if (target !== undefined && open.has(this) && rawOut.has(this)) {
@@ -621,6 +635,11 @@ const cutFetch = (...args) => {
   }
   if (target !== undefined && hung(target, targetPort)) {
     const signal = args[1]?.signal ?? (args[0] instanceof Request ? args[0].signal : undefined);
+    // Round 157 (fleet-suite audit): a real fetch with a signal already aborted rejects at once — `abort` never fires
+    // again, and the hung call stood as "never ended" in D21
+    if (signal?.aborted) {
+      return Promise.reject(signal.reason ?? new DOMException("aborted", "AbortError"));
+    }
     hangStart(target, targetPort);
     return new Promise((_resolve, reject) => {
       signal?.addEventListener("abort", () => {

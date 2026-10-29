@@ -1,60 +1,69 @@
 // Fleet master (.consistency-master/src/lib/network-address.test.ts) — never edit the copy in an adapter.
-import { describe, expect, it } from "vitest";
-import { networkInterfaces } from "node:os";
+import type * as Os from "node:os";
+import { describe, expect, it, vi } from "vitest";
 import { carriesAddress, chosenAddress, isOwnPeer, localNets, ownNets, type InterfaceMap } from "./network-address";
 
-const IFACES: InterfaceMap = {
-  lo0: [
-    {
-      address: "127.0.0.1",
-      netmask: "255.0.0.0",
-      family: "IPv4",
-      mac: "00:00:00:00:00:00",
-      internal: true,
-      cidr: "127.0.0.1/8",
-    },
-  ],
-  eth0: [
-    {
-      address: "192.168.1.5",
-      netmask: "255.255.255.0",
-      family: "IPv4",
-      mac: "aa:aa:aa:aa:aa:aa",
-      internal: false,
-      cidr: "192.168.1.5/24",
-    },
-    {
-      address: "2001:db8::5",
-      netmask: "ffff:ffff:ffff:ffff::",
-      family: "IPv6",
-      mac: "aa:aa:aa:aa:aa:aa",
-      internal: false,
-      cidr: "2001:db8::5/64",
-      scopeid: 0,
-    },
-  ],
-  iot: [
-    {
-      address: "192.0.2.2",
-      netmask: "255.255.255.0",
-      family: "IPv4",
-      mac: "bb:bb:bb:bb:bb:bb",
-      internal: false,
-      cidr: null,
-    },
-    {
-      address: "FE80::1%iot",
-      netmask: "ffff:ffff:ffff:ffff::",
-      family: "IPv6",
-      mac: "bb:bb:bb:bb:bb:bb",
-      internal: false,
-      cidr: null,
-      scopeid: 3,
-    },
-  ],
-  odd: [{ address: "x", netmask: "x", family: "IPX" as "IPv4", mac: "", internal: false, cidr: null }],
-  none: undefined,
-};
+// Round 157 (master audit M21/M22): the defaults read `os.networkInterfaces()` — the tests read the machine's own
+// interfaces before (counted with the code's own filter, or expected only `false`), so they measured the machine. The
+// module is replaced: the default must hand over exactly these interfaces.
+const { IFACES } = vi.hoisted((): { IFACES: InterfaceMap } => ({
+  IFACES: {
+    lo0: [
+      {
+        address: "127.0.0.1",
+        netmask: "255.0.0.0",
+        family: "IPv4",
+        mac: "00:00:00:00:00:00",
+        internal: true,
+        cidr: "127.0.0.1/8",
+      },
+    ],
+    eth0: [
+      {
+        address: "192.168.1.5",
+        netmask: "255.255.255.0",
+        family: "IPv4",
+        mac: "aa:aa:aa:aa:aa:aa",
+        internal: false,
+        cidr: "192.168.1.5/24",
+      },
+      {
+        address: "2001:db8::5",
+        netmask: "ffff:ffff:ffff:ffff::",
+        family: "IPv6",
+        mac: "aa:aa:aa:aa:aa:aa",
+        internal: false,
+        cidr: "2001:db8::5/64",
+        scopeid: 0,
+      },
+    ],
+    iot: [
+      {
+        address: "192.0.2.2",
+        netmask: "255.255.255.0",
+        family: "IPv4",
+        mac: "bb:bb:bb:bb:bb:bb",
+        internal: false,
+        cidr: null,
+      },
+      {
+        address: "FE80::1%iot",
+        netmask: "ffff:ffff:ffff:ffff::",
+        family: "IPv6",
+        mac: "bb:bb:bb:bb:bb:bb",
+        internal: false,
+        cidr: null,
+        scopeid: 3,
+      },
+    ],
+    odd: [{ address: "x", netmask: "x", family: "IPX" as "IPv4", mac: "", internal: false, cidr: null }],
+    none: undefined,
+  },
+}));
+vi.mock("node:os", async importOriginal => ({
+  ...(await importOriginal<typeof Os>()),
+  networkInterfaces: () => IFACES,
+}));
 
 describe("chosenAddress", () => {
   it("reads every wildcard and the empty value as every address", () => {
@@ -79,10 +88,7 @@ describe("localNets", () => {
   });
 
   it("reads the host's own interfaces when given none", () => {
-    const own = Object.values(networkInterfaces())
-      .flat()
-      .filter(i => i && !i.internal).length;
-    expect(localNets().length).toBe(own);
+    expect(localNets()).toEqual(localNets(IFACES));
   });
 });
 
@@ -100,6 +106,7 @@ describe("carriesAddress", () => {
   });
 
   it("reads the host's own interfaces when given none", () => {
+    expect(carriesAddress("192.168.1.5")).toBe(true);
     expect(carriesAddress("192.0.2.1")).toBe(false);
   });
 });
@@ -121,7 +128,7 @@ describe("ownNets", () => {
   });
 
   it("reads the host's own interfaces when given none", () => {
-    expect(ownNets(undefined)).toEqual(localNets());
+    expect(ownNets(undefined)).toEqual(localNets(IFACES));
   });
 });
 
@@ -158,6 +165,7 @@ describe("isOwnPeer", () => {
   });
 
   it("reads the host's own interfaces when given none", () => {
-    expect(isOwnPeer("192.0.2.77", undefined)).toBe(false);
+    expect(isOwnPeer("192.168.1.77", undefined)).toBe(true);
+    expect(isOwnPeer("10.47.4.9", undefined)).toBe(false);
   });
 });

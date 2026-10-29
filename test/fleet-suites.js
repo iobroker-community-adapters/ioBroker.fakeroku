@@ -11,10 +11,7 @@
 //                                       error · D9 a button falls back to false, confirmed — a press the adapter drops
 //                                       itself stays unconfirmed (GV-13), proven by a press alone that reaches nothing ·
 //                                       D4 the stop leaves every
-//                                       marker offline, every reason text `Unknown`, the sums at 0/false, and nothing is
-//                                       written after the unload callback (resource probe) · D17 no datagram to
-//                                       255.255.255.255, and every own address it names to others is the chosen one
-//                                       (network hook, section 8 — the records of every suite before count too)
+//                                       marker offline, every reason text `Unknown`, the sums at 0/false
 //   (in the same start)                D3 the connection test answers `result` while the counterpart is there and `error` while it
 //                                       is cut — a test that answers from memory says `result` both times; a throttled
 //                                       test declares its spacing (`spacingMs`), the suite waits it between the two
@@ -35,12 +32,15 @@
 //   "one device gone while the channel lives" D6 one device stays in the account's list and stops answering: only
 //                                       that one goes unreachable (a marker already down before counts not; counted by
 //                                       device, a device may carry several markers)
-//   "every call to a hung counterpart ends" D21 a start with every counterpart hung, held past the deadline: every
-//                                       call that hung — there and in the hang suites of the template — ended within
-//                                       the deadline while its process lived
+//   "every call to a hung counterpart ends" D21 a start with every counterpart hung, held until each call of its first
+//                                       window ended or outlived the deadline: every call that hung — there and in the
+//                                       hang suites of the template — ended within the deadline while its process lived
 //   "every writable datapoint reaches the adapter" D10 (no start) every writable state of the inventory reached the
 //                                       adapter's stateChange in this run (resource probe; the commands of the
 //                                       template's suite "a command nobody answers stays unconfirmed")
+//   "the whole run"                     (no start, round 157) D4 nothing is written after the unload callback in any stop
+//                                       of the run (resource probe) · D17 no datagram to 255.255.255.255, and every own
+//                                       address it names to others is the chosen one (network hook, section 8)
 const fs = require("node:fs");
 const path = require("node:path");
 const assert = require("node:assert");
@@ -75,7 +75,8 @@ const RENAME_SWITCH = "INVENTORY_RENAME";
 const REJECT_LOGIN_SWITCH = "INVENTORY_REJECT_LOGIN";
 const DROP_DEVICE_SWITCH = "INVENTORY_DROP_DEVICE";
 const KEYS = ["connectionTest", "groupSwitches", "rename", "rejectLogin", "dropDevice"];
-// D6/C26b: how long each wrong answer lasts — several cycles of every fleet poll; D21: the window the calls are counted in.
+// D6 (one device gone): how long the suite holds the dropped device — several cycles of every fleet poll (round 157: the
+// wrong answers hold by FAULT_IDLE_MS/FAULT_CAP_MS below, the comment named that suite).
 const FAULT_HOLD_MS = 60000;
 // D6/C26b (round 124, red-proof run 2026-10-16): a wrong answer lasts until every request of a clean start met one, or
 // no new request met one for longer than a 60 s backoff, at most three minutes.
@@ -84,6 +85,10 @@ const FAULT_CAP_MS = 180000;
 const BACKOFF_WINDOW_MS = 120000;
 const SETTLE_MS = 10000;
 const START_MS = 60000;
+// Round 157 (fleet-suite audit): the first start of a suite had no limit of its own — only the mocha timeout (up to 33 min
+// in the wrong-answers suite) ended a start that hung, with a message that named nothing. Twice START_MS: a full first start
+// measured about 30 s on the CI runner.
+const FIRST_START_MS = 2 * START_MS;
 // D21: how long the start with every counterpart hung outlives the deadline — the pulse of the network hook beats every 2 s
 const HANG_SLACK_MS = 15000;
 // D21: the retry-after the network hook sends with every 429 (section 7), and the slack around its first answer.
@@ -159,6 +164,43 @@ function emptiedOf(clean, before, after) {
       (!(id in after) || EMPTY.has(after[id]?.val)),
   );
 }
+// D6/C26b (round 157, fleet-suite audit F6): a value of the clean start the adapter emptied WHILE a wrong answer was played —
+// the before/after picture missed one emptied and filled again inside the window (deletions had their listener already).
+function emptiedDuring(clean, before, empties, at) {
+  return [
+    ...new Set(
+      empties
+        .filter(([id, when]) => when >= at && id in clean && !EMPTY.has(clean[id]?.val) && !EMPTY.has(before[id]?.val))
+        .map(([id]) => id),
+    ),
+  ];
+}
+// D21 (round 157, fleet-suite audit F17): the calls to a host before the retry-after of its first 429 ran out — a call
+// once there stays (a later one never moves the first), so the window ends at the first and the verdict is the same.
+function retryTooEarly(calls) {
+  const byHost = new Map();
+  for (const c of calls) {
+    byHost.set(c.host, [...(byHost.get(c.host) ?? []), c.t]);
+  }
+  const early = [];
+  for (const [host, times] of byHost) {
+    const first = Math.min(...times);
+    const again = times.filter(when => when > first + RETRY_GRACE_MS && when < first + RETRY_AFTER_MS - RETRY_GRACE_MS);
+    if (again.length > 0) {
+      early.push(`${host}: ${again.length} call(s), the first ${again[0] - first} ms after a 429 with retry-after 60`);
+    }
+  }
+  return early;
+}
+// D12 (round 157, fleet-suite audit F3): after a restart waitForAdapterWork ends at once (the values exist from the first
+// start), so the tree was counted before the adapter rebuilt it — "0 changed, no line" was green without a proof. The
+// suite waits for the balance line or a state set that holds still for SWITCH_STILL_POLLS seconds, at most
+// SWITCH_SETTLE_CAP_MS.
+const SWITCH_STILL_POLLS = 5;
+const SWITCH_SETTLE_CAP_MS = 60000;
+function sameIds(a, b) {
+  return a.size === b.size && [...a].every(id => b.has(id));
+}
 // D6 (round 141, yamaha 2026-10-22: every receiver carries info.connection and one reachable flag per transport, 32
 // markers on 8 devices, and one dropped receiver turned 2 to 4 of them false): the suite counts DEVICES, not markers. A
 // marker belongs to the nearest object above it whose type is "device", else to the first id segment under the namespace.
@@ -202,6 +244,54 @@ async function droppedPress(harness, id, opts) {
     }
   }
   return false;
+}
+// D21 (round 157, fleet-suite audit): the hang suite slept a fixed since + deadline + slack (135 s) — and since its start
+// alone takes up to 30 s, a call that never ended could hardly ever be judged (that needs it older than the deadline while
+// its process lives). The calls judged are those that began within `windowMs` of the first hung call; the suite holds until
+// each has ended or is open past the deadline plus one pulse of the network hook (2 s) — the verdict below reads the same
+// records. "none": no call hung yet.
+const PULSE_SLACK_MS = 3000;
+function hangDecided(calls, windowMs, deadlineMs, now) {
+  const starts = calls.filter(c => c.kind === "hang-start");
+  if (starts.length === 0) {
+    return "none";
+  }
+  const first = Math.min(...starts.map(c => c.t));
+  const open = new Map();
+  for (const c of [...calls].sort((a, b) => a.t - b.t)) {
+    const key = `${c.host} ${c.port}`;
+    if (c.kind === "hang-start") {
+      open.set(key, [...(open.get(key) ?? []), c.t]);
+    } else if (c.kind === "hang-end") {
+      (open.get(key) ?? []).shift();
+    }
+  }
+  const undecided = [...open.values()]
+    .flat()
+    .filter(t => t < first + windowMs && now - t <= deadlineMs + PULSE_SLACK_MS);
+  return undecided.length === 0 ? "decided" : "open";
+}
+// D21 (round 157): under a 500 to every answer only a host called at least twice in the second minute is judged, red when
+// the fourth minute holds as many calls or more — once the second minute is over and no host qualifies, or one host is red
+// already, the verdict cannot change (the suite slept all four minutes).
+function errorCountsByHost(calls, since) {
+  const byHost = new Map();
+  for (const c of calls) {
+    const w = Math.floor((c.t - since) / ERROR_WINDOW_MS);
+    if (w >= 0 && w < ERROR_WINDOWS) {
+      const counts = byHost.get(c.host) ?? new Array(ERROR_WINDOWS).fill(0);
+      counts[w]++;
+      byHost.set(c.host, counts);
+    }
+  }
+  return byHost;
+}
+function backoffSettled(byHost, minute) {
+  if (minute < 2) {
+    return false;
+  }
+  const judged = [...byHost.values()].filter(counts => counts[1] >= 2);
+  return judged.length === 0 || judged.some(counts => counts[ERROR_WINDOWS - 1] >= counts[1]);
 }
 // D11 (round 133, govee CI 39408072351): when each state was last written — the template's dumpStates carries val and ack
 // only, so D11 read no time, counted no data and was red for every adapter whose data kept arriving.
@@ -336,9 +426,18 @@ module.exports = function fleetSuites(suite, ctx) {
           .readFileSync(path.join(RESOURCE_DIR, f), "utf8")
           .split("\n")
           .filter(Boolean)
-          .map(l => JSON.parse(l)),
+          .map(l => ({ ...JSON.parse(l), pid: f.slice(0, -".requests".length) })),
       )
       .filter(r => r.t >= from && r.t < until);
+  // round 157 (fleet-suite audit F20): the processes that ran before a restart — what the dying one sends while it stops
+  // is no answer of the restarted adapter
+  const pidsOf = suffix =>
+    new Set(
+      fs
+        .readdirSync(RESOURCE_DIR)
+        .filter(f => f.endsWith(suffix))
+        .map(f => f.slice(0, -suffix.length)),
+    );
   const declared = readDeclarations(ADAPTER_DIR);
   const manifest = require(path.join(ADAPTER_DIR, "io-package.json"));
   const takesMessages = Boolean(manifest.common?.messagebox || manifest.common?.supportedMessages);
@@ -352,7 +451,11 @@ module.exports = function fleetSuites(suite, ctx) {
     await resetInstanceNative(harness, await fixtureNative());
     await setSystemLanguage(harness, language);
     const restarts = playControllerRestarts(harness, null, ...hooks);
-    await harness.startAdapterAndWait(false, adapterEnv(...hooks));
+    await withinDeadline(
+      harness.startAdapterAndWait(false, adapterEnv(...hooks)),
+      FIRST_START_MS,
+      "the adapter did not start",
+    );
     await feedFixtures(harness);
     await restarts.done;
     await waitForAdapterWork(harness);
@@ -373,7 +476,11 @@ module.exports = function fleetSuites(suite, ctx) {
       harness = getHarness();
       await start(harness, FIRST_LANGUAGE, ...NET);
       const line = harness.getLogs().length;
-      await sleep(QUIET_WINDOW_MS);
+      // round 157 (fleet-suite audit F13): a loud line is the verdict at once — only a quiet run needs the whole window
+      const until = Date.now() + QUIET_WINDOW_MS;
+      while (Date.now() < until && !harness.getLogs().slice(line).some(loud)) {
+        await sleep(1000);
+      }
       quiet = harness
         .getLogs()
         .slice(line)
@@ -477,13 +584,18 @@ module.exports = function fleetSuites(suite, ctx) {
         "fleet.json suites.connectionTest declares a test, but the adapter carries no test/network-hook.js to cut its counterpart",
       );
       const spacing = spacingOf(test);
-      this.timeout(2 * ANSWER_MS + 10000 + spacing);
+      this.timeout(3 * ANSWER_MS + 10000 + 2 * spacing);
       const there = await ask(harness, test.command, test.message ?? {});
       await sleep(spacing);
       let cut;
+      let again;
       fs.writeFileSync(OUTAGE_FLAG, "");
       try {
         cut = await ask(harness, test.command, test.message ?? {});
+        // round 157 (fleet-suite audit F4): the same cut twice — D14 compares this text with the second language, and a
+        // text with changing parts (a time, a counter) would differ there without a word translated
+        await sleep(spacing);
+        again = await ask(harness, test.command, test.message ?? {});
       } finally {
         fs.rmSync(OUTAGE_FLAG, { force: true });
       }
@@ -496,31 +608,10 @@ module.exports = function fleetSuites(suite, ctx) {
         typeof cut?.error === "string" && cut.error.length > 0,
         `with every counterpart cut the test answered ${JSON.stringify(cut)} — a test that asks for real gets { error }`,
       );
-    });
-
-    it("sends no datagram to 255.255.255.255 — a broadcast comes from address and netmask (D17)", function () {
-      const wide = [
-        ...new Set(
-          netRecords()
-            .filter(r => r.kind === "send" && r.host === "255.255.255.255")
-            .map(r => `port ${r.port}`),
-        ),
-      ];
-      assert.deepStrictEqual(wide, [], `datagrams to the limited broadcast address:\n${wide.join("\n")}`);
-    });
-
-    it("names only the chosen address of this machine to others (D17)", function () {
-      const other = [
-        ...new Set(
-          netRecords()
-            .filter(r => r.kind === "advertise" && r.address !== CHOSEN_ADDRESS)
-            .map(r => `${r.via} ${r.address}`),
-        ),
-      ];
-      assert.deepStrictEqual(
-        other,
-        [],
-        `addresses of this machine named to others that are not the chosen one (${CHOSEN_ADDRESS}):\n${other.join("\n")}`,
+      assert.strictEqual(
+        again?.error,
+        cut.error,
+        "the cut test answered two different texts — D14 cannot tell a translation from a changing text",
       );
     });
 
@@ -558,34 +649,25 @@ module.exports = function fleetSuites(suite, ctx) {
       }
       assert.deepStrictEqual(wrong, [], `after the stop:\n${wrong.join("\n")}`);
     });
-
-    it("writes nothing after its unload callback (D4)", function () {
-      // resource probe: every stop of this run — a write after the callback never reaches the database
-      const records = probeLines(".unload");
-      const late = [...new Set(records.filter(r => r.kind === "write").map(r => `${r.via} ${r.id}`))];
-      if (!records.some(r => r.kind === "callback")) {
-        console.log("      no stop of this run called its unload callback — js-controller ended it after stopTimeout");
-      }
-      assert.deepStrictEqual(
-        late,
-        [],
-        `written after the unload callback (lost — callback() comes after the last write):\n${late.join("\n")}`,
-      );
-    });
   });
 
   suite("answers in the system language", getHarness => {
     let harness;
     let test;
+    let there;
     let cut;
     before(async function () {
-      this.timeout(240000);
+      this.timeout(240000 + 2 * ANSWER_MS + SPACING_CAP_MS);
       test = declared("connectionTest");
       if (test === null) {
         return;
       }
       harness = getHarness();
       await start(harness, SECOND_LANGUAGE, ...NET);
+      // round 157 (fleet-suite audit F4): the test answers `result` first — a cut answer of a test not ready yet differs
+      // from the first language for another reason than the language
+      there = await ask(harness, test.command, test.message ?? {});
+      await sleep(spacingOf(test));
       fs.writeFileSync(OUTAGE_FLAG, "");
       try {
         cut = await ask(harness, test.command, test.message ?? {});
@@ -602,6 +684,10 @@ module.exports = function fleetSuites(suite, ctx) {
       assert.ok(
         firstLanguageError !== undefined,
         'the test of D3 in "a quiet run and a clean stop" measured no error text to compare with',
+      );
+      assert.ok(
+        there && there.result !== undefined && there.error === undefined,
+        `with the counterpart there the test answered ${JSON.stringify(there)} in ${SECOND_LANGUAGE} — { result } is due`,
       );
       assert.ok(typeof cut?.error === "string" && cut.error.length > 0, `the cut test answered ${JSON.stringify(cut)}`);
       assert.notStrictEqual(
@@ -641,6 +727,22 @@ module.exports = function fleetSuites(suite, ctx) {
         const line = harness.getLogs().length;
         await restartAsTheHost(harness, null, `for the group switch ${key}`);
         await waitForAdapterWork(harness);
+        const settle = Date.now() + SWITCH_SETTLE_CAP_MS;
+        let seen = stateIds(await dumpObjects(harness));
+        for (let still = 0; still < SWITCH_STILL_POLLS && Date.now() < settle;) {
+          if (
+            harness
+              .getLogs()
+              .slice(line)
+              .some(l => own(l) && BALANCE_RE.test(l.message))
+          ) {
+            break;
+          }
+          await sleep(1000);
+          const now = stateIds(await dumpObjects(harness));
+          still = sameIds(now, seen) ? still + 1 : 0;
+          seen = now;
+        }
         const after = stateIds(await dumpObjects(harness));
         lines[key] = {
           changed: [...after].filter(id => !before.has(id)).length + [...before].filter(id => !after.has(id)).length,
@@ -750,7 +852,11 @@ module.exports = function fleetSuites(suite, ctx) {
         await resetInstanceNative(harness, await fixtureNative());
         await setSystemLanguage(harness, FIRST_LANGUAGE);
         const restarts = playControllerRestarts(harness, null, ...NET);
-        await harness.startAdapterAndWait(false, adapterEnv(...NET));
+        await withinDeadline(
+          harness.startAdapterAndWait(false, adapterEnv(...NET)),
+          FIRST_START_MS,
+          "the adapter did not start with its login rejected",
+        );
         await restarts.done;
         await sleep(QUIET_WINDOW_MS);
         const objects = await dumpObjects(harness);
@@ -799,6 +905,7 @@ module.exports = function fleetSuites(suite, ctx) {
     // every object the adapter deletes while a wrong answer is played — a delete followed by a re-creation in the same
     // window leaves no trace in a before/after comparison (red-proof run 2026-10-16)
     const deletions = [];
+    const empties = [];
     let refusedCalls = [];
     let errorCalls = [];
     let errorSince = 0;
@@ -824,6 +931,11 @@ module.exports = function fleetSuites(suite, ctx) {
           deletions.push([id, Date.now()]);
         }
       });
+      harness.on("stateChange", (id, state) => {
+        if (id.startsWith(NS) && state && EMPTY.has(state.val) && state.from === `system.adapter.${ADAPTER}.0`) {
+          empties.push([id, Date.now()]);
+        }
+      });
       const clean = new Set(readRequests(since).map(r => r.key));
       const cleanStates = await dumpStates(harness);
       try {
@@ -832,11 +944,12 @@ module.exports = function fleetSuites(suite, ctx) {
           const states = await dumpStates(harness);
           fs.writeFileSync(FAULT_FLAG, mode);
           const at = Date.now();
+          const old = pidsOf(".requests");
           await restartAsTheHost(harness, null, `with ${mode} answers`, ...NET);
           const met = () =>
             new Set(
               readRequests(at)
-                .filter(r => r.fault === mode)
+                .filter(r => r.fault === mode && !old.has(r.pid))
                 .map(r => r.key),
             );
           let seen = 0;
@@ -873,7 +986,12 @@ module.exports = function fleetSuites(suite, ctx) {
                 ...deletions.filter(([id, when]) => when >= at && id in objects).map(([id]) => id),
               ]),
             ],
-            emptied: emptiedOf(cleanStates, states, after),
+            emptied: [
+              ...new Set([
+                ...emptiedOf(cleanStates, states, after),
+                ...emptiedDuring(cleanStates, states, empties, at),
+              ]),
+            ],
           };
           if (!verdicts[mode].running) {
             return;
@@ -881,14 +999,28 @@ module.exports = function fleetSuites(suite, ctx) {
         }
         fs.writeFileSync(FAULT_FLAG, "429");
         const t1 = Date.now();
+        const before429 = pidsOf(".calls");
         await restartAsTheHost(harness, null, "with 429 answers", ...NET);
-        await sleep(BACKOFF_WINDOW_MS);
-        refusedCalls = readCalls().filter(c => c.kind === "http" && !c.hook && c.t >= t1);
+        const refusedNow = () =>
+          readCalls().filter(c => c.kind === "http" && !c.hook && c.t >= t1 && !before429.has(c.pid));
+        while (Date.now() < t1 + BACKOFF_WINDOW_MS && retryTooEarly(refusedNow()).length === 0) {
+          await sleep(1000);
+        }
+        refusedCalls = refusedNow();
         fs.writeFileSync(FAULT_FLAG, "500all");
         errorSince = Date.now();
+        const before500 = pidsOf(".calls");
         await restartAsTheHost(harness, null, "with a 500 to every answer", ...NET);
-        await sleep(Math.max(0, errorSince + ERROR_WINDOWS * ERROR_WINDOW_MS - Date.now()));
-        errorCalls = readCalls().filter(c => c.kind === "http" && !c.hook && c.t >= errorSince);
+        const errorsNow = () =>
+          readCalls().filter(c => c.kind === "http" && !c.hook && c.t >= errorSince && !before500.has(c.pid));
+        while (Date.now() < errorSince + ERROR_WINDOWS * ERROR_WINDOW_MS) {
+          const minute = Math.floor((Date.now() - errorSince) / ERROR_WINDOW_MS);
+          if (backoffSettled(errorCountsByHost(errorsNow(), errorSince), minute)) {
+            break;
+          }
+          await sleep(1000);
+        }
+        errorCalls = errorsNow();
       } finally {
         fs.rmSync(FAULT_FLAG, { force: true });
       }
@@ -934,22 +1066,7 @@ module.exports = function fleetSuites(suite, ctx) {
       }
       // network hook, section 7: every 429 says `retry-after: 60`; the calls of the first two seconds may be in flight
       // together, any later one before the minute is up ignores the rate limit (mcm1957: 429 is a rate limit)
-      const early = [];
-      const byHost = new Map();
-      for (const c of refusedCalls) {
-        byHost.set(c.host, [...(byHost.get(c.host) ?? []), c.t]);
-      }
-      for (const [host, times] of byHost) {
-        const first = Math.min(...times);
-        const again = times.filter(
-          when => when > first + RETRY_GRACE_MS && when < first + RETRY_AFTER_MS - RETRY_GRACE_MS,
-        );
-        if (again.length > 0) {
-          early.push(
-            `${host}: ${again.length} call(s), the first ${again[0] - first} ms after a 429 with retry-after 60`,
-          );
-        }
-      }
+      const early = retryTooEarly(refusedCalls);
       assert.deepStrictEqual(early, [], `calls before the retry-after of a 429 ran out:\n${early.join("\n")}`);
     });
 
@@ -961,15 +1078,7 @@ module.exports = function fleetSuites(suite, ctx) {
       // a 500 to every answer for four minutes: the first minute holds the start, the second against the fourth is the
       // verdict — a host the adapter calls at least twice in the second minute and as often or more in the fourth gets no
       // backoff; a host called less is not measured here (printed, not judged)
-      const byHost = new Map();
-      for (const c of errorCalls) {
-        const w = Math.floor((c.t - errorSince) / ERROR_WINDOW_MS);
-        if (w < ERROR_WINDOWS) {
-          const counts = byHost.get(c.host) ?? new Array(ERROR_WINDOWS).fill(0);
-          counts[w]++;
-          byHost.set(c.host, counts);
-        }
-      }
+      const byHost = errorCountsByHost(errorCalls, errorSince);
       const steady = [];
       for (const [host, counts] of byHost) {
         console.log(`      ${host}: ${counts.join(" / ")} call(s) per minute under a 500 to every answer`);
@@ -1059,7 +1168,8 @@ module.exports = function fleetSuites(suite, ctx) {
 
   // The hang suites of the template end a process before a hung call is due (homeconnect: a command hangs 30 s, then
   // the stop — red-proof run 2026-10-16), so this suite starts once with every counterpart hung and holds the process
-  // past the deadline; the verdict reads its records and those the hang suites left in RESOURCE_DIR.
+  // until each call of the first window has ended or is open past the deadline (hangDecided, round 157); the verdict
+  // reads its records and those the hang suites left in RESOURCE_DIR.
   suite("every call to a hung counterpart ends", getHarness => {
     let since;
     before(async function () {
@@ -1075,9 +1185,26 @@ module.exports = function fleetSuites(suite, ctx) {
       since = Date.now();
       try {
         const restarts = playControllerRestarts(harness, null, ...NET);
-        await harness.startAdapterAndWait(false, adapterEnv(...NET));
+        await withinDeadline(
+          harness.startAdapterAndWait(false, adapterEnv(...NET)),
+          FIRST_START_MS,
+          "the adapter did not start with every counterpart hung",
+        );
         await restarts.done;
-        await sleep(Math.max(0, since + HANG_DEADLINE_MS + HANG_SLACK_MS - Date.now()));
+        const started = Date.now();
+        const cap = since + START_MS + HANG_DEADLINE_MS + HANG_SLACK_MS;
+        while (Date.now() < cap) {
+          const state = hangDecided(
+            readCalls().filter(c => c.t >= since),
+            HANG_SLACK_MS,
+            HANG_DEADLINE_MS,
+            Date.now(),
+          );
+          if (state === "decided" || (state === "none" && Date.now() >= started + HANG_SLACK_MS)) {
+            break;
+          }
+          await sleep(1000);
+        }
       } finally {
         fs.rmSync(HANG_FILE, { force: true });
       }
@@ -1161,6 +1288,51 @@ module.exports = function fleetSuites(suite, ctx) {
       );
     });
   });
+
+  // Round 157 (fleet-suite audit): the records of the WHOLE run, read after its last start — in the first suite they saw
+  // only the stops and network records up to there; every later stop (language, group switch, rename, the six processes of
+  // the wrong answers, the dropped device, the hang) went unjudged. No start of its own.
+  suite("the whole run", () => {
+    it("writes nothing after its unload callback, in any stop of the run (D4)", function () {
+      // resource probe: a write after the callback never reaches the database
+      const records = probeLines(".unload");
+      const late = [...new Set(records.filter(r => r.kind === "write").map(r => `${r.via} ${r.id}`))];
+      if (!records.some(r => r.kind === "callback")) {
+        console.log("      no stop of this run called its unload callback — js-controller ended it after stopTimeout");
+      }
+      assert.deepStrictEqual(
+        late,
+        [],
+        `written after the unload callback (lost — callback() comes after the last write):\n${late.join("\n")}`,
+      );
+    });
+
+    it("sends no datagram to 255.255.255.255 — a broadcast comes from address and netmask (D17)", function () {
+      const wide = [
+        ...new Set(
+          netRecords()
+            .filter(r => r.kind === "send" && r.host === "255.255.255.255")
+            .map(r => `port ${r.port}`),
+        ),
+      ];
+      assert.deepStrictEqual(wide, [], `datagrams to the limited broadcast address:\n${wide.join("\n")}`);
+    });
+
+    it("names only the chosen address of this machine to others (D17)", function () {
+      const other = [
+        ...new Set(
+          netRecords()
+            .filter(r => r.kind === "advertise" && r.address !== CHOSEN_ADDRESS)
+            .map(r => `${r.via} ${r.address}`),
+        ),
+      ];
+      assert.deepStrictEqual(
+        other,
+        [],
+        `addresses of this machine named to others that are not the chosen one (${CHOSEN_ADDRESS}):\n${other.join("\n")}`,
+      );
+    });
+  });
 };
 module.exports.workshopMutexProblem = workshopMutexProblem;
 module.exports.spacingOf = spacingOf;
@@ -1170,3 +1342,9 @@ module.exports.emptiedOf = emptiedOf;
 module.exports.devicesOf = devicesOf;
 module.exports.stampsOf = stampsOf;
 module.exports.droppedPress = droppedPress;
+module.exports.hangDecided = hangDecided;
+module.exports.errorCountsByHost = errorCountsByHost;
+module.exports.backoffSettled = backoffSettled;
+module.exports.emptiedDuring = emptiedDuring;
+module.exports.retryTooEarly = retryTooEarly;
+module.exports.sameIds = sameIds;

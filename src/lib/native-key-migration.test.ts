@@ -214,7 +214,23 @@ describe("buildCommonKeyPatch", () => {
     const table: NativeKeyMigration[] = KEPT_COMMON_KEYS.map(k => ({ commonDrop: k }));
     const common = Object.fromEntries(KEPT_COMMON_KEYS.map(k => [k, "user value"]));
     expect(buildCommonKeyPatch(common, table)).toEqual({});
-    expect(KEPT_COMMON_KEYS).toEqual(expect.arrayContaining(["title", "enabled", "custom", "supportedMessages"]));
+    // round 157 (master audit M24): the list itself from its source — the table above is built from it, so a key struck
+    // from the list stayed green. `preserveAttributes` of js-controller (7.2.5, lib/setup/setupUpload.js, measured
+    // 2026-10-28 in the throwaway controller), the keys the controller maintains itself, and `supportedMessages`
+    expect(KEPT_COMMON_KEYS).toEqual([
+      "title",
+      "schedule",
+      "restartSchedule",
+      "mode",
+      "loglevel",
+      "enabled",
+      "custom",
+      "tier",
+      "visWidgets",
+      "localLinks",
+      "compact",
+      "supportedMessages",
+    ]);
   });
 
   it("takes a key literally, even one with a trailing space", () => {

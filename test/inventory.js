@@ -705,13 +705,16 @@ const RECORDING = "inventory-recording.0";
  * @param {Record<string, ioBroker.Object>} previous the previous release's inventory
  */
 async function seedPrevious(harness, previous) {
-  for (const [id, obj] of Object.entries(previous)) {
-    const common =
-      obj.type === "state"
-        ? { ...obj.common, custom: { ...obj.common?.custom, [RECORDING]: { enabled: true, origin: id } } }
-        : obj.common;
-    await harness.objects.setObjectAsync(id, { ...obj, common });
-  }
+  // round 157 (inventory-template audit V31): the objects are independent — written together, not one after the other
+  await Promise.all(
+    Object.entries(previous).map(([id, obj]) => {
+      const common =
+        obj.type === "state"
+          ? { ...obj.common, custom: { ...obj.common?.custom, [RECORDING]: { enabled: true, origin: id } } }
+          : obj.common;
+      return harness.objects.setObjectAsync(id, { ...obj, common });
+    }),
+  );
 }
 
 /** Round 67: the text a dump puts where the adapter stored a secret encrypted with its installation's secret. */
@@ -829,6 +832,9 @@ async function playOutage(harness, watch) {
   try {
     await waitForStates(harness, OUTAGE_SHOWN, "the adapter did not show the outage");
     const shown = Date.now();
+    // round 157 (inventory-template audit V33): each phase says how long it took — the suite's minutes were not to be told
+    // apart in a log before
+    console.log(`      outage shown after ${Math.round((shown - outage.cut) / 1000)} s`);
     await new Promise(resolve => setTimeout(resolve, Math.max(OUTAGE_HOLD_MS, shown - outage.cut)));
   } finally {
     // A cut that stays on after a failed wait would cut every later suite of the run too.
@@ -837,6 +843,7 @@ async function playOutage(harness, watch) {
   }
   try {
     await waitForStates(harness, before, "the adapter did not show the return");
+    console.log(`      return shown after ${Math.round((Date.now() - outage.back) / 1000)} s`);
     await new Promise(resolve => setTimeout(resolve, SETTLE_MS));
   } finally {
     harness.removeListener("stateChange", record);
@@ -884,6 +891,7 @@ function channel(c) {
 function startHang() {
   const calls = readCalls().filter(c => !c.kind.startsWith("hang-"));
   const opened = new Map();
+  /** @type {Record<string, number>} */
   const usual = {};
   for (const c of calls) {
     opened.set(c.pid, opened.get(c.pid) ?? c.t);
@@ -913,11 +921,13 @@ function startHang() {
  * @param {{ hung: string | null, others: string[], usual: Record<string, number>, since: number }} hang what startHang chose
  */
 async function playHang(harness, hang, restarts) {
+  let fed = Promise.resolve();
+  let played;
   try {
     if (hang.hung === null) {
       return { ...hang, calls: [] };
     }
-    const fed = feedFixtures(harness).then(
+    fed = feedFixtures(harness).then(
       () => undefined,
       err => err,
     );
@@ -937,11 +947,14 @@ async function playHang(harness, hang, restarts) {
       }
       await new Promise(resolve => setTimeout(resolve, 500));
     }
-    void fed;
-    return { ...hang, calls };
+    played = { ...hang, calls };
   } finally {
     fs.rmSync(HANG_FLAG, { force: true });
   }
+  // Round 157 (inventory-template audit V18): feedFixtures may wait on the hung counterpart — released, it ends before the
+  // next suite starts (at most START_DEADLINE_MS); left running it fed into the next suite's fresh database
+  await Promise.race([fed, new Promise(resolve => setTimeout(resolve, START_DEADLINE_MS))]);
+  return played;
 }
 
 /**
@@ -1009,15 +1022,18 @@ async function playHangMidRun(harness, restarts) {
   if (hang.hung !== null) {
     fs.writeFileSync(HANG_FLAG, hang.hung);
   }
+  let played;
   try {
     while (hang.hung !== null && Date.now() < hang.since + HANG_DEADLINE_MS) {
       await new Promise(resolve => setTimeout(resolve, 500));
     }
-    void fed;
-    return { ...hang, pid, end: Date.now(), calls: readCalls().filter(c => c.pid === pid && c.t >= warm) };
+    played = { ...hang, pid, end: Date.now(), calls: readCalls().filter(c => c.pid === pid && c.t >= warm) };
   } finally {
     fs.rmSync(HANG_FLAG, { force: true });
   }
+  // Round 157 (V18): as in playHang — the feed ends before the next suite, at most START_DEADLINE_MS
+  await Promise.race([fed, new Promise(resolve => setTimeout(resolve, START_DEADLINE_MS))]);
+  return played;
 }
 
 /**
@@ -1138,10 +1154,31 @@ function commandValue(common, now) {
 }
 
 /**
+ * Round 157 (inventory-template audit V21): the moment the adapter gave up the last hung attempt a command opened (its
+ * `hang-start` carries the command as its cause, network hook) — 0 when no command hung, null while one is still open.
+ *
+ * @param {number} since the first command
+ */
+function commandGaveUp(since) {
+  const open = new Map();
+  let last = 0;
+  for (const c of readCalls().filter(c => c.t >= since)) {
+    const key = `${c.host} ${c.port}`;
+    if (c.kind === "hang-start") {
+      open.set(key, [...(open.get(key) ?? []), c.cause !== undefined]);
+    } else if (c.kind === "hang-end" && open.get(key)?.length && open.get(key).shift()) {
+      last = c.t;
+    }
+  }
+  return [...open.values()].some(list => list.includes(true)) ? null : last;
+}
+
+/**
  * Round 101 (krobi 2026-10-07 15:54, GV-13 as the fleet rule for every adapter that talks to devices: never set ack true
  * unless the device confirmed it): every counterpart hangs and nothing reaches the adapter any more (the
  * network hook with `*` in HANG_FLAG), then every writable state of the adapter gets one command (commandValue), and the
- * suite waits COMMAND_WINDOW_MS. Returns the commands, every `ack: true` the adapter wrote on them, and every call the
+ * suite waits COMMAND_WINDOW_MS — since round 157 at least, and until every hung attempt of a command was given up plus
+ * SETTLE_MS (commandGaveUp). Returns the commands, every `ack: true` the adapter wrote on them, and every call the
  * hook counted with a command as its cause — the calls a command made, awaited or not.
  *
  * @param {import("@iobroker/testing").IntegrationTestHarness} harness
@@ -1178,6 +1215,20 @@ async function playCommands(harness) {
       }
     }
     await new Promise(resolve => setTimeout(resolve, COMMAND_WINDOW_MS));
+    // Round 157 (inventory-template audit V21): an adapter that confirms a command once its own timeout ran out did it
+    // unseen whenever that timeout is longer than the window — it stays open until every hung attempt of a command was
+    // given up and SETTLE_MS after it, at most HANG_DEADLINE_MS from the first command (a call that never ends is D21's)
+    for (
+      let gaveUp = commandGaveUp(run.since);
+      Date.now() < run.since + HANG_DEADLINE_MS;
+      gaveUp = commandGaveUp(run.since)
+    ) {
+      if (gaveUp !== null && Date.now() >= gaveUp + SETTLE_MS) {
+        break;
+      }
+      await new Promise(resolve => setTimeout(resolve, 500));
+    }
+    console.log(`      commands watched ${Math.round((Date.now() - run.since) / 1000)} s`);
   } finally {
     harness.removeListener("stateChange", acknowledged);
     fs.rmSync(HANG_FLAG, { force: true });
@@ -1298,7 +1349,9 @@ async function playReports(harness, watch) {
     values: await dumpStates(harness),
     deleted: watch.deleted.length,
     start: Date.now(),
+    /** @type {string[]} */
     writes: [],
+    /** @type {string[]} */
     onlineWrites: [],
   };
   const recordInto = list => (id, state) => {
@@ -1876,7 +1929,16 @@ tests.integration(ADAPTER_DIR, {
           // missing address may keep the adapter's state short of green (fakeroku F-06: yellow until changed).
           await feedFixtures(harness);
           await restarts.done;
-          lines = harness.getLogs().filter(l => l.from === `${ADAPTER}.0` && l.message.includes(MISSING_ADDRESS));
+          // Round 157 (inventory-template audit V24): the warning may come after the fixtures — wait for it (at most
+          // START_DEADLINE_MS), then SETTLE_MS for a second one; read at once, a warning a moment later turned it red
+          const naming = () =>
+            harness.getLogs().filter(l => l.from === `${ADAPTER}.0` && l.message.includes(MISSING_ADDRESS));
+          const warned = Date.now() + START_DEADLINE_MS;
+          while (Date.now() < warned && !naming().some(l => l.level === "warn" || l.level === "error")) {
+            await new Promise(resolve => setTimeout(resolve, 250));
+          }
+          await new Promise(resolve => setTimeout(resolve, SETTLE_MS));
+          lines = naming();
         });
 
         it("falls back to every address and warns once", function () {
@@ -1906,7 +1968,9 @@ tests.integration(ADAPTER_DIR, {
         let restarts;
         let reports;
         before(async function () {
-          this.timeout(3 * OUTAGE_DEADLINE_MS + 120000);
+          // round 157 (V28): three report rounds (each up to REPORT_DEADLINE_MS), the return after the silence and the
+          // outage shown again (each up to OUTAGE_DEADLINE_MS), and the start before them
+          this.timeout(3 * REPORT_DEADLINE_MS + 2 * OUTAGE_DEADLINE_MS + 240000);
           harness = getHarness();
           clearInstanceData(harness);
           watch = await watchObjectWrites(harness);
@@ -2460,6 +2524,19 @@ after(function () {
         .map(c => `${c.kind} ${c.host}:${c.port}`),
     ),
   ];
+  // Round 157 (inventory-template audit V13): `calls only counterparts it declares` reads the calls up to its own suite —
+  // every call after it (the commands, the reports, the fleet suites) is judged here, over the whole run; a copy without a
+  // counterpart (its sealed register) carries no apiLimits
+  const undeclared =
+    typeof apiLimits === "function" && fs.existsSync(API_LIMITS)
+      ? [
+          ...new Set(
+            readCalls()
+              .filter(c => !c.kind.startsWith("hang-") && !apiLimits().some(d => fits(c, d.match)))
+              .map(channel),
+          ),
+        ]
+      : [];
   fs.rmSync(RESOURCE_DIR, { recursive: true, force: true });
   assert.ok(starts.length > 0, "no adapter start loaded the resource probe — a start without adapterEnv()");
   assert.deepStrictEqual(silent, [], "adapter processes that never reached their exit (killed or crashed)");
@@ -2473,6 +2550,11 @@ after(function () {
     single,
     [],
     `read-only states read one by one from the database (one bulk getStatesAsync at the start, then compare in memory):\n${single.join("\n")}`,
+  );
+  assert.deepStrictEqual(
+    undeclared,
+    [],
+    `calls in the run to counterparts src/lib/api-limits.json does not declare:\n${undeclared.join("\n")}`,
   );
   assert.deepStrictEqual(
     away,
