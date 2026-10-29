@@ -40,7 +40,7 @@ For details and how to disable it, see the [Sentry plugin documentation](https:/
 
 - Node.js >= 22
 - js-controller >= 7.2.5
-- admin >= 8.2.0
+- admin >= 8.3.5
 
 ## Ports
 
@@ -124,7 +124,7 @@ More cases: [documentation](./docs/en/README.md#troubleshooting).
 - (krobipd) Improved: the README has a troubleshooting section.
 - (krobipd) Improved: the update notice links to the description of the object tree.
 - (krobipd) Changed: the interface setting is labelled "Network interface".
-- (krobipd) Changed: js-controller 7.2.5 and admin 8.2.0 or newer are required.
+- (krobipd) Changed: js-controller 7.2.5 and admin 8.3.5 or newer are required.
 
 ### 1.10.0 (2026-10-03)
 
