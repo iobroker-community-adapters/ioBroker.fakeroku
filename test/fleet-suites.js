@@ -22,7 +22,8 @@
 //   "a rejected login shows no connection" D11 (krobi 2026-10-16 07:38: no connection, then offline) after a rejected
 //                                       login info.connection is true only while data still arrives
 //   "a counterpart that answers wrong or refuses" D6 a 500 and an empty 200 · C26b drifted JSON: the adapter runs on,
-//                                       deletes no object and empties no value the clean start had (round 148),
+//                                       deletes no object and empties no value the clean start had (round 148) beyond
+//                                       what the same restart with right answers empties (round 163),
 //                                       each met by a restart (network hook,
 //                                       section 7 `fault`: the first answer to each request wrong, the repeat right),
 //                                       red as well when the wrong answers reached no request past the first one of a
@@ -164,16 +165,53 @@ function emptiedOf(clean, before, after) {
       (!(id in after) || EMPTY.has(after[id]?.val)),
   );
 }
+// D6/C26b (round 163, dl-manager CI 41098560273): the adapter's writes in the order the states arrived, and the host's
+// alive=false of each restart among them (GONE) — what the old process wrote before it, its stop, is no answer of the
+// restarted adapter (round 157 F20 for its requests). A missing mark would judge nothing, so it fails loudly.
+const GONE = "";
+function newProcessWrites(writes) {
+  const gone = writes.findIndex(([id]) => id === GONE);
+  assert.ok(
+    gone >= 0,
+    "the host's alive=false of a restart never reached the states — the restart play needs a new form",
+  );
+  return writes.slice(gone + 1);
+}
+// D6/C26b (round 163): per value of the clean start the empties the new process of a restart with right answers wrote
+// before its first value (dl-manager resets its speeds on every stop and start), and the values still waiting for one.
+function restartEmpties(clean, writes) {
+  const lead = {};
+  const filled = new Set();
+  for (const [id, empty] of newProcessWrites(writes)) {
+    if (!(id in clean) || EMPTY.has(clean[id]?.val) || filled.has(id)) {
+      continue;
+    }
+    if (empty) {
+      lead[id] = (lead[id] ?? 0) + 1;
+    } else {
+      filled.add(id);
+    }
+  }
+  return { lead, waiting: Object.keys(lead).filter(id => !filled.has(id)) };
+}
 // D6/C26b (round 157, fleet-suite audit F6): a value of the clean start the adapter emptied WHILE a wrong answer was played —
 // the before/after picture missed one emptied and filled again inside the window (deletions had their listener already).
-function emptiedDuring(clean, before, empties, at) {
-  return [
-    ...new Set(
-      empties
-        .filter(([id, when]) => when >= at && id in clean && !EMPTY.has(clean[id]?.val) && !EMPTY.has(before[id]?.val))
-        .map(([id]) => id),
-    ),
-  ];
+// Round 163: only the new process counts, and of its empties before a value only those beyond the clean restart's.
+function emptiedDuring(clean, before, writes, restart) {
+  const lead = {};
+  const filled = new Set();
+  const emptied = new Set();
+  for (const [id, empty] of newProcessWrites(writes)) {
+    if (!(id in clean) || EMPTY.has(clean[id]?.val) || EMPTY.has(before[id]?.val)) {
+      continue;
+    }
+    if (!empty) {
+      filled.add(id);
+    } else if (filled.has(id) || (lead[id] = (lead[id] ?? 0) + 1) > (restart[id] ?? 0)) {
+      emptied.add(id);
+    }
+  }
+  return [...emptied];
 }
 // D21 (round 157, fleet-suite audit F17): the calls to a host before the retry-after of its first 429 ran out — a call
 // once there stays (a later one never moves the first), so the window ends at the first and the verdict is the same.
@@ -905,7 +943,7 @@ module.exports = function fleetSuites(suite, ctx) {
     // every object the adapter deletes while a wrong answer is played — a delete followed by a re-creation in the same
     // window leaves no trace in a before/after comparison (red-proof run 2026-10-16)
     const deletions = [];
-    const empties = [];
+    const writes = [];
     let refusedCalls = [];
     let errorCalls = [];
     let errorSince = 0;
@@ -914,7 +952,7 @@ module.exports = function fleetSuites(suite, ctx) {
     // cloud answers wrong while the adapter comes up.
     before(async function () {
       this.timeout(
-        5 * (START_MS + FAULT_CAP_MS + SETTLE_MS) + 2 * BACKOFF_WINDOW_MS + ERROR_WINDOWS * ERROR_WINDOW_MS + 240000,
+        6 * (START_MS + FAULT_CAP_MS + SETTLE_MS) + 2 * BACKOFF_WINDOW_MS + ERROR_WINDOWS * ERROR_WINDOW_MS + 240000,
       );
       if (NET.length === 0) {
         return;
@@ -932,18 +970,33 @@ module.exports = function fleetSuites(suite, ctx) {
         }
       });
       harness.on("stateChange", (id, state) => {
-        if (id.startsWith(NS) && state && EMPTY.has(state.val) && state.from === `system.adapter.${ADAPTER}.0`) {
-          empties.push([id, Date.now()]);
+        if (id === `system.adapter.${ADAPTER}.0.alive` && state?.from === "system.host.testing") {
+          writes.push([GONE, false]);
+        } else if (id.startsWith(NS) && state && state.from === `system.adapter.${ADAPTER}.0`) {
+          writes.push([id, EMPTY.has(state.val)]);
         }
       });
       const clean = new Set(readRequests(since).map(r => r.key));
       const cleanStates = await dumpStates(harness);
       try {
+        // round 163: the same restart with right answers, held until each value its new process emptied came back
+        const cleanFrom = writes.length;
+        await restartAsTheHost(harness, null, "with right answers", ...NET);
+        const restarted = Date.now();
+        await sleep(SETTLE_MS);
+        while (
+          Date.now() - restarted < START_MS &&
+          restartEmpties(cleanStates, writes.slice(cleanFrom)).waiting.length > 0
+        ) {
+          await sleep(1000);
+        }
+        const restart = restartEmpties(cleanStates, writes.slice(cleanFrom)).lead;
         for (const mode of ["500", "empty", "drift"]) {
           const objects = await dumpObjects(harness);
           const states = await dumpStates(harness);
           fs.writeFileSync(FAULT_FLAG, mode);
           const at = Date.now();
+          const from = writes.length;
           const old = pidsOf(".requests");
           await restartAsTheHost(harness, null, `with ${mode} answers`, ...NET);
           const met = () =>
@@ -989,7 +1042,7 @@ module.exports = function fleetSuites(suite, ctx) {
             emptied: [
               ...new Set([
                 ...emptiedOf(cleanStates, states, after),
-                ...emptiedDuring(cleanStates, states, empties, at),
+                ...emptiedDuring(cleanStates, states, writes.slice(from), restart),
               ]),
             ],
           };
@@ -1346,5 +1399,6 @@ module.exports.hangDecided = hangDecided;
 module.exports.errorCountsByHost = errorCountsByHost;
 module.exports.backoffSettled = backoffSettled;
 module.exports.emptiedDuring = emptiedDuring;
+module.exports.restartEmpties = restartEmpties;
 module.exports.retryTooEarly = retryTooEarly;
 module.exports.sameIds = sameIds;
