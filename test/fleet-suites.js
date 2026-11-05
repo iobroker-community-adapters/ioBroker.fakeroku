@@ -127,6 +127,761 @@ function readDeclarations(adapterDir) {
 
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 
+// Round 165 (krobi 2026-10-31 01:33 and 02:10: why D06 is always the slowest part, and that no run could be debugged):
+// every suite, test, start, restart, stop and wait for the adapter's work as one JSON line in
+// $KROBI_RUN_DIR/d06-events.jsonl — the run of werkbank-run.py sets the folder; without it (the CI) nothing is written,
+// and a line that cannot be written changes no verdict. Each line names the adapter (npm's package name): a lab copy's
+// run folder has no state that would.
+const EVENTS = process.env.KROBI_RUN_DIR ? path.join(process.env.KROBI_RUN_DIR, "d06-events.jsonl") : null;
+// Round 165 (krobi 2026-11-01 16:17: every check has a key over exactly its inputs, nothing runs twice): D06 per suite.
+// pre-release.py names the suites whose key moved (KROBI_D06_ONLY, a JSON list of titles — every other suite is not
+// registered), the files the run writes as its output (KROBI_D06_WATCH) and a file for one line per suite
+// (KROBI_D06_RESULTS): its tests and hooks, what it left for the next suite, what it read of an earlier one, the output
+// files before and after it and which of them it read and wrote (a later suite reads test/objects.inventory.json, which
+// the first one writes). Without them (the CI) every suite runs, nothing is measured and nothing is written.
+const ONLY = process.env.KROBI_D06_ONLY ? new Set(JSON.parse(process.env.KROBI_D06_ONLY)) : null;
+const RESULTS = process.env.KROBI_D06_RESULTS || null;
+const WATCH = process.env.KROBI_D06_WATCH ? JSON.parse(process.env.KROBI_D06_WATCH) : [];
+// What the template's suiteState held where a suite left out would have ended (KROBI_D06_CARRY): `before` per title — the
+// state the suite after a left-out one starts from in the whole run —, `end` the state the root hooks judge with when the
+// last suites were left out. restoreState of the contract sets it; the suite's line says what it started from.
+const CARRY = process.env.KROBI_D06_CARRY ? JSON.parse(process.env.KROBI_D06_CARRY) : { before: {}, end: null };
+// fs as it is before the measurement below wraps it — the measurement reads through these
+const FS = { readdirSync: fs.readdirSync, readFileSync: fs.readFileSync, statSync: fs.statSync };
+// The state of the run between two suites. `suite`, `start`, `reads`, `cleared`, `read` and `wrote` belong to the suite
+// running: its title, its start, what it read of an earlier suite, whether it removed the instance data before its
+// adapter started, the output files it read and wrote. `first` is the world before the first suite and `firstStart` that
+// suite's start; `pending` is the suite whose line waits until its harness has stopped; `contract` is the template's
+// (withProtocol), `testDir` and `adapter` the harness's.
+/**
+ * @typedef {object} RunState
+ * @property {string} suite
+ * @property {number} start
+ * @property {string[]} reads
+ * @property {boolean} cleared
+ * @property {string[]} read
+ * @property {string[]} wrote
+ * @property {number} starts
+ * @property {ReturnType<typeof world> | null} first
+ * @property {number} firstStart
+ * @property {{ title: string, node: Mocha.Suite | undefined, at: number, before: Record<string, string>, start: string,
+ *   carried: boolean } | null} pending
+ * @property {boolean} span
+ * @property {{ RESOURCE_DIR: string, suiteState?: () => unknown, restoreState?: (state: any) => void } | null} contract
+ * @property {string} testDir
+ * @property {string} adapter
+ */
+/** @type {RunState} */
+const run = {
+  suite: "",
+  start: 0,
+  reads: [],
+  cleared: false,
+  read: [],
+  wrote: [],
+  starts: 0,
+  first: null,
+  firstStart: 0,
+  pending: null,
+  span: false,
+  contract: null,
+  testDir: "",
+  adapter: "",
+};
+function result(line) {
+  if (!RESULTS) {
+    return;
+  }
+  try {
+    fs.appendFileSync(RESULTS, `${JSON.stringify(line)}\n`);
+  } catch {
+    // a lost line never changes a verdict — pre-release.py runs D06 whole without it
+  }
+}
+/** The master's own state between two suites — each suite must leave it as the first one found it. */
+function masterState() {
+  return {
+    suite: run.suite,
+    start: run.start,
+    reads: run.reads,
+    cleared: run.cleared,
+    read: run.read,
+    wrote: run.wrote,
+    starts: run.starts,
+    pending: run.pending !== null,
+    titles: protocolledTitles.size,
+  };
+}
+/** A value as stable text: a Set and a Map by their entries, an object by its sorted keys, a function by its name. */
+function stateText(value) {
+  const open = new Set();
+  const walk = v => {
+    if (typeof v === "function") {
+      return `<function ${v.name}>`;
+    }
+    if (typeof v === "bigint" || typeof v === "symbol") {
+      return String(v);
+    }
+    if (v === undefined) {
+      return "<undefined>";
+    }
+    if (!v || typeof v !== "object") {
+      return v;
+    }
+    if (open.has(v)) {
+      return "<cycle>";
+    }
+    open.add(v);
+    try {
+      if (v instanceof Set) {
+        return { "<Set>": [...v].map(walk) };
+      }
+      if (v instanceof Map) {
+        return { "<Map>": [...v].map(([k, x]) => [walk(k), walk(x)]) };
+      }
+      if (Array.isArray(v)) {
+        return v.map(walk);
+      }
+      return Object.fromEntries(
+        Object.keys(v)
+          .sort()
+          .map(k => [k, walk(v[k])]),
+      );
+    } finally {
+      open.delete(v);
+    }
+  };
+  return JSON.stringify(walk(value));
+}
+const sha256 = data => require("node:crypto").createHash("sha256").update(data).digest("hex");
+/**
+ * Each file below `dir` (path relative to it → its sha256), the names `skip` returns true for left out.
+ *
+ * @param {string} dir the folder
+ * @param {(name: string) => boolean} [skip] the paths (relative, with `/`) to leave out
+ * @returns {Record<string, string>} path → sha256
+ */
+function filesOf(dir, skip = () => false) {
+  /** @type {Record<string, string>} */
+  const out = {};
+  const walk = (at, rel) => {
+    let entries = [];
+    try {
+      entries = FS.readdirSync(at, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const e of entries) {
+      const name = rel ? `${rel}/${e.name}` : e.name;
+      if (skip(name)) {
+        continue;
+      }
+      if (e.isDirectory()) {
+        walk(path.join(at, e.name), name);
+      } else {
+        try {
+          out[name] = sha256(FS.readFileSync(path.join(at, e.name)));
+        } catch {
+          out[name] = "<unreadable>";
+        }
+      }
+    }
+  };
+  walk(dir, "");
+  return out;
+}
+// what @iobroker/testing resets before each suite (the two databases it restores, the folder it empties, the databases'
+// own backups) and the instance data, whose reader the start measures (startsFromEarlier)
+const CONTROLLER_RESET = /^(?:(?:objects|states)\.jsonl.*|sqlite|backup-objects)(?:\/|$)/;
+/** The template's suiteState as stable text (plain values: restoreState gets them back through JSON). */
+function suiteStateText() {
+  try {
+    return stateText(run.contract?.suiteState?.() ?? null);
+  } catch (err) {
+    return JSON.stringify(`<suiteState unreadable: ${err instanceof Error ? err.message : err}>`);
+  }
+}
+/**
+ * Sets the template's suiteState to `text` (KROBI_D06_CARRY) — false when the contract has no restoreState or it throws.
+ *
+ * @param {string} text the state as suiteStateText wrote it
+ */
+function restoreSuiteState(text) {
+  try {
+    run.contract?.restoreState?.(JSON.parse(text));
+    return typeof run.contract?.restoreState === "function";
+  } catch {
+    return false;
+  }
+}
+/**
+ * The state one suite can leave for the next: the environment, the flags of RESOURCE_DIR (its files that are no record
+ * `<pid|time>.<kind>`), the controller's data folder past what @iobroker/testing resets, both state functions.
+ */
+function world() {
+  const dir = run.contract?.RESOURCE_DIR;
+  const flags = dir ? filesOf(dir, name => /^\d+\./.test(name)) : {};
+  const suiteState = suiteStateText();
+  const controller = run.testDir
+    ? filesOf(
+        path.join(run.testDir, "iobroker-data"),
+        name => CONTROLLER_RESET.test(name) || name === `${run.adapter}.0`,
+      )
+    : {};
+  return { env: { ...process.env }, flags, controller, suiteState, masterState: stateText(masterState()) };
+}
+/**
+ * What `now` holds that `first` did not, by name: environment variables, flags, controller files, the master's state. The
+ * template's suiteState is no such leftover: each line says what its suite started from and ended with (`start`,
+ * `state`), and a suite after one left out starts from what that one ended with (KROBI_D06_CARRY).
+ */
+function leftBehind(first, now) {
+  const left = [];
+  const differ = (what, a, b) => {
+    for (const k of new Set([...Object.keys(a), ...Object.keys(b)])) {
+      if (a[k] !== b[k]) {
+        left.push(`${what} ${k}`);
+      }
+    }
+  };
+  differ("env", first.env, now.env);
+  differ("flag", first.flags, now.flags);
+  differ("controller", first.controller, now.controller);
+  if (now.masterState !== first.masterState) {
+    left.push("masterState");
+  }
+  return left;
+}
+/**
+ * Each file the run writes as its output (KROBI_D06_WATCH) → its sha256, a missing one as such.
+ *
+ * @returns {Record<string, string>} path → sha256 or "<absent>"
+ */
+function outputState() {
+  return Object.fromEntries(
+    WATCH.map(file => {
+      try {
+        return [file, sha256(FS.readFileSync(file))];
+      } catch {
+        return [file, "<absent>"];
+      }
+    }),
+  );
+}
+/** The absolute path an fs call names (a string, a Buffer or a file URL), or null (a descriptor). */
+function pathOf(file) {
+  try {
+    if (typeof file === "string") {
+      return path.resolve(file);
+    }
+    if (Buffer.isBuffer(file)) {
+      return path.resolve(file.toString());
+    }
+    if (file instanceof URL) {
+      return require("node:url").fileURLToPath(file);
+    }
+  } catch {
+    // not a path
+  }
+  return null;
+}
+const inside = (full, dir) => Boolean(full && dir) && (full === dir || full.startsWith(`${dir}${path.sep}`));
+const resources = () => (run.contract?.RESOURCE_DIR ? path.resolve(run.contract.RESOURCE_DIR) : "");
+const instanceData = () => (run.testDir ? path.join(run.testDir, "iobroker-data", `${run.adapter}.0`) : "");
+/** A suite read what an earlier suite left: `why` names the channel ("records", "instance data"). */
+function readEarlier(why) {
+  if (run.start > 0 && !run.reads.includes(why)) {
+    run.reads.push(why);
+  }
+}
+/** A record an earlier suite made: born (a record only grows) after the first suite began and before this one. */
+function madeEarlier(full) {
+  try {
+    const s = FS.statSync(full);
+    const born = s.birthtimeMs > 0 ? s.birthtimeMs : s.mtimeMs;
+    return born >= run.firstStart && born < run.start;
+  } catch {
+    return false;
+  }
+}
+/** A file at or below `full` last written before this suite began. */
+function olderInside(full) {
+  let s;
+  try {
+    s = FS.statSync(full);
+  } catch {
+    return false;
+  }
+  if (!s.isDirectory()) {
+    return s.mtimeMs < run.start;
+  }
+  try {
+    return FS.readdirSync(full).some(name => olderInside(path.join(full, name)));
+  } catch {
+    return true;
+  }
+}
+// Every fs call of this process is measured while a suite runs (pre-release.py only, KROBI_D06_RESULTS): a listing of
+// RESOURCE_DIR outside recordFiles reads whatever earlier suites left — so it does in a run where they did not run —, and
+// a record an earlier suite made holds its records; the instance data a suite did not remove first is what an earlier
+// suite left, and a file in it older than the suite as well. Such a suite needs every suite before it. An output file
+// (KROBI_D06_WATCH) a suite reads or writes is noted by its path — an open by its flags (fs.readFileSync opens through
+// fs.openSync, so a read is also an open for reading). The measurement only looks: each call returns and throws as fs
+// does.
+const LISTINGS = new Set(["readdirSync", "opendirSync", "readdir", "opendir"]);
+const READS = ["readFileSync", "statSync", "lstatSync", "existsSync", "accessSync", "openSync", "createReadStream"];
+const READS_ASYNC = ["readFile", "stat", "lstat", "access", "open", "exists"];
+const REMOVALS = ["rmSync", "rmdirSync", "rm", "rmdir"];
+const WRITES = [
+  "writeFileSync",
+  "appendFileSync",
+  "writeFile",
+  "appendFile",
+  "createWriteStream",
+  "truncateSync",
+  "truncate",
+  "unlinkSync",
+  "unlink",
+  ...REMOVALS,
+];
+// these name a second file the call changes: the target of a copy, both ends of a move
+const MOVES = new Set(["copyFileSync", "copyFile", "cpSync", "cp", "renameSync", "rename"]);
+// an open writes when its flags say so ("r" when it names none)
+const OPENS = new Set(["openSync", "open"]);
+const WRITE_BITS =
+  fs.constants.O_WRONLY | fs.constants.O_RDWR | fs.constants.O_APPEND | fs.constants.O_TRUNC | fs.constants.O_CREAT;
+const opensToWrite = flags =>
+  typeof flags === "string" ? /[wa+]/.test(flags) : typeof flags === "number" && (flags & WRITE_BITS) !== 0;
+const note = (list, file) => {
+  const full = pathOf(file);
+  if (full && WATCH.includes(full) && !list.includes(full)) {
+    list.push(full);
+  }
+};
+function wrote(name, file, rest) {
+  if (run.start === 0) {
+    return;
+  }
+  if (OPENS.has(name) && !opensToWrite(rest[0])) {
+    return;
+  }
+  note(run.wrote, file);
+  if (MOVES.has(name)) {
+    note(run.wrote, rest[0]);
+  }
+}
+function looked(name, file, rest) {
+  if (run.start === 0) {
+    return;
+  }
+  if (!MOVES.has(name) && !(OPENS.has(name) && opensToWrite(rest[0]))) {
+    note(run.read, file);
+  }
+  const full = pathOf(file);
+  if (inside(full, resources()) && !run.reads.includes("records") && (LISTINGS.has(name) || madeEarlier(full))) {
+    readEarlier("records");
+  }
+  if (inside(full, instanceData()) && !run.reads.includes("instance data") && (!run.cleared || olderInside(full))) {
+    readEarlier("instance data");
+  }
+}
+function removed(name, file) {
+  if (run.start > 0 && inside(instanceData(), pathOf(file))) {
+    run.cleared = true;
+  }
+}
+if (RESULTS) {
+  const wrap = (target, name, measure) => {
+    const original = target?.[name];
+    if (typeof original !== "function") {
+      return;
+    }
+    /** @this {unknown} */
+    const wrapper = function (file, ...rest) {
+      try {
+        measure(name, file, rest);
+      } catch {
+        // the measurement never changes what fs does
+      }
+      return original.call(this, file, ...rest);
+    };
+    // what the function carries beyond itself (fs.exists its promisified form)
+    for (const key of Reflect.ownKeys(original)) {
+      const own = Object.getOwnPropertyDescriptor(original, key);
+      if (own && !(typeof key === "string" && ["length", "name", "prototype"].includes(key))) {
+        Object.defineProperty(wrapper, key, own);
+      }
+    }
+    target[name] = wrapper;
+  };
+  /** @type {Map<string, Array<(name: string, file: unknown, rest: unknown[]) => void>>} */
+  const measures = new Map();
+  const add = (names, measure) => names.forEach(n => measures.set(n, [...(measures.get(n) ?? []), measure]));
+  add([...LISTINGS, ...READS, ...READS_ASYNC], looked);
+  add(REMOVALS, removed);
+  add([...WRITES, ...MOVES, ...OPENS], wrote);
+  for (const target of [fs, fs.promises]) {
+    for (const [name, list] of measures) {
+      wrap(target, name, (n, file, rest) => list.forEach(measure => measure(n, file, rest)));
+    }
+  }
+}
+/**
+ * The record files `<pid|time><suffix>` of RESOURCE_DIR last written at or after `from` (ms) — the one way a suite reads
+ * the run's records. A file last written before `from` holds no record after it. `from` before the suite's own start (0:
+ * the whole run) reads what earlier suites left, and so does a file an earlier suite made: the suite then needs every
+ * suite before it — unless the master declares it in RUN_WIDE.
+ *
+ * @param {string} dir RESOURCE_DIR
+ * @param {string} suffix ".calls", ".net", ".requests", …
+ * @param {number} [from] the earliest time of interest (ms)
+ * @returns {string[]} the file names
+ */
+function recordFiles(dir, suffix, from = 0) {
+  if (from < run.start) {
+    readEarlier("records");
+  }
+  return FS.readdirSync(dir).filter(f => {
+    if (!f.endsWith(suffix)) {
+      return false;
+    }
+    const full = path.join(dir, f);
+    try {
+      if (from > 0 && FS.statSync(full).mtimeMs < from) {
+        return false;
+      }
+    } catch {
+      return false;
+    }
+    if (madeEarlier(full)) {
+      readEarlier("records");
+    }
+    return true;
+  });
+}
+/**
+ * The JSON lines of recordFiles, each with the `pid` (or time) its file name starts with.
+ *
+ * @param {string} dir RESOURCE_DIR
+ * @param {string} suffix ".calls", ".net", ".requests", …
+ * @param {number} [from] the earliest time of interest (ms)
+ * @returns {object[]} the records, file by file
+ */
+function recordLines(dir, suffix, from = 0) {
+  return recordFiles(dir, suffix, from).flatMap(f => {
+    let text = "";
+    try {
+      text = FS.readFileSync(path.join(dir, f), "utf8");
+    } catch {
+      return [];
+    }
+    return text
+      .split("\n")
+      .filter(Boolean)
+      .map(l => ({ ...JSON.parse(l), pid: f.slice(0, -suffix.length) }));
+  });
+}
+function protocolEvent(step, fields = {}) {
+  if (!EVENTS) {
+    return;
+  }
+  try {
+    const line = {
+      t: Date.now() / 1000,
+      pid: process.pid,
+      part: "fleet-suites",
+      adapter: process.env.npm_package_name ?? "",
+      step,
+      suite: run.suite,
+      ...fields,
+    };
+    fs.appendFileSync(EVENTS, `${JSON.stringify(line)}\n`);
+  } catch {
+    // the protocol never changes a verdict
+  }
+}
+async function timed(step, fields, work) {
+  const at = Date.now();
+  protocolEvent(`${step}-start`, { ...fields, t: at / 1000 });
+  try {
+    return await work;
+  } finally {
+    // one clock reading for the line's end and its seconds — two straddled a millisecond tick and moved its begin
+    const now = Date.now();
+    protocolEvent(step, { ...fields, s: (now - at) / 1000, t: now / 1000 });
+  }
+}
+// Round 165 (R165-159, lab runs 2026-11-02 00:12 and 00:50 on the fakeroku copy: of the eight calls of its hook the
+// protocol measured the master's four, the template's suites make the other four themselves): the wait for the adapter's
+// work as one "work-wait" line with its seconds, wherever it is called. The template builds its hook through it; a hook
+// built without it (an adapter before its next release) is measured here for the master's suites, and one built with it
+// is never measured twice. The mark sits on the function, not in a set of the master: nothing of the master changes as
+// the template loads.
+const MEASURED = Symbol("work-wait");
+function workWaitOf(work) {
+  if (work[MEASURED]) {
+    return work;
+  }
+  // the hook is called once the wait's line is open (review 2026-11-02): called first, the template's hook opened its own
+  // window before the wait began, and `analyse` counted that time as a wait and as a window
+  const measured = (...args) =>
+    timed(
+      "work-wait",
+      {},
+      Promise.resolve().then(() => work(...args)),
+    );
+  measured[MEASURED] = true;
+  return measured;
+}
+// Round 165 (krobi 2026-10-31 23:07 and 23:08: one uniform build for every wait, as a whole): every wait of a
+// suite, the master's and the template's, goes through this one helper and is its own line in the protocol — its name,
+// its cap and the seconds it took. `done` decides how it ends: without it the whole window (a window that proves something
+// does not happen, or a pause the suite plays); a promise ends it when it settles; a function is asked at once, after every
+// pause of `every` ms and once more at the cap, and ends it at its first truthy answer, which the wait returns. A cap of
+// Infinity leaves the deadline to `done` (one that moves with the process started last).
+function waitWindow(name, ms, done, every = 1000) {
+  const cap = Math.max(0, ms);
+  const wait = async () => {
+    if (done === undefined) {
+      await sleep(cap);
+      return undefined;
+    }
+    if (typeof done !== "function") {
+      let timer;
+      try {
+        return await Promise.race([done, new Promise(resolve => (timer = setTimeout(resolve, cap)))]);
+      } finally {
+        clearTimeout(timer);
+      }
+    }
+    const until = Date.now() + cap;
+    let got;
+    while (!(got = await done()) && Date.now() < until) {
+      await sleep(Math.min(every, until - Date.now()));
+    }
+    return got;
+  };
+  return timed("window", { name, ms: cap }, wait());
+}
+// every start and stop of a suite's harness as its own line, wherever the suite calls it — each harness once. A start
+// without the wait for "ready" (the template's "a taken port") is a start too; the one the waiting start makes inside
+// (@iobroker/testing 6.3.1 calls this.startAdapter synchronously) is the same start. Round 165: every start measures
+// whether the adapter meets instance data an earlier suite left — @iobroker/testing resets the databases before each
+// suite, never the instance data folder: it does unless the suite removed the folder before, or a file in it is older
+// than the suite.
+const TIMED = Symbol("fleet-suites timed");
+function startsFromEarlier() {
+  if (RESULTS && run.start > 0 && (!run.cleared || olderInside(instanceData()))) {
+    readEarlier("instance data");
+  }
+}
+function protocolHarness(harness) {
+  if (harness && typeof harness === "object" && !harness[TIMED]) {
+    harness[TIMED] = true;
+    if (typeof harness.testDir === "string") {
+      run.testDir = harness.testDir;
+      run.adapter = harness.adapterName;
+    }
+    const startAndWait = harness.startAdapterAndWait.bind(harness);
+    const startOnly = harness.startAdapter.bind(harness);
+    const stop = harness.stopAdapter.bind(harness);
+    let inner = false;
+    const begin = (work, args) => {
+      inner = true;
+      try {
+        if (run.start > 0) {
+          run.starts++;
+        }
+        startsFromEarlier();
+        return timed("start", {}, work(...args));
+      } finally {
+        inner = false;
+      }
+    };
+    harness.startAdapterAndWait = (...args) => begin(startAndWait, args);
+    harness.startAdapter = (...args) => (inner ? startOnly(...args) : begin(startOnly, args));
+    harness.stopAdapter = (...args) => timed("stop", {}, stop(...args));
+  }
+  return harness;
+}
+/** A mocha suite's verdicts: its tests by state, recursively, and its hooks that failed (a harness stop among them). */
+function tally(node) {
+  const out = { passed: 0, failed: 0, pending: 0, notRun: node ? 0 : 1, hooksFailed: 0 };
+  const walk = s => {
+    for (const t of s.tests ?? []) {
+      if (t.isPending?.()) {
+        out.pending++;
+      } else if (t.state === "passed") {
+        out.passed++;
+      } else if (t.state === "failed") {
+        out.failed++;
+      } else {
+        out.notRun++;
+      }
+    }
+    for (const h of [
+      ...(s._beforeAll ?? []),
+      ...(s._beforeEach ?? []),
+      ...(s._afterEach ?? []),
+      ...(s._afterAll ?? []),
+    ]) {
+      if (h.state === "failed") {
+        out.hooksFailed++;
+      }
+    }
+    for (const c of s.suites ?? []) {
+      walk(c);
+    }
+  };
+  if (node) {
+    walk(node);
+  }
+  return out;
+}
+/**
+ * The line of the suite that ran last, once its harness has stopped (the next suite's start, the end of all suites):
+ * its verdicts, what it left that the first suite did not find, what it read of an earlier suite, the output before and
+ * after it.
+ */
+function finishSuite() {
+  const p = run.pending;
+  if (!p) {
+    return;
+  }
+  const { reads, read, wrote: written, starts } = run;
+  run.pending = null;
+  run.suite = "";
+  run.start = 0;
+  run.reads = [];
+  run.cleared = false;
+  run.read = [];
+  run.wrote = [];
+  run.starts = 0;
+  if (RESULTS) {
+    result({
+      title: p.title,
+      ...tally(p.node),
+      left: run.first ? leftBehind(run.first, world()) : ["<no world before the first suite>"],
+      reads,
+      before: p.before,
+      after: outputState(),
+      read,
+      wrote: written,
+      start: p.start,
+      state: suiteStateText(),
+      carried: p.carried,
+      starts,
+      s: p.at ? (Date.now() - p.at) / 1000 : 0,
+    });
+  }
+}
+// Round 165 (lab run 2026-10-31 22:50: 28 s of a 224 s D06 before the first event): what @iobroker/testing does before
+// the first suite — its preparation of the controller and its own suite "Adapter startup" — as one span with the seconds
+// since the process started, and that suite's tests with mocha's duration. Registered once, where the template calls
+// withProtocol (@iobroker/testing's "User-defined tests"): it runs after "Adapter startup" and before the first suite;
+// its end finishes the last suite.
+const HARNESS_SPAN = "@iobroker/testing";
+function protocolHarnessSpan() {
+  if (run.span) {
+    return;
+  }
+  run.span = true;
+  before(function () {
+    const own = this?.test?.parent;
+    for (const sibling of own?.parent?.suites ?? []) {
+      if (sibling === own) {
+        break;
+      }
+      for (const test of sibling.tests ?? []) {
+        protocolEvent("test", {
+          suite: HARNESS_SPAN,
+          title: `${sibling.title}: ${test.title}`,
+          state: test.state,
+          s: (test.duration ?? 0) / 1000,
+        });
+      }
+    }
+    protocolEvent("suite", { suite: HARNESS_SPAN, s: process.uptime() });
+    // Round 165 (R165-94, krobi 2026-11-01 00:28): how many suites follow — the status window shows "Suite k von N"
+    protocolEvent("plan", {
+      suite: HARNESS_SPAN,
+      kind: "suite",
+      of: (own?.suites ?? []).filter(suite => protocolledTitles.has(suite.title)).length,
+    });
+  });
+  after(function () {
+    finishSuite();
+    // the last suites were left out: the root hooks judge with the state the whole run ends with
+    if (RESULTS && CARRY.end !== null && CARRY.end !== undefined) {
+      result({ end: restoreSuiteState(CARRY.end) ? suiteStateText() : "<not restored>" });
+    }
+  });
+}
+// The template's `suite` with a start and an end per suite and one line per test (mocha's duration and verdict). The
+// template wraps its own suites with it and hands the wrapped one to this file (lab run 2026-10-31 22:25: without that,
+// 103 s of a 222 s D06 left events), which wraps it no second time. Round 165: the template hands its contract along —
+// `{ RESOURCE_DIR, suiteState, restoreState }`, suiteState naming every binding of the template a function writes and
+// restoreState setting each of them again —, and a suite pre-release.py did not select (KROBI_D06_ONLY) is not registered.
+const PROTOCOLLED = Symbol("fleet-suites protocolled");
+const protocolledTitles = new Set();
+function withProtocol(suite, contract) {
+  protocolHarnessSpan();
+  if (contract) {
+    run.contract = contract;
+  }
+  if (suite?.[PROTOCOLLED]) {
+    return suite;
+  }
+  const wrapped = (title, body) => {
+    if (ONLY && !ONLY.has(title)) {
+      result({ title, registered: false });
+      return undefined;
+    }
+    protocolledTitles.add(title);
+    result({ title, registered: true });
+    return suite(title, getHarness => {
+      let at = 0;
+      before(function () {
+        finishSuite();
+        protocolHarness(getHarness());
+        // the suite before it was left out: it starts from the state that one ended with in the run that proved it
+        const carried =
+          RESULTS && typeof CARRY.before?.[title] === "string" ? restoreSuiteState(CARRY.before[title]) : true;
+        if (RESULTS && !run.first) {
+          run.first = world();
+        }
+        // measured before the suite counts as running: the master's own reads are no read of the suite
+        const outputs = RESULTS ? outputState() : {};
+        const start = RESULTS ? suiteStateText() : "";
+        at = Date.now();
+        run.suite = title;
+        run.start = at;
+        run.firstStart ||= at;
+        run.pending = { title, node: this?.test?.parent, at, before: outputs, start, carried };
+        protocolEvent("suite-start", { t: at / 1000 });
+      });
+      afterEach(function () {
+        const test = this.currentTest;
+        protocolEvent("test", { title: test?.title, state: test?.state, s: (test?.duration ?? 0) / 1000 });
+      });
+      body(() => protocolHarness(getHarness()));
+      after(function () {
+        // a suite whose start failed before its own hook ran: the line of the one before it, then its own — its end
+        // carries its own title (review 2026-11-02: it carried the one before it, and `analyse` set that suite to 0 s)
+        if (run.pending?.title !== title) {
+          finishSuite();
+          run.pending = { title, node: this?.test?.parent, at: 0, before: {}, start: "", carried: false };
+          run.suite = title;
+        }
+        const now = Date.now();
+        protocolEvent("suite", { s: at ? (now - at) / 1000 : 0, t: now / 1000 });
+      });
+    });
+  };
+  wrapped[PROTOCOLLED] = true;
+  return wrapped;
+}
+
 // D3 (round 132, govee 2026-10-20: a second test within 30 s answers from its throttle): the spacing an adapter
 // declares between two real connection tests. It only makes the suite wait — a spacing shorter than the throttle
 // leaves the cut test answered from the throttle, and D3 stays red. The cap only bounds a run against a wrong value
@@ -263,9 +1018,16 @@ function devicesOf(ids, objects) {
 // press, and a press of it alone meets a window without any call at all. The cause only makes a button red: a queue may
 // lose it (round 104, yamaha 11 of 436), so a call without it or with another one is ambiguous and the press is repeated.
 async function droppedPress(harness, id, opts) {
-  const { adapter, readCalls, since, windowMs = PRESS_ALONE_MS, tries = PRESS_TRIES, wait = sleep } = opts;
+  const {
+    adapter,
+    readCalls,
+    since,
+    windowMs = PRESS_ALONE_MS,
+    tries = PRESS_TRIES,
+    wait = ms => waitWindow("D9 a press alone", ms),
+  } = opts;
   const untouched = s => s?.val === true && s?.ack === false && s?.from !== `system.adapter.${adapter}.0`;
-  const ownCall = from => readCalls().some(c => c.cause === id && c.t >= from);
+  const ownCall = from => readCalls(from).some(c => c.cause === id && c.t >= from);
   if (!untouched(await harness.states.getStateAsync(id)) || ownCall(since)) {
     return false;
   }
@@ -273,7 +1035,7 @@ async function droppedPress(harness, id, opts) {
     const t = Date.now();
     await harness.states.setStateAsync(id, { val: true, ack: false });
     await wait(windowMs);
-    const calls = readCalls().filter(c => c.t >= t);
+    const calls = readCalls(t).filter(c => c.t >= t);
     if (!untouched(await harness.states.getStateAsync(id)) || calls.some(c => c.cause === id)) {
       return false;
     }
@@ -388,11 +1150,12 @@ function workshopMutexProblem(startDir) {
   }
 }
 
-module.exports = function fleetSuites(suite, ctx) {
+module.exports = function fleetSuites(templateSuite, ctx) {
   const mutexProblem = workshopMutexProblem(ctx.ADAPTER_DIR);
   if (mutexProblem) {
     throw new Error(mutexProblem);
   }
+  const suite = withProtocol(templateSuite);
   const {
     ADAPTER_DIR,
     ADAPTER,
@@ -406,10 +1169,8 @@ module.exports = function fleetSuites(suite, ctx) {
     fixtureNative,
     setSystemLanguage,
     playControllerRestarts,
-    restartAsTheHost,
     adapterEnv,
     feedFixtures,
-    waitForAdapterWork,
     dumpObjects,
     dumpStates,
     withinDeadline,
@@ -418,18 +1179,13 @@ module.exports = function fleetSuites(suite, ctx) {
     HANG_DEADLINE_MS,
     CHOSEN_ADDRESS,
   } = ctx;
-  const netRecords = () =>
-    fs
-      .readdirSync(RESOURCE_DIR)
-      .filter(f => f.endsWith(".net"))
-      .flatMap(f =>
-        fs
-          .readFileSync(path.join(RESOURCE_DIR, f), "utf8")
-          .split("\n")
-          .filter(Boolean)
-          .map(l => JSON.parse(l)),
-      )
-      .filter(r => !r.hook);
+  // round 165: every restart and wait of this file through the protocol, with its seconds — the starts and stops inside
+  // them, like every other, at the harness (protocolHarness)
+  const restartAsTheHost = (harness, ...rest) =>
+    timed("restart", { why: rest[1] }, ctx.restartAsTheHost(harness, ...rest));
+  const waitForAdapterWork = workWaitOf(ctx.waitForAdapterWork);
+  // round 165: every record through recordLines — `from` bounds it to this suite (0: the whole run, RUN_WIDE)
+  const netRecords = (from = 0) => recordLines(RESOURCE_DIR, ".net", from).filter(r => !r.hook);
   const FAULT_FLAG = path.join(RESOURCE_DIR, "fault");
   // network hook, section 4: `*` lets every counterpart hang
   const HANG_FILE = path.join(RESOURCE_DIR, "hang");
@@ -439,43 +1195,17 @@ module.exports = function fleetSuites(suite, ctx) {
     console.log(`      no test/network-hook.js — the adapter has no counterpart, ${what}`);
   };
   const httpCalls = (from, until = Infinity) =>
-    readCalls().filter(c => c.kind === "http" && c.t >= from && c.t < until && !c.hook).length;
+    readCalls(from).filter(c => c.kind === "http" && c.t >= from && c.t < until && !c.hook).length;
   // network hook: the JSON lines every process of the run wrote into RESOURCE_DIR/<pid><suffix>
-  const probeLines = suffix =>
-    fs
-      .readdirSync(RESOURCE_DIR)
-      .filter(f => f.endsWith(suffix))
-      .flatMap(f =>
-        fs
-          .readFileSync(path.join(RESOURCE_DIR, f), "utf8")
-          .split("\n")
-          .filter(Boolean)
-          .map(l => JSON.parse(l)),
-      );
+  const probeLines = (suffix, from = 0) => recordLines(RESOURCE_DIR, suffix, from);
   const stateIds = objects => new Set(Object.keys(objects).filter(id => objects[id]?.type === "state"));
   // network hook, section 7: every HTTP request of the adapter with the fault it met
   const readRequests = (from, until = Infinity) =>
-    fs
-      .readdirSync(RESOURCE_DIR)
-      // a file last written before `from` holds nothing after it — the run's earlier starts are not read again
-      .filter(f => f.endsWith(".requests") && fs.statSync(path.join(RESOURCE_DIR, f)).mtimeMs >= from)
-      .flatMap(f =>
-        fs
-          .readFileSync(path.join(RESOURCE_DIR, f), "utf8")
-          .split("\n")
-          .filter(Boolean)
-          .map(l => ({ ...JSON.parse(l), pid: f.slice(0, -".requests".length) })),
-      )
-      .filter(r => r.t >= from && r.t < until);
+    recordLines(RESOURCE_DIR, ".requests", from).filter(r => r.t >= from && r.t < until);
   // round 157 (fleet-suite audit F20): the processes that ran before a restart — what the dying one sends while it stops
-  // is no answer of the restarted adapter
-  const pidsOf = suffix =>
-    new Set(
-      fs
-        .readdirSync(RESOURCE_DIR)
-        .filter(f => f.endsWith(suffix))
-        .map(f => f.slice(0, -suffix.length)),
-    );
+  // is no answer of the restarted adapter; `from` the suite's first start — an earlier suite's process is no answer either
+  const pidsOf = (suffix, from) =>
+    new Set(recordFiles(RESOURCE_DIR, suffix, from).map(f => f.slice(0, -suffix.length)));
   const declared = readDeclarations(ADAPTER_DIR);
   const manifest = require(path.join(ADAPTER_DIR, "io-package.json"));
   const takesMessages = Boolean(manifest.common?.messagebox || manifest.common?.supportedMessages);
@@ -515,10 +1245,7 @@ module.exports = function fleetSuites(suite, ctx) {
       await start(harness, FIRST_LANGUAGE, ...NET);
       const line = harness.getLogs().length;
       // round 157 (fleet-suite audit F13): a loud line is the verdict at once — only a quiet run needs the whole window
-      const until = Date.now() + QUIET_WINDOW_MS;
-      while (Date.now() < until && !harness.getLogs().slice(line).some(loud)) {
-        await sleep(1000);
-      }
+      await waitWindow("D7 a quiet run", QUIET_WINDOW_MS, () => harness.getLogs().slice(line).some(loud));
       quiet = harness
         .getLogs()
         .slice(line)
@@ -561,13 +1288,15 @@ module.exports = function fleetSuites(suite, ctx) {
       for (const id of buttons) {
         await harness.states.setStateAsync(id, { val: true, ack: false });
       }
-      const deadline = Date.now() + PRESS_WINDOW_MS;
       let stuck = buttons;
-      while (stuck.length > 0 && Date.now() < deadline) {
-        await sleep(500);
-        const states = await harness.states.getStates(stuck);
-        stuck = stuck.filter((id, i) => !(states[i]?.val === false && states[i]?.ack === true));
-      }
+      const fellBack = async () => {
+        if (stuck.length > 0) {
+          const states = await harness.states.getStates(stuck);
+          stuck = stuck.filter((id, i) => !(states[i]?.val === false && states[i]?.ack === true));
+        }
+        return stuck.length === 0;
+      };
+      await waitWindow("D9 every button falls back", PRESS_WINDOW_MS, fellBack, 500);
       // round 142: only a button that is red so far is pressed again alone — a press that falls back stays judged as
       // before; once more a full window after the last press, so a call a slow queue sent late still marks it sent
       this.timeout(stuck.length * PRESS_TRIES * (PRESS_ALONE_MS + 1000) + PRESS_WINDOW_MS + 10000);
@@ -584,12 +1313,12 @@ module.exports = function fleetSuites(suite, ctx) {
         }
       }
       if (dropped.length > 0) {
-        await sleep(PRESS_WINDOW_MS);
+        await waitWindow("D9 a late call of a dropped press", PRESS_WINDOW_MS);
         const after = await harness.states.getStates(dropped);
         const late = dropped.filter(
           (id, i) =>
             !(after[i]?.val === true && after[i]?.ack === false && after[i]?.from !== `system.adapter.${ADAPTER}.0`) ||
-            readCalls().some(c => c.cause === id && c.t >= since),
+            readCalls(since).some(c => c.cause === id && c.t >= since),
         );
         stuck = stuck.filter(id => !dropped.includes(id) || late.includes(id));
         console.log(
@@ -624,7 +1353,7 @@ module.exports = function fleetSuites(suite, ctx) {
       const spacing = spacingOf(test);
       this.timeout(3 * ANSWER_MS + 10000 + 2 * spacing);
       const there = await ask(harness, test.command, test.message ?? {});
-      await sleep(spacing);
+      await waitWindow("D3 spacing", spacing);
       let cut;
       let again;
       fs.writeFileSync(OUTAGE_FLAG, "");
@@ -632,7 +1361,7 @@ module.exports = function fleetSuites(suite, ctx) {
         cut = await ask(harness, test.command, test.message ?? {});
         // round 157 (fleet-suite audit F4): the same cut twice — D14 compares this text with the second language, and a
         // text with changing parts (a time, a counter) would differ there without a word translated
-        await sleep(spacing);
+        await waitWindow("D3 spacing", spacing);
         again = await ask(harness, test.command, test.message ?? {});
       } finally {
         fs.rmSync(OUTAGE_FLAG, { force: true });
@@ -705,7 +1434,7 @@ module.exports = function fleetSuites(suite, ctx) {
       // round 157 (fleet-suite audit F4): the test answers `result` first — a cut answer of a test not ready yet differs
       // from the first language for another reason than the language
       there = await ask(harness, test.command, test.message ?? {});
-      await sleep(spacingOf(test));
+      await waitWindow("D14 spacing", spacingOf(test));
       fs.writeFileSync(OUTAGE_FLAG, "");
       try {
         cut = await ask(harness, test.command, test.message ?? {});
@@ -765,22 +1494,28 @@ module.exports = function fleetSuites(suite, ctx) {
         const line = harness.getLogs().length;
         await restartAsTheHost(harness, null, `for the group switch ${key}`);
         await waitForAdapterWork(harness);
-        const settle = Date.now() + SWITCH_SETTLE_CAP_MS;
         let seen = stateIds(await dumpObjects(harness));
-        for (let still = 0; still < SWITCH_STILL_POLLS && Date.now() < settle;) {
+        let still = 0;
+        let paused = false;
+        // the stillness counts the pauses only — the first answer, before any pause, compares nothing
+        const settled = async () => {
           if (
             harness
               .getLogs()
               .slice(line)
               .some(l => own(l) && BALANCE_RE.test(l.message))
           ) {
-            break;
+            return true;
           }
-          await sleep(1000);
-          const now = stateIds(await dumpObjects(harness));
-          still = sameIds(now, seen) ? still + 1 : 0;
-          seen = now;
-        }
+          if (paused) {
+            const now = stateIds(await dumpObjects(harness));
+            still = sameIds(now, seen) ? still + 1 : 0;
+            seen = now;
+          }
+          paused = true;
+          return still >= SWITCH_STILL_POLLS;
+        };
+        await waitWindow(`D12 the tree settles after ${key}`, SWITCH_SETTLE_CAP_MS, settled);
         const after = stateIds(await dumpObjects(harness));
         lines[key] = {
           changed: [...after].filter(id => !before.has(id)).length + [...before].filter(id => !after.has(id)).length,
@@ -835,17 +1570,20 @@ module.exports = function fleetSuites(suite, ctx) {
             .map(([id, o]) => [id, JSON.stringify(o.common?.name)]),
         );
       const before = names(await dumpObjects(harness));
+      const renamed = async () => {
+        const after = names(await dumpObjects(harness));
+        return Object.keys(before).filter(id => id in after && after[id] !== before[id]);
+      };
       process.env[RENAME_SWITCH] = "1";
       try {
         await restartAsTheHost(harness, null, "for the rename");
         await feedFixtures(harness);
         await waitForAdapterWork(harness);
-        await sleep(10000);
+        await waitWindow("D22 a renamed device follows", 10000, async () => (await renamed()).length > 0);
       } finally {
         delete process.env[RENAME_SWITCH];
       }
-      const after = names(await dumpObjects(harness));
-      changed = Object.keys(before).filter(id => id in after && after[id] !== before[id]);
+      changed = await renamed();
     });
     after(() => {
       delete process.env[RENAME_SWITCH];
@@ -896,7 +1634,7 @@ module.exports = function fleetSuites(suite, ctx) {
           "the adapter did not start with its login rejected",
         );
         await restarts.done;
-        await sleep(QUIET_WINDOW_MS);
+        await waitWindow("D11 no data after a rejected login", QUIET_WINDOW_MS);
         const objects = await dumpObjects(harness);
         const states = await dumpStates(harness);
         const stamps = await stampsOf(harness, Object.keys(states));
@@ -983,13 +1721,12 @@ module.exports = function fleetSuites(suite, ctx) {
         const cleanFrom = writes.length;
         await restartAsTheHost(harness, null, "with right answers", ...NET);
         const restarted = Date.now();
-        await sleep(SETTLE_MS);
-        while (
-          Date.now() - restarted < START_MS &&
-          restartEmpties(cleanStates, writes.slice(cleanFrom)).waiting.length > 0
-        ) {
-          await sleep(1000);
-        }
+        await waitWindow("D6 a restart with right answers settles", SETTLE_MS);
+        await waitWindow(
+          "D6 the restart's emptied values come back",
+          restarted + START_MS - Date.now(),
+          () => restartEmpties(cleanStates, writes.slice(cleanFrom)).waiting.length === 0,
+        );
         const restart = restartEmpties(cleanStates, writes.slice(cleanFrom)).lead;
         for (const mode of ["500", "empty", "drift"]) {
           const objects = await dumpObjects(harness);
@@ -997,7 +1734,7 @@ module.exports = function fleetSuites(suite, ctx) {
           fs.writeFileSync(FAULT_FLAG, mode);
           const at = Date.now();
           const from = writes.length;
-          const old = pidsOf(".requests");
+          const old = pidsOf(".requests", since);
           await restartAsTheHost(harness, null, `with ${mode} answers`, ...NET);
           const met = () =>
             new Set(
@@ -1007,26 +1744,24 @@ module.exports = function fleetSuites(suite, ctx) {
             );
           let seen = 0;
           let lastNew = Date.now();
-          while (Date.now() - at < FAULT_CAP_MS) {
-            await sleep(2000);
+          const faultMet = () => {
             const now = met();
             if (now.size > seen) {
               seen = now.size;
               lastNew = Date.now();
             }
             if ([...clean].every(key => now.has(key))) {
-              break;
+              return true;
             }
             // the idle end only once the verdict below is met: a retry slower than the idle window is no fault of the
             // adapter, and cutting the hold before it would judge one
             const judged = [...now].filter(key => clean.has(key)).length >= Math.min(2, clean.size);
-            if (judged && Date.now() - lastNew >= FAULT_IDLE_MS) {
-              break;
-            }
-          }
+            return judged && Date.now() - lastNew >= FAULT_IDLE_MS;
+          };
+          await waitWindow(`D6 every request met with ${mode} answers`, at + FAULT_CAP_MS - Date.now(), faultMet, 2000);
           const reached = [...met()].filter(key => clean.has(key));
           fs.rmSync(FAULT_FLAG, { force: true });
-          await sleep(SETTLE_MS);
+          await waitWindow(`D6 settles after ${mode} answers`, SETTLE_MS);
           const after = await dumpStates(harness);
           const live = await dumpObjects(harness);
           verdicts[mode] = {
@@ -1052,27 +1787,31 @@ module.exports = function fleetSuites(suite, ctx) {
         }
         fs.writeFileSync(FAULT_FLAG, "429");
         const t1 = Date.now();
-        const before429 = pidsOf(".calls");
+        const before429 = pidsOf(".calls", since);
         await restartAsTheHost(harness, null, "with 429 answers", ...NET);
         const refusedNow = () =>
-          readCalls().filter(c => c.kind === "http" && !c.hook && c.t >= t1 && !before429.has(c.pid));
-        while (Date.now() < t1 + BACKOFF_WINDOW_MS && retryTooEarly(refusedNow()).length === 0) {
-          await sleep(1000);
-        }
+          readCalls(t1).filter(c => c.kind === "http" && !c.hook && c.t >= t1 && !before429.has(c.pid));
+        await waitWindow(
+          "D21 a retry after a 429",
+          t1 + BACKOFF_WINDOW_MS - Date.now(),
+          () => retryTooEarly(refusedNow()).length > 0,
+        );
         refusedCalls = refusedNow();
         fs.writeFileSync(FAULT_FLAG, "500all");
         errorSince = Date.now();
-        const before500 = pidsOf(".calls");
+        const before500 = pidsOf(".calls", since);
         await restartAsTheHost(harness, null, "with a 500 to every answer", ...NET);
         const errorsNow = () =>
-          readCalls().filter(c => c.kind === "http" && !c.hook && c.t >= errorSince && !before500.has(c.pid));
-        while (Date.now() < errorSince + ERROR_WINDOWS * ERROR_WINDOW_MS) {
-          const minute = Math.floor((Date.now() - errorSince) / ERROR_WINDOW_MS);
-          if (backoffSettled(errorCountsByHost(errorsNow(), errorSince), minute)) {
-            break;
-          }
-          await sleep(1000);
-        }
+          readCalls(errorSince).filter(c => c.kind === "http" && !c.hook && c.t >= errorSince && !before500.has(c.pid));
+        await waitWindow(
+          "D21 calls under a series of errors",
+          errorSince + ERROR_WINDOWS * ERROR_WINDOW_MS - Date.now(),
+          () =>
+            backoffSettled(
+              errorCountsByHost(errorsNow(), errorSince),
+              Math.floor((Date.now() - errorSince) / ERROR_WINDOW_MS),
+            ),
+        );
         errorCalls = errorsNow();
       } finally {
         fs.rmSync(FAULT_FLAG, { force: true });
@@ -1179,7 +1918,7 @@ module.exports = function fleetSuites(suite, ctx) {
         await restartAsTheHost(harness, null, "for the dropped device");
         await feedFixtures(harness);
         await waitForAdapterWork(harness);
-        await sleep(FAULT_HOLD_MS);
+        await waitWindow("D6 one device gone", FAULT_HOLD_MS);
       } finally {
         delete process.env[DROP_DEVICE_SWITCH];
       }
@@ -1246,18 +1985,16 @@ module.exports = function fleetSuites(suite, ctx) {
         await restarts.done;
         const started = Date.now();
         const cap = since + START_MS + HANG_DEADLINE_MS + HANG_SLACK_MS;
-        while (Date.now() < cap) {
+        const decided = () => {
           const state = hangDecided(
-            readCalls().filter(c => c.t >= since),
+            readCalls(since).filter(c => c.t >= since),
             HANG_SLACK_MS,
             HANG_DEADLINE_MS,
             Date.now(),
           );
-          if (state === "decided" || (state === "none" && Date.now() >= started + HANG_SLACK_MS)) {
-            break;
-          }
-          await sleep(1000);
-        }
+          return state === "decided" || (state === "none" && Date.now() >= started + HANG_SLACK_MS);
+        };
+        await waitWindow("D21 every hung call decided", cap - Date.now(), decided);
       } finally {
         fs.rmSync(HANG_FILE, { force: true });
       }
@@ -1269,7 +2006,7 @@ module.exports = function fleetSuites(suite, ctx) {
         noNet("nothing to hang");
         return;
       }
-      const own = readCalls().filter(c => c.t >= since && c.kind === "hang-start").length;
+      const own = readCalls(since).filter(c => c.t >= since && c.kind === "hang-start").length;
       if (own === 0) {
         console.log("      no call while every counterpart hung — nothing of its own to judge");
       }
@@ -1277,17 +2014,15 @@ module.exports = function fleetSuites(suite, ctx) {
       // process that lived past start + deadline owes the end (lab run 2026-10-16). How long it lived is its pulse
       // (network hook, <pid>.alive): a process blocked on the hung call writes no record after it (red-proof run).
       const late = [];
-      for (const file of fs.readdirSync(RESOURCE_DIR).filter(f => f.endsWith(".calls"))) {
-        const calls = fs
-          .readFileSync(path.join(RESOURCE_DIR, file), "utf8")
-          .split("\n")
-          .filter(Boolean)
-          .map(l => JSON.parse(l));
+      // every process of the run (RUN_WIDE "every")
+      const byProcess = new Map();
+      for (const c of recordLines(RESOURCE_DIR, ".calls")) {
+        byProcess.set(c.pid, [...(byProcess.get(c.pid) ?? []), c]);
+      }
+      for (const [pid, calls] of byProcess) {
         let lastSeen = calls.at(-1)?.t ?? 0;
         try {
-          const beat = Number(
-            fs.readFileSync(path.join(RESOURCE_DIR, `${file.slice(0, -".calls".length)}.alive`), "utf8"),
-          );
+          const beat = Number(fs.readFileSync(path.join(RESOURCE_DIR, `${pid}.alive`), "utf8"));
           lastSeen = Math.max(lastSeen, Number.isFinite(beat) ? beat : 0);
         } catch {
           // a process without the network hook has no pulse — its records are all there is
@@ -1388,6 +2123,10 @@ module.exports = function fleetSuites(suite, ctx) {
   });
 };
 module.exports.workshopMutexProblem = workshopMutexProblem;
+module.exports.withProtocol = withProtocol;
+module.exports.timed = timed;
+module.exports.workWaitOf = workWaitOf;
+module.exports.waitWindow = waitWindow;
 module.exports.spacingOf = spacingOf;
 module.exports.newlyDown = newlyDown;
 module.exports.upBefore = upBefore;
@@ -1402,3 +2141,17 @@ module.exports.emptiedDuring = emptiedDuring;
 module.exports.restartEmpties = restartEmpties;
 module.exports.retryTooEarly = retryTooEarly;
 module.exports.sameIds = sameIds;
+module.exports.recordFiles = recordFiles;
+module.exports.recordLines = recordLines;
+module.exports.stateText = stateText;
+module.exports.leftBehind = leftBehind;
+module.exports.tally = tally;
+// Round 165: the suites that judge the records of the whole run — pre-release.py's run of single suites reads it through
+// scripts/inventory-suites.mjs. "every" judges each record of every process (it runs along with every partial run, and a
+// move of its own code runs D06 whole); a list names the suites whose records it needs (it runs with them, and they with
+// it). Every other suite that reads an earlier suite's records needs every suite before it.
+module.exports.RUN_WIDE = {
+  "every call to a hung counterpart ends": "every",
+  "every writable datapoint reaches the adapter": ["a command nobody answers stays unconfirmed"],
+  "the whole run": "every",
+};
