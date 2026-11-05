@@ -118,6 +118,7 @@ More cases: [documentation](./docs/en/README.md#troubleshooting).
 -->
 
 ### **WORK IN PROGRESS**
+- (copilot) Adapter requires node.js >= 22.19.0 now
 
 - (krobipd) New: every emulated Roku shows in the object tree whether it is a player or a TV.
 - (krobipd) Improved: the documentation describes what happens when the chosen network address is missing on the host.
