@@ -15,7 +15,7 @@ controlling a device, a device controls ioBroker.
 
 ## Requirements
 
-- Node.js 22 or newer
+- Node.js 22.19.0 or newer
 - js-controller 7.2.5 or newer
 - admin 8.3.5 or newer
 - A remote or hub on the **same local network** as your ioBroker host

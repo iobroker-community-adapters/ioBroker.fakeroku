@@ -38,7 +38,7 @@ For details and how to disable it, see the [Sentry plugin documentation](https:/
 
 ## Requirements
 
-- Node.js >= 22
+- Node.js >= 22.19.0
 - js-controller >= 7.2.5
 - admin >= 8.3.5
 
@@ -118,7 +118,6 @@ More cases: [documentation](./docs/en/README.md#troubleshooting).
 -->
 
 ### **WORK IN PROGRESS**
-- (copilot) Adapter requires node.js >= 22.19.0 now
 
 - (krobipd) New: every emulated Roku shows in the object tree whether it is a player or a TV.
 - (krobipd) Improved: the documentation describes what happens when the chosen network address is missing on the host.
@@ -126,6 +125,7 @@ More cases: [documentation](./docs/en/README.md#troubleshooting).
 - (krobipd) Improved: the update notice links to the description of the object tree.
 - (krobipd) Changed: the interface setting is labelled "Network interface".
 - (krobipd) Changed: js-controller 7.2.5 and admin 8.3.5 or newer are required.
+- (copilot) Changed: Node.js 22.19.0 or newer is required.
 
 ### 1.10.0 (2026-10-03)
 
