@@ -116,6 +116,7 @@ More cases: [documentation](./docs/en/README.md#troubleshooting).
 	Placeholder for the next version (at the beginning of the line):
 	### **WORK IN PROGRESS**
 -->
+
 ### 1.11.0 (2026-11-05)
 
 - (krobipd) New: every emulated Roku shows in the object tree whether it is a player or a TV.

@@ -1,4 +1,5 @@
 # Older changes
+
 ## 1.8.0 (2026-09-25)
 
 - (krobipd) Fixed: Home Assistant and openHAB can set up the emulated Roku again — it now answers the active-app, media-player and TV-channel queries they send.
